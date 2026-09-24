@@ -68,7 +68,7 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
+  // #1335 phase 5 — the retired DB-backed render-selector flag is gone; v7.2 is
   // the only rendered policy, so a caller negotiating any other policy is
   // rejected before writing.
   const expectedPolicy = request.headers.get("X-Chapa-Scoring-Policy");

@@ -18,7 +18,6 @@ import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
   buildOgImageCacheVersion,
-  constantScoringSelection,
   readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
@@ -47,8 +46,6 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { isWebmcpEnabled } from "@/lib/feature-flags";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { getTrendData } from "@/lib/history/get-trend-data";
-import { redactSnapshotDiffForVisitor } from "@/lib/history/diff";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
 import { DynamicRouteShell } from "@/components/DynamicRouteShell";
@@ -215,16 +212,13 @@ export async function SharePageContent({
   // only hides the UI — the data would already be in a visitor's
   // view-source via the RSC payload.
   //
-  // #1034 — trend/diff history is fetched alongside profile materialization
-  // (rather than in a client `useEffect` post-hydration) so the dashboard
-  // renders with this data on first paint instead of a client fetch waterfall.
-  // getTrendData() already degrades gracefully (returns nulls) on any
-  // history-store failure; the `.catch()` here is a belt-and-suspenders
-  // guard so a future regression in that contract still can't fail the
-  // whole share page render — a 500 here would be a bug (CLAUDE.md).
+  // #1335 phase 5 — trend/diff history display was retired along with
+  // `metrics_snapshots` (CLAUDE.md's non-goals: "No long-term history
+  // charts"); `SharePageOwnerContent`/`SharePageWebMcpTools` no longer take
+  // trend/diff props, so this page no longer fetches `getTrendData` at all.
   //
-  // Session and flag resolution have no data dependency on the profile or
-  // trend fetches, so all four run concurrently.
+  // Session and flag resolution have no data dependency on the profile
+  // fetch, so all three run concurrently.
   //
   // #1180 (PE-L1) — the shared SVG cache read (#720 below) depends on
   // nothing in this wave: only `handle` and today's date, both known here
@@ -235,11 +229,10 @@ export async function SharePageContent({
   // below — computing the date once and reusing it (rather than recomputing
   // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
   // race where a request could read one day's key and write another.
-  // #1335 phase 5 — replaces the retired `readScoringRenderSelection()` flag
-  // read: there is one policy now (`SCORING_POLICY`), captured once per
-  // render so every cache-header/key computation below agrees.
+  // #1335 phase 5 — there is one policy now (`SCORING_POLICY`); `capturedAt`
+  // is captured once per render so every cache-header/key computation below
+  // agrees.
   const capturedAt = Date.now();
-  const scoringSelection = constantScoringSelection(capturedAt);
 
   // #1335 phase 4/5 — a handle with no ready receipt renders its scoring
   // state instead of the normal materialize/breakdown pipeline: there is
@@ -256,7 +249,7 @@ export async function SharePageContent({
   // `materializePublicProfile` below already does) finds a drawable current
   // receipt. See badge.svg's own comment for the full rationale.
   let scoringStatus: ScoringStatus | null = null;
-  if (!(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
+  if (!(await hasDrawableCurrentReceipt(handle))) {
     try {
       scoringStatus = await readScoringStatus(handle);
     } catch (err) {
@@ -291,12 +284,11 @@ export async function SharePageContent({
   // served an English badge).
   const badgeLocale = resolveBadgeLocale(locale);
   const svgCacheKey = badgeLocale.cacheKey(handle, today);
-  const [session, materialization, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
+  const [session, materialization, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
-    materializePublicProfile(handle, { readOnly, scoringSelection }),
-    getTrendData(handle).catch(() => ({ trend: null, diff: null })),
+    materializePublicProfile(handle, { readOnly }),
     isWebmcpEnabled(),
-    scoringSelection.cacheable ? readBadgeSvgCache(svgCacheKey) : Promise.resolve(null),
+    readBadgeSvgCache(svgCacheKey),
   ]);
   // LE-8-2 — GitHub answered that nobody owns this handle. Not the empty
   // "try later" state, which is reserved for `null` (an outage or a rate
@@ -317,7 +309,7 @@ export async function SharePageContent({
   // below — reuses the exact same status-placeholder component as
   // `collecting`/`action_needed`/`unregistered` rather than inventing a
   // second one.
-  if (materialized && needsUnavailablePlaceholder(scoringSelection, scoringStatus, materialized.scoring?.policyVersion)) {
+  if (materialized && needsUnavailablePlaceholder(scoringStatus, materialized.scoring?.policyVersion)) {
     return (
       <SharePageScoringStatus
         handle={handle}
@@ -353,11 +345,10 @@ export async function SharePageContent({
   // gated on `materialized` alone, unchanged, and `materialized` stays null here.
   const stored: StoredBadgeProfile | null = materialized
     ? null
-    : await readStoredBadgeProfile(handle, scoringSelection);
+    : await readStoredBadgeProfile(handle);
   const storedInputs = stored ? storedBadgeRenderInputs(stored) : null;
 
   const stats = materialized?.stats ?? storedInputs?.stats ?? null;
-  const craftResult = materialized?.craftResult ?? null;
   // The one scoring authority both a live and a stored render draw from —
   // v7.2 receipt authority when present, never mixed with a v6 aggregate
   // (`stored.scoring`/`materialized.scoring` are each already one or the
@@ -535,7 +526,7 @@ export async function SharePageContent({
   const receiptExplanation = identity && materialized?.scoring?.policyVersion === "v7.2"
     ? await readObservedScoreReceipt(handle, identity.revisionId).then(stored =>
         stored.status === "found" && stored.envelope.receipt.revisionId === identity.revisionId && stored.envelope.contentHash.value === identity.contentHash
-          ? explainObservedReceipt({ receipt: stored.envelope, trend: stored.trend }, scoringSelection.capturedAt) : null)
+          ? explainObservedReceipt({ receipt: stored.envelope, trend: stored.trend }, capturedAt) : null)
     : identity && materialized?.scoring?.policyVersion === "v7"
       ? await readScoreReceiptV7(handle, identity.revisionId).then(snapshot =>
           snapshot && snapshot.receipt.receipt.revisionId === identity.revisionId && snapshot.receipt.contentHash.value === identity.contentHash ? explainReceipt(snapshot) : null)
@@ -566,11 +557,6 @@ export async function SharePageContent({
 
   const badgeLabelId = `share-badge-label-${handle}`;
 
-  const diffForClient =
-    trendData.diff && !isOwner
-      ? redactSnapshotDiffForVisitor(trendData.diff)
-      : trendData.diff;
-
   return (
     <>
       <SharePageShortcuts
@@ -584,8 +570,6 @@ export async function SharePageContent({
           scoring={materialized.scoring}
           stats={stats}
           verification={verification}
-          trend={trendData.trend}
-          diff={diffForClient}
           embedMarkdown={embedMarkdown}
           embedHtml={embedHtml}
         />
@@ -659,34 +643,28 @@ export async function SharePageContent({
         </div>
 
         {/* ── Owner/Visitor Content (isOwner resolved server-side above) ──
-             #1335 phase 5 — "delete v6": there is no `ClientImpactV6Result`
-             projection left to pass. `SharePageOwnerContent`'s Impact
-             Dashboard section still gates on this prop and reads a
-             v6-shaped object internally even for a v7.2 subject
-             (`ImpactDashboard.tsx`'s `impact: ClientImpactV6Result` — not
-             just the nullable pass-through this component declares); it has
-             not been updated to draw solely from `scoring`. That is plan
-             step 5.8 ("Dashboard components ... SharePageOwnerContent:282:
-             v7.2 branch only"), owned outside this workstream's file list.
-             Passing `null` here is the honest state of the data (there is
-             none), but it means every owner's Impact Dashboard section
-             renders `EmptyImpactState` until 5.8 lands — a known, reported
-             regression, not a silent one. */}
-        <SharePageOwnerContentLazy
-          handle={handle}
-          stats={stats}
-          impact={null}
-          craftResult={craftResult}
-          trend={trendData.trend}
-          diff={diffForClient}
-          isOwner={isOwner}
-          embedMarkdown={embedMarkdown}
-          embedHtml={embedHtml}
-          receiptExplanation={receiptExplanation}
-          scoring={scoringModel}
-          staleFallback={stored ? { observedAt: stored.observedAt } : null}
-          reconnectNeeded={reconnectNeeded}
-        />
+             #1335 phase 5 — "delete v6": `SharePageOwnerContent`'s Impact
+             Dashboard section now draws solely from `scoring`/
+             `receiptExplanation`; there is no `impact`/`craftResult`/
+             `trend`/`diff` prop left to pass. `scoring` is a required
+             `ScoreViewModel`: `scoringModel` is genuinely null only for a
+             receipt-authority desync neither earlier placeholder branch
+             caught (a status with `hasPriorReceipt: true` whose prior
+             receipt is not itself drawable) — render nothing below the
+             toolbar rather than pass a non-existent model. */}
+        {scoringModel && (
+          <SharePageOwnerContentLazy
+            handle={handle}
+            stats={stats}
+            isOwner={isOwner}
+            embedMarkdown={embedMarkdown}
+            embedHtml={embedHtml}
+            receiptExplanation={receiptExplanation}
+            scoring={scoringModel}
+            staleFallback={stored ? { observedAt: stored.observedAt } : null}
+            reconnectNeeded={reconnectNeeded}
+          />
+        )}
       </div>
 
       {/* pb-16 spacer (#1167 / UX-B1) — CommandBarHint (rendered by the

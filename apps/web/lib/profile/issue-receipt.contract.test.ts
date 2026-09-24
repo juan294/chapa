@@ -10,7 +10,6 @@ import { resolveBadgeVerification } from "./badge-verification";
 import { receiptViewModel } from "./score-view-model";
 import * as env from "@/lib/env";
 
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: async () => ({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() }) }));
 vi.mock("@/lib/cache/snapshot-cache", () => ({ getCachedReceiptSnapshotV7: async () => null }));
 // The test starts at a real partial write: receipt committed, verification absent.
 // Collection is excluded so retries exercise durable identity and issuance only.

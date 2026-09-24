@@ -40,7 +40,9 @@ describe("locale-segmented content pages remain statically generated (#1167 / UX
     }
     expect(fs.existsSync(path.resolve(__dirname, "page.tsx"))).toBe(false);
     expect(source).not.toMatch(/export const revalidate\s*=/);
-    expect(source).toContain("getLeaderboard(3, selection)");
+    // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
+    // the only rendered policy, so this no longer threads a `selection`.
+    expect(source).toContain("getLeaderboard(3)");
   });
 
   it("the scoring methodology stays force-dynamic and renders the one current policy", () => {

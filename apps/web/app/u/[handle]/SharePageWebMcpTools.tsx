@@ -5,8 +5,6 @@ import {
   type StatsData,
 } from "@chapa/shared";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
-import type { ClientSnapshotDiff } from "@/lib/history/diff";
-import type { TrendSummary } from "@/lib/history/trend";
 import { publicScoreProjection, comparePublicScores, readPublicComparison } from "@/lib/profile/public-score-projection";
 import { type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { isValidHandle } from "@/lib/validation";
@@ -15,6 +13,7 @@ import {
   publicStats,
 } from "@/lib/webmcp/catalog";
 import {
+  createExplainDimensionTool,
   isWebMcpRecord,
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
@@ -40,8 +39,6 @@ interface SharePageWebMcpToolsProps {
   scoring: ScoreViewModel;
   stats: StatsData;
   verification: PublicVerification | null;
-  trend: TrendSummary | null;
-  diff: ClientSnapshotDiff | null;
   embedMarkdown: string;
   embedHtml: string;
 }
@@ -63,8 +60,6 @@ export function SharePageWebMcpTools({
   scoring,
   stats,
   verification,
-  trend,
-  diff,
   embedMarkdown,
   embedHtml,
 }: SharePageWebMcpToolsProps) {
@@ -87,8 +82,6 @@ export function SharePageWebMcpTools({
         displayTier: projection.tier,
         stats: publicStats(stats),
         verification,
-        trend,
-        diff,
         freshness: {
           source: "current page render",
           statsFetchedAt: stats.fetchedAt,
@@ -160,6 +153,11 @@ export function SharePageWebMcpTools({
       },
     };
 
+    const explainDimension = createExplainDimensionTool({
+      scoring,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
+    });
+
     const compareProfiles: WebMcpTool = {
       name: "compare_profiles",
       description:
@@ -224,17 +222,16 @@ export function SharePageWebMcpTools({
       getImpactProfile,
       getImpactHistory,
       verifyBadge,
+      explainDimension,
       compareProfiles,
       getEmbedSnippet,
     ];
   }, [
-    diff,
     embedHtml,
     embedMarkdown,
     handle,
     scoring,
     stats,
-    trend,
     verification,
     webmcpEnabled,
   ]);

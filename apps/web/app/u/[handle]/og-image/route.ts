@@ -15,7 +15,6 @@ import {
   isScoringImageReceiptCurrent,
   buildOgImageCacheVersion,
   scoringResponseMaxAge,
-  constantScoringSelection,
 } from "@/lib/render/badge-svg-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
@@ -91,11 +90,10 @@ export async function GET(
     return new NextResponse("Invalid handle", { status: 400, headers: ERROR_CACHE_HEADERS });
   }
 
-  // #1335 phase 5 — replaces the retired `readScoringRenderSelection()` flag
-  // read: there is one policy now (`SCORING_POLICY`), captured once per
-  // request so every cache-header/key computation below agrees.
+  // #1335 phase 5 — there is one policy now (`SCORING_POLICY`); `capturedAt`
+  // is captured once per request so every cache-header/key computation
+  // below agrees.
   const capturedAt = Date.now();
-  const scoringSelection = constantScoringSelection(capturedAt);
   const today = toDateString(new Date(capturedAt));
   // #1190 — the OG image is credential-less and publicly cacheable, exactly
   // like badge.svg, so locale comes from `?lang=` rather than the cookie
@@ -116,7 +114,7 @@ export async function GET(
   // warm cache hit just below must not pay for it. See badge.svg's own
   // comment for the full rationale.
   let scoringStatus: ScoringStatus | null = null;
-  if (!(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
+  if (!(await hasDrawableCurrentReceipt(handle))) {
     try {
       scoringStatus = await readScoringStatus(handle);
     } catch (err) {
@@ -186,7 +184,7 @@ export async function GET(
   }
 
   try {
-    const materialized = await materializePublicProfile(handle, { scoringSelection });
+    const materialized = await materializePublicProfile(handle, {});
     // LE-8-2 — GitHub says nobody owns the handle; distinct body, same status.
     if (isGitHubUserNotFound(materialized)) {
       return new NextResponse("No GitHub user with this handle", { status: 404, headers: ERROR_CACHE_HEADERS });
@@ -204,7 +202,7 @@ export async function GET(
     // handle WITH a drawable receipt (found independently right here) still
     // rasterizes it normally below — reuses the exact same status-
     // placeholder path as `collecting`/`action_needed`/`unregistered`.
-    if (needsUnavailablePlaceholder(scoringSelection, scoringStatus, materialized.scoring?.policyVersion)) {
+    if (needsUnavailablePlaceholder(scoringStatus, materialized.scoring?.policyVersion)) {
       try {
         const t = getServerT(locale);
         const statusSvg = renderBadgeStatusSvg("unavailable", {

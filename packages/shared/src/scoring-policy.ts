@@ -1,6 +1,6 @@
 /**
  * The only scoring policy Chapa renders (#1335). Replaces the retired
- * `scoring_v7_rendering` selector; image and cache key segments keep this
+ * DB-backed render-selector flag; image and cache key segments keep this
  * literal so their key format is unchanged.
  *
  * Deliberately NOT in constants.ts: that file is one of the byte-digested

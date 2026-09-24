@@ -16,8 +16,6 @@ import { LANDING_SECTIONS } from "@/components/landing/landing-commands";
 // this test exercises the actual English dictionary rather than mocking
 // translation. Only heavy/interactive dependencies are mocked below.
 
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788861600000 })) }));
-
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: vi.fn(() => "<svg data-testid='demo-badge'></svg>"),
 }));

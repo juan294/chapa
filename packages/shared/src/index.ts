@@ -12,8 +12,6 @@ export type {
   PublicImpactV6Result,
   ClientImpactV6Result,
   SupplementalStats,
-  SnapshotPenalty,
-  MetricsSnapshot,
   BadgeBackground,
   BadgeCardStyle,
   BadgeBorder,

@@ -1,5 +1,3 @@
-import { SCORING_POLICY } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { readPublicObservedScore } from "@/lib/profile/post-write-score";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
 import { readObservedScoringHistory } from "@/lib/history/observed-history";
@@ -58,19 +56,6 @@ const MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS = {
 
 const HEADLINE_NOTE = "Current scores and dimensions come from the current v7.2 receipt.";
 
-/**
- * #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
- * the only rendered policy. `readPublicObservedScore` still takes the
- * `ScoringRenderSelection` shape, so this constant stands in for the old
- * dynamic DB-backed read.
- */
-const CONSTANT_SELECTION: ScoringRenderSelection = {
-  enabled: true,
-  machinePolicy: SCORING_POLICY,
-  cacheable: true,
-  capturedAt: Date.now(),
-};
-
 function readString(inputs: unknown, key: string): string {
   if (!isWebMcpRecord(inputs) || typeof inputs[key] !== "string") return "";
   return inputs[key].trim();
@@ -114,7 +99,7 @@ type LoadedProfile =
  * is no drawable current receipt yet (#1335 phase 5 — reads the receipt
  * directly rather than a live materialize; there is no legacy fallback). */
 async function loadPublicProfile(handle: string): Promise<LoadedProfile> {
-  const current = await readPublicObservedScore(handle, CONSTANT_SELECTION);
+  const current = await readPublicObservedScore(handle);
   if (current.status === "unavailable") return { status: "unavailable" };
   if (current.status === "current") return { status: "current", projection: current.projection };
   const scoringStatus = await readScoringStatus(handle);

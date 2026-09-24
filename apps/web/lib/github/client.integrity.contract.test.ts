@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStats, _resetInflight } from "./client";
 import { materializeProfile } from "@/lib/profile/materialize-profile";
-import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { getServiceClient } from "@/test/contract/invoke";
 import { redisFake } from "@/test/contract/redis-fake";
@@ -80,12 +79,11 @@ describe("source integrity through actual legacy collection and local persistenc
     expect(materialized.statsComplete).toBe(true);
     expect(materialized.stats.prsMergedCount).toBe(prsMergedCount);
   });
-  it("never turns a malformed unbound hot-cache row into a snapshot on a read-only call", async () => {
+  it("never fetches live on a read-only call against a malformed unbound hot-cache row (#1335 phase 5 — there is no snapshot left to poison)", async () => {
     const handle = handles[5]!;
     await redisFake.cacheSet(`stats:v2:merged:${handle}`, makeFullStats({ handle, fetchedAt: "invalid" }), 21600);
     const http = stubLegacyGitHub(handle);
     expect(await materializeProfile(handle, { readOnly: true })).toBeNull();
     expect(http.mock.calls.filter(([input]) => isGitHubApiRequest(input))).toHaveLength(0);
-    expect(await dbGetLatestSnapshot(handle)).toBeNull();
   });
 });

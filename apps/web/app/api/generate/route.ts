@@ -1,6 +1,4 @@
 import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
-import { SCORING_POLICY } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit } from "@/lib/cache/redis";
@@ -113,17 +111,6 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // than `refresh`, which would reset an already-complete day's collection
   // back to queued and discard evidence this route did nothing to change.
   //
-  // #1335 phase 5 — the retired `readScoringRenderSelection()` flag read is
-  // gone: there is one policy now (`SCORING_POLICY`). This literal is never
-  // a call to that flag reader; it exists only to satisfy
-  // `enqueueAndReportScoringStatus`'s existing parameter type.
-  const scoringSelection: ScoringRenderSelection = {
-    enabled: true,
-    machinePolicy: SCORING_POLICY,
-    cacheable: true,
-    capturedAt: Date.now(),
-  };
-
   // LE-5-1 — the stats cache row is bound to the credential that fetched it
   // (source-context hashes the token into accessContextId), and the share
   // page materializes tokenless, as the server GITHUB_TOKEN. Warming only the
@@ -142,7 +129,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
     });
   }
 
-  const scoringStatus = await enqueueAndReportScoringStatus(handle, "signup", scoringSelection);
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "signup");
 
   return NextResponse.json({ success: true, handle, ...(scoringStatus ? { scoringStatus } : {}) });
 });

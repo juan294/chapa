@@ -8,7 +8,7 @@
  * Fire-and-forget: called with `void` from the badge route — never blocks
  * SVG rendering, never throws.
  *
- * #1335 phase 5 — receipt-only body. The v6 `ImpactV6Result`-based HTML
+ * #1335 phase 5 — receipt-only body. The legacy aggregate-based HTML
  * template is retired; every notification is built from the current v7.2
  * receipt's observation, never a legacy aggregate.
  */

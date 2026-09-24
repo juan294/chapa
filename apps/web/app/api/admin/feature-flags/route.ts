@@ -1,5 +1,3 @@
-import { invalidateScoringRenderSelection } from "@/lib/scoring-render-selection";
-import { purgeEdgeCacheTag, SCORING_IMAGES_EDGE_TAG } from "@/lib/cache/edge-cache";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
@@ -73,10 +71,5 @@ export const PATCH = withErrorCapture("/api/admin/feature-flags", async (request
   // "seconds" profile: revalidate=1s, expire=60s — appropriate for admin writes.
   revalidateTag("feature-flags", "seconds");
 
-  if (body.key === "scoring_v7_rendering") {
-    invalidateScoringRenderSelection();
-    const edgePurge = await purgeEdgeCacheTag(SCORING_IMAGES_EDGE_TAG);
-    return NextResponse.json({ success: true, persisted: true, edgePurge, imagesRefreshed: edgePurge !== "failed" });
-  }
   return NextResponse.json({ success: true });
 });

@@ -1,11 +1,3 @@
-const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
-vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
-  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
-}));
-beforeEach(() => {
-  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
-});
 const { mockSweepReceipts } = vi.hoisted(() => ({ mockSweepReceipts: vi.fn(async () => ({ attempted: 0, deleted: 0, failed: 0, cursorSaved: true })) }));
 vi.mock("@/lib/verification/cleanup", () => ({ sweepRevokedReceiptCachesV7: mockSweepReceipts, sweepRetiredSupplementalCachesV7: mockSweepReceipts }));
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
@@ -13,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { GET } from "./route";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 
 const { mockPurgeCraft } = vi.hoisted(() => ({ mockPurgeCraft: vi.fn(async () => 0) }));
 vi.mock("@/lib/db/craft-v7", () => ({ dbPurgeExpiredCraftRawV7: mockPurgeCraft }));
@@ -34,8 +27,7 @@ const {
   mockCaptureServerEvent,
   mockCaptureOperationalAlert,
   mockRenderBadgeSvg,
-  mockGetPublicProfileVerification,
-  mockDeferProfileCacheWork,
+  mockResolveBadgeVerification,
   mockBuildBadgeSvgCacheKey,
   mockWriteBadgeSvgCache,
   mockReadBadgeSvgCache,
@@ -53,8 +45,7 @@ const {
   mockCaptureServerEvent: vi.fn(),
   mockCaptureOperationalAlert: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
-  mockDeferProfileCacheWork: vi.fn(),
+  mockResolveBadgeVerification: vi.fn(),
   mockBuildBadgeSvgCacheKey: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockReadBadgeSvgCache: vi.fn(),
@@ -102,11 +93,9 @@ vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
 }));
 
-vi.mock("@/lib/profile/public-profile", () => ({
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
-  deferProfileCacheWork: (...args: unknown[]) =>
-    mockDeferProfileCacheWork(...args),
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) =>
+    mockResolveBadgeVerification(...args),
 }));
 
 vi.mock("@/lib/render/badge-svg-cache", () => ({
@@ -129,29 +118,9 @@ const FAKE_MATERIALIZED = {
     avatarUrl: "https://avatars.example.com/alice.png",
   },
   craftResult: null,
-  rawImpact: {
-    adjustedComposite: 70,
-    compositeScore: 70,
-    dimensions: { delivery: 50, quality: 50, consistency: 50, breadth: 50 },
-    archetype: "Balanced",
-    tier: "High",
-    profileType: "collaborative",
-    confidence: 80,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  displayImpact: {
-    adjustedComposite: 66,
-    compositeScore: 70,
-    dimensions: { delivery: 50, quality: 50, consistency: 50, breadth: 50 },
-    archetype: "Balanced",
-    tier: "Solid",
-    profileType: "collaborative",
-    confidence: 80,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  snapshot: { date: "2026-04-17", adjustedComposite: 66, tier: "Solid" },
+  // #1335 phase 5 — v7.2 is the one scoring policy this cron renders; there
+  // is no separate raw/display aggregate or snapshot left to carry.
+  scoring: makeScoring({ archetype: "Balanced", tier: "Solid" }),
   statsComplete: true,
 };
 
@@ -187,7 +156,7 @@ describe("GET /api/cron/warm-cache", () => {
     mockCaptureServerEvent.mockResolvedValue(undefined);
     mockCaptureOperationalAlert.mockResolvedValue(undefined);
     mockRenderBadgeSvg.mockReturnValue("<svg>rendered</svg>");
-    mockGetPublicProfileVerification.mockReturnValue({
+    mockResolveBadgeVerification.mockResolvedValue({
       hash: "verified-hash",
       date: "2026-04-17",
     });
@@ -195,7 +164,6 @@ describe("GET /api/cron/warm-cache", () => {
       (handle: string, date: string) => `badge:v1:${handle}:warm-amber-v3:${date}`,
     );
     mockWriteBadgeSvgCache.mockResolvedValue(true);
-    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     // Default: no pre-existing badge SVG cache entry for today's key, so the
     // existing render/write assertions below keep passing unchanged.
     mockReadBadgeSvgCache.mockResolvedValue(null);
@@ -250,7 +218,7 @@ it("reports raw-retention failures without claiming deletion success", async () 
     expect(body.processedCount).toBe(2);
     expect(body.processedSample).toEqual(["alice", "bob"]);
     expect(body.handles).toBeUndefined();
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", { scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) });
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {});
     expect(mockGetAvatarBase64).toHaveBeenCalledWith(
       "alice",
       "https://avatars.example.com/alice.png",
@@ -315,16 +283,9 @@ it("reports raw-retention failures without claiming deletion success", async () 
   // `enqueueCollection` call in route.ts. This test covered exactly that
   // removed comparison and is retired with it.
 
-  it("enqueues a daily collection job for every warmed handle while v7.2 rendering is on (#1335 phase 4)", async () => {
-    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+  it("enqueues a daily collection job for every warmed handle (#1335 phase 4/5 — v7.2 is the one rendered policy, so this always enqueues)", async () => {
     await GET(makeRequest());
     expect(mockEnqueueCollection).toHaveBeenCalledWith("alice", "daily");
-  });
-
-  it("never enqueues collection while v7.2 rendering is off", async () => {
-    mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-    await GET(makeRequest());
-    expect(mockEnqueueCollection).not.toHaveBeenCalled();
   });
 
   it("maintains rotation metadata and persists the next offset", async () => {
@@ -575,7 +536,6 @@ it("reports raw-retention failures without claiming deletion success", async () 
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           avatarDataUri: "data:image/png;base64,abc",
           verificationHash: "verified-hash",
@@ -587,18 +547,18 @@ it("reports raw-retention failures without claiming deletion success", async () 
         expect.stringContaining("alice"),
         "<svg>rendered</svg>",
         "alice",
-        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
+        expect.objectContaining({ configRevision: null }),
       );
       expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
         expect.stringContaining("bob"),
         "<svg>rendered</svg>",
         "bob",
-        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
+        expect.objectContaining({ configRevision: null }),
       );
     });
 
     it("withholds the SVG cache write when verification is null (degraded/incomplete stats)", async () => {
-      mockGetPublicProfileVerification.mockReturnValue(null);
+      mockResolveBadgeVerification.mockResolvedValue(null);
 
       const res = await GET(makeRequest());
       const body = await res.json();
@@ -608,42 +568,14 @@ it("reports raw-retention failures without claiming deletion success", async () 
       expect(body.warmed).toBe(2);
       expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
     });
 
-    // LE-6-1 — the SVG the cron publishes at the date rollover is the public
-    // badge for the rest of the day, and nothing else ever stored the record
-    // for the hash it printed: the snapshot writer below never writes
-    // `verification_records`, and the request path only stores what IT
-    // rendered. Once a visitor's stats moved, `/verify/<hash>` was a 404 for
-    // the number on the badge.
-    it("stores the verification record for the hash it rendered into the warmed SVG", async () => {
-      await GET(makeRequest());
-
-      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
-        "alice",
-        FAKE_MATERIALIZED,
-        { verification: { hash: "verified-hash", date: "2026-04-17" }, verificationOnly: true },
-      );
-      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
-        "bob",
-        FAKE_MATERIALIZED,
-        { verification: { hash: "verified-hash", date: "2026-04-17" }, verificationOnly: true },
-      );
-      // The record is stored after the SVG that prints it is published.
-      const writeOrder = mockWriteBadgeSvgCache.mock.invocationCallOrder[0]!;
-      const storeOrder = mockDeferProfileCacheWork.mock.invocationCallOrder[0]!;
-      expect(storeOrder).toBeGreaterThan(writeOrder);
-    });
-
-    it("stores no record when today's SVG was already warm (nothing new was printed)", async () => {
-      mockReadBadgeSvgCache.mockResolvedValue("<svg>already cached</svg>");
-
-      await GET(makeRequest());
-
-      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
-    });
+    // #1335 phase 5 — the record this used to defer (LE-6-1's rationale: the
+    // SVG this cron publishes at the date rollover is the public badge for
+    // the rest of the day, so something must store the record for the hash
+    // it printed) is gone along with `metrics_snapshots`/`verification_records`:
+    // the issued v7.2 receipt is the attestation, minted at issuance rather
+    // than deferred from a render path. There is nothing left to store here.
 
     it("withholds the SVG cache write when the avatar fails to resolve", async () => {
       mockGetAvatarBase64.mockRejectedValue(new Error("avatar fetch timeout"));
@@ -664,14 +596,13 @@ it("reports raw-retention failures without claiming deletion success", async () 
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         expect.anything(),
-        expect.anything(),
         expect.objectContaining({ avatarDataUri: undefined }),
       );
       expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
         expect.any(String),
         "<svg>rendered</svg>",
         expect.any(String),
-        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
+        expect.objectContaining({ configRevision: null }),
       );
     });
 
@@ -723,11 +654,10 @@ it("reports raw-retention failures without claiming deletion success", async () 
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           strings: expect.objectContaining({
             metricsVerified: "Verified metrics",
-            tierLabel: "Solid", // tiers.solid (displayImpact.tier === "Solid")
+            tierLabel: "Solid", // tiers.solid (scoring.tier === "Solid")
             radarLabels: expect.objectContaining({ delivery: "Delivery" }),
           }),
         }),
@@ -741,10 +671,8 @@ it("reports raw-retention failures without claiming deletion success", async () 
         "alice",
         expect.any(String),
         DEFAULT_LOCALE,
-        "v6",
       );
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        expect.anything(),
         expect.anything(),
         expect.objectContaining({
           strings: expect.objectContaining({ metricsVerified: "Verified metrics" }),
@@ -811,7 +739,6 @@ it("reports raw-retention failures without claiming deletion success", async () 
         "alice",
         expect.any(String),
         DEFAULT_LOCALE,
-        "v6",
       );
     });
 

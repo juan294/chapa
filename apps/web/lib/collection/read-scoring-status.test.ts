@@ -23,8 +23,6 @@ vi.mock("@/lib/analytics/server-errors", () => ({ captureServerError: mockCaptur
 
 import { readScoringStatus, hasDrawableCurrentReceipt } from "./read-scoring-status";
 
-const V72 = { enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt: Date.now() };
-const V6 = { enabled: false, machinePolicy: "v6" as const, cacheable: true, capturedAt: Date.now() };
 
 beforeEach(() => {
   mockDbIsScoringSubject.mockReset();
@@ -129,12 +127,12 @@ describe("hasDrawableCurrentReceipt", () => {
       isCurrent: true,
       envelope: { receipt: { action: "publish", window: { referenceDate: "2026-09-22" } } },
     });
-    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(true);
+    expect(await hasDrawableCurrentReceipt("octocat")).toBe(true);
   });
 
   it("is false when no receipt has ever been published", async () => {
     mockDbReadObservedReceipt.mockResolvedValue({ status: "missing" });
-    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(false);
+    expect(await hasDrawableCurrentReceipt("octocat")).toBe(false);
   });
 
   it("is false for a retracted receipt", async () => {
@@ -143,26 +141,17 @@ describe("hasDrawableCurrentReceipt", () => {
       isCurrent: true,
       envelope: { receipt: { action: "retract", window: { referenceDate: "2026-09-20" } } },
     });
-    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(false);
+    expect(await hasDrawableCurrentReceipt("octocat")).toBe(false);
   });
 
   it("is false when the receipt authority read itself fails", async () => {
     mockDbReadObservedReceipt.mockResolvedValue({ status: "unavailable" });
-    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(false);
+    expect(await hasDrawableCurrentReceipt("octocat")).toBe(false);
   });
 
   it("is false when the read throws unexpectedly, never bubbling the error", async () => {
     mockDbReadObservedReceipt.mockRejectedValue(new Error("boom"));
-    await expect(hasDrawableCurrentReceipt("octocat", V72)).resolves.toBe(false);
+    await expect(hasDrawableCurrentReceipt("octocat")).resolves.toBe(false);
   });
 
-  it("is false under an explicit v6 selection, without even reading the receipt", async () => {
-    mockDbReadObservedReceipt.mockResolvedValue({
-      status: "found",
-      isCurrent: true,
-      envelope: { receipt: { action: "publish", window: { referenceDate: "2026-09-22" } } },
-    });
-    expect(await hasDrawableCurrentReceipt("octocat", V6)).toBe(false);
-    expect(mockDbReadObservedReceipt).not.toHaveBeenCalled();
-  });
 });

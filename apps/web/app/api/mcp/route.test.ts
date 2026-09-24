@@ -17,6 +17,7 @@ vi.mock("@/lib/http/client-ip", () => ({
 }));
 vi.mock("@/lib/analytics/server-errors", () => ({
   withErrorCapture: (_route: string, handler: unknown) => handler,
+  captureServerError: vi.fn(),
 }));
 vi.mock("@/lib/analytics/schedule-server-event", () => ({
   scheduleServerEvent: mocks.scheduleServerEvent,

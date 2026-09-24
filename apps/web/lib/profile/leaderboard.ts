@@ -1,6 +1,4 @@
 import "server-only";
-import { SCORING_POLICY } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { observedReceiptViewModel, renderableScore, type ScoreViewModel } from "./score-view-model";
 import { dbGetAllUserHandles } from "@/lib/db/users";
 import { readRenderableReceipt } from "./score-model";
@@ -21,16 +19,11 @@ export interface LeaderboardPlace {
  * registered subject with a drawable current receipt is considered;
  * unavailable and not-yet-scored subjects take no place (#1335 phase 5 —
  * the legacy stored-headline/candidate-materialization branch is retired
- * along with `metrics_snapshots`). */
-export async function getLeaderboard(places = 3, selection?: ScoringRenderSelection): Promise<LeaderboardPlace[]> {
+ * along with `metrics_snapshots`, and the retired DB-backed render-selector
+ * this used to gate on is retired too — v7.2 is the one rendered policy). */
+export async function getLeaderboard(places = 3): Promise<LeaderboardPlace[]> {
   if (places <= 0) return [];
 
-  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
-  // the only rendered policy. `readRenderableReceipt` still takes the
-  // `ScoringRenderSelection` shape, so this constant stands in for the old
-  // dynamic DB-backed read when the caller passes none.
-  const captured = selection ?? { enabled: true, machinePolicy: SCORING_POLICY, cacheable: true, capturedAt: Date.now() };
-  if (!captured.cacheable) return [];
   const registered = await dbGetAllUserHandles();
   if (registered.length === 0) return [];
 
@@ -39,40 +32,30 @@ export async function getLeaderboard(places = 3, selection?: ScoringRenderSelect
   // provider data.
   for (let offset = 0; offset < registered.length; offset += 16) {
     const handles = registered.slice(offset, offset + 16);
-    const rows = await Promise.all(handles.map(handle => drawnForRegistered(handle, captured)));
-    rows.forEach((row, index) => { if (row && row !== "unplaceable") current.set(handles[index]!, row); });
+    const rows = await Promise.all(handles.map(handle => drawnForRegistered(handle)));
+    rows.forEach((row, index) => { if (row) current.set(handles[index]!, row); });
   }
   return groupIntoPlaces(current).slice(0, places).map(row => ({ ...row, policyVersion: "v7.2" as const }));
 }
 
 /**
  * What the badge draws for a registered subject: the receipt's point, or
- * `"unplaceable"` for a range or an unavailable read. `null` means no
- * receipt is drawable yet (collection in progress or never scored) — the
- * subject takes no place.
+ * `null` for a range, an unavailable read, or no receipt drawable yet
+ * (collection in progress or never scored) — the subject takes no place.
  */
-async function drawnForRegistered(
-  handle: string,
-  selection: ScoringRenderSelection,
-): Promise<{ score: number; tier: string } | "unplaceable" | null> {
-  let receipt: Awaited<ReturnType<typeof readRenderableReceipt>> = null;
-  try {
-    receipt = await readRenderableReceipt(handle, selection);
-  } catch {
-    return "unplaceable";
-  }
-  if (receipt && "unavailable" in receipt) return "unplaceable";
-  return receipt ? placeable(observedReceiptViewModel(handle, receipt, selection.capturedAt)) : null;
+async function drawnForRegistered(handle: string): Promise<{ score: number; tier: string } | null> {
+  const receipt = await readRenderableReceipt(handle);
+  return receipt ? placeable(observedReceiptViewModel(handle, receipt)) : null;
 }
 
 /**
- * The one number a place can publish, or `"unplaceable"`. A range has no single
+ * The one number a place can publish, or `null`. A range has no single
  * number to publish and a model with no tier has no tier to print beside it,
  * so the next candidate takes the place.
  */
-function placeable(model: ScoreViewModel): { score: number; tier: string } | "unplaceable" {
+function placeable(model: ScoreViewModel): { score: number; tier: string } | null {
   const drawn = renderableScore(model);
-  if (model.composite.kind !== "point" || drawn.tier === null) return "unplaceable";
+  if (model.composite.kind !== "point" || drawn.tier === null) return null;
   return { score: drawn.composite, tier: drawn.tier };
 }
 

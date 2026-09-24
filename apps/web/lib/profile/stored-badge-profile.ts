@@ -1,6 +1,5 @@
 import "server-only";
 import type { StatsData } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { readPublicObservedScore } from "./post-write-score";
 import { readStats } from "@/lib/github/client";
 import type { ScoreViewModel } from "./score-view-model";
@@ -52,19 +51,15 @@ function withStaleFreshness(model: ScoreViewModel): ScoreViewModel {
 /**
  * Read the durable last-known-good badge projection for `handle`: the
  * committed current v7.2 receipt is the sole scoring authority. Returns
- * `null` only when there is nothing to draw at all — no current receipt — or
- * when `selection` is not a known/cacheable policy; an unknown policy
- * authority is never a fallback opportunity. A receipt with no backing stats
- * envelope still returns a profile — {@link storedBadgeRenderInputs} renders
- * its counts as unavailable rather than refusing the fallback entirely.
+ * `null` only when there is nothing to draw at all — no current receipt. A
+ * receipt with no backing stats envelope still returns a profile —
+ * {@link storedBadgeRenderInputs} renders its counts as unavailable rather
+ * than refusing the fallback entirely.
  */
 export async function readStoredBadgeProfile(
   handle: string,
-  selection: ScoringRenderSelection,
 ): Promise<StoredBadgeProfile | null> {
-  if (!selection.cacheable) return null;
-
-  const observed = await readPublicObservedScore(handle, selection);
+  const observed = await readPublicObservedScore(handle);
   if (observed.status !== "current") return null;
 
   const statsRead = await readStats(handle, undefined, { readOnly: true });

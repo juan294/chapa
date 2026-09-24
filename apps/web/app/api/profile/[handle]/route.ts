@@ -1,5 +1,3 @@
-import { SCORING_POLICY } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { readPublicObservedScore } from "@/lib/profile/post-write-score";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
 import { type NextRequest, NextResponse } from "next/server";
@@ -42,17 +40,7 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
     );
   }
 
-  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
-  // the only rendered policy. `readPublicObservedScore` still takes the
-  // `ScoringRenderSelection` shape, so this constant stands in for the old
-  // dynamic DB-backed read.
-  const selection: ScoringRenderSelection = {
-    enabled: true,
-    machinePolicy: SCORING_POLICY,
-    cacheable: true,
-    capturedAt: Date.now(),
-  };
-  const current = await readPublicObservedScore(handle, selection);
+  const current = await readPublicObservedScore(handle);
   if (current.status === "unavailable") {
     return NextResponse.json({ error: "Current scoring is temporarily unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
   }

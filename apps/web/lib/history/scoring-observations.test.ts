@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
-import { legacyViewModel } from "@/lib/profile/score-view-model";
 import { scoringObservation, compareScoringObservations, buildScoringHistory } from "./scoring-observations";
 
 describe("policy-segmented scoring observations", () => {
@@ -15,7 +14,8 @@ describe("policy-segmented scoring observations", () => {
   it("never calls a policy transition or changed annual window an improvement", async () => {
     const fixture = await scoringConsistencyFixture();
     const current = scoringObservation(fixture.model)!;
-    expect(compareScoringObservations(scoringObservation(legacyViewModel(fixture.impact))!, current)).toMatchObject({ status: "not_comparable", reason: "policy_mismatch" });
+    const otherPolicy = scoringObservation({ ...fixture.model, policyVersion: "v7" })!;
+    expect(compareScoringObservations(otherPolicy, current)).toMatchObject({ status: "not_comparable", reason: "policy_mismatch" });
     expect(compareScoringObservations(current, { ...current, window: { ...current.window!, referenceDate: "2026-09-09" } })).toMatchObject({ status: "not_comparable", reason: "window_mismatch" });
     expect(compareScoringObservations(current, { ...current, window: { ...current.window!, referenceTime: "2026-09-08T15:00:00.000Z" } })).toMatchObject({ status: "comparable", composite: { exact: 0, display: 0 } });
   });
@@ -34,5 +34,5 @@ it("allows a significant same-window current revision and suppresses changed-win
   const previous = scoringObservation(model)!;
   const current = { ...previous, composite: { exact: 60, display: 60 } };
   expect(isSignificantScoringChange(compareScoringObservations(previous, current))).toMatchObject({ significant: true, reason: "score_bump" });
-  expect(isSignificantScoringChange(compareScoringObservations(previous, { ...current, policyVersion: "v6" }))).toEqual({ significant: false });
+  expect(isSignificantScoringChange(compareScoringObservations(previous, { ...current, policyVersion: "v7" }))).toEqual({ significant: false });
 });

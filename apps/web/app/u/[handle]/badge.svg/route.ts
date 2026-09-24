@@ -27,7 +27,6 @@ import {
   writeBadgeSvgCache,
   isScoringImageReceiptCurrent,
   scoringResponseMaxAge,
-  constantScoringSelection,
   type ScoringImageReceiptIdentity,
 } from "@/lib/render/badge-svg-cache";
 import { badgeEdgeCacheTag, SCORING_IMAGES_EDGE_TAG } from "@/lib/cache/edge-cache";
@@ -499,11 +498,10 @@ export async function GET(
   // SVG full-response cache: serve warm-cache badge without any Redis rate-limit
   // overhead (#882 — rate limit moved to cache-MISS branch only).
   const readOnly = request.nextUrl.searchParams.get(READ_ONLY_SMOKE_PARAM) === "1";
-  // #1335 phase 5 — replaces the retired `readScoringRenderSelection()` flag
-  // read: there is one policy now (`SCORING_POLICY`), captured once per
-  // request so every cache-header/key computation below agrees.
+  // #1335 phase 5 — there is one policy now (`SCORING_POLICY`); `capturedAt`
+  // is captured once per request so every cache-header/key computation
+  // below agrees.
   const capturedAt = Date.now();
-  const scoringSelection = constantScoringSelection(capturedAt);
 
   // #1335 phase 4/5 — a handle with no ready receipt renders its scoring
   // STATE (collecting/action_needed/unregistered) instead of an empty
@@ -521,7 +519,7 @@ export async function GET(
   // write checks) already fences a retraction without needing the status
   // read — see CLAUDE.md's "Caching rules".
   let scoringStatus: ScoringStatus | null = null;
-  if (!(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
+  if (!(await hasDrawableCurrentReceipt(handle))) {
     try {
       scoringStatus = await readScoringStatus(handle);
     } catch (err) {
@@ -574,7 +572,7 @@ export async function GET(
   // lib/monitoring/latency-slo.ts) until the new es/en keys re-warm.
   const svgCacheKey = resolveBadgeLocale(locale).cacheKey(handle, today);
   const cacheReadStart = Date.now();
-  const primaryCacheRead = scoringSelection.cacheable ? await readBadgeSvgCacheWithStatus(svgCacheKey) : { svg: null, timedOut: false };
+  const primaryCacheRead = await readBadgeSvgCacheWithStatus(svgCacheKey);
   if (primaryCacheRead.svg) {
     return badgeSvgResponse(primaryCacheRead.svg, badgeCacheHeaders(handle, capturedAt), startedAt, [
       { name: "cache", desc: "hit", durMs: Date.now() - cacheReadStart },
@@ -688,7 +686,7 @@ export async function GET(
         ]);
       }
 
-      const lockedSvg = scoringSelection.cacheable ? await waitForBadgeSvgCache(svgCacheKey) : null;
+      const lockedSvg = await waitForBadgeSvgCache(svgCacheKey);
       if (lockedSvg) {
         const sharedResult = {
           svg: lockedSvg,
@@ -713,7 +711,6 @@ export async function GET(
     const materializePromise = materializePublicProfile(handle, {
       token,
       readOnly,
-      scoringSelection,
     });
     const staleSvgForDeadlineFallback = staleSvgLookup ? await staleSvgLookup : null;
     let materialized: MaterializedProfile | GitHubUserNotFound | null;
@@ -807,7 +804,7 @@ export async function GET(
       // normal daily SVG, never verified, and never runs the normal profile
       // side effects (snapshot persist, verification mint) — those all
       // require a real live `MaterializedProfile`.
-      const stored = await readStoredBadgeProfile(handle, scoringSelection);
+      const stored = await readStoredBadgeProfile(handle);
       if (stored) {
         const { stats, countsAvailable } = storedBadgeRenderInputs(stored);
         const configSnapshot = await resolveBadgeConfigSnapshot(handle);
@@ -884,7 +881,7 @@ export async function GET(
     // independently right here) still renders it normally below — this
     // reuses the exact same status-placeholder path as `collecting`/
     // `action_needed`/`unregistered` rather than inventing a second one.
-    if (needsUnavailablePlaceholder(scoringSelection, scoringStatus, profile.scoring?.policyVersion)) {
+    if (needsUnavailablePlaceholder(scoringStatus, profile.scoring?.policyVersion)) {
       try {
         const t = getServerT(locale);
         const svg = renderBadgeStatusSvg("unavailable", {

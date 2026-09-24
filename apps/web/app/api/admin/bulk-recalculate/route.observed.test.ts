@@ -11,7 +11,6 @@ import { NextRequest } from "next/server";
  */
 const mocks = vi.hoisted(() => ({
   materialize: vi.fn(),
-  persist: vi.fn(),
   invalidate: vi.fn(),
   listJobs: vi.fn(),
   maybeIssue: vi.fn(),
@@ -26,7 +25,6 @@ vi.mock("@/lib/cache/redis", () => ({ rateLimit: vi.fn().mockResolvedValue({ all
 vi.mock("@/lib/http/client-ip", () => ({ getClientIp: () => "127.0.0.1" }));
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: mocks.materialize,
-  persistOrchestratedSnapshot: mocks.persist,
 }));
 vi.mock("@/lib/profile/post-write-invalidation", () => ({ invalidateProfileReadModels: mocks.invalidate }));
 vi.mock("@/lib/db/users", () => ({ dbGetUserHandlePage: mocks.dbGetUserHandlePage }));
@@ -41,7 +39,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { POST } from "./route";
 
-const materialized = { stats: { handle: "x" }, displayImpact: {}, rawImpact: {}, statsComplete: true, craftResult: null };
+const materialized = { stats: { handle: "x" }, statsComplete: true, craftResult: null };
 
 function job(state: string) {
   return { id: "j", ownerHandle: "x", provider: "github", referenceDate: "2026-09-23", referenceTime: "2026-09-23T10:00:00.000Z",
@@ -60,7 +58,6 @@ function makeRequest(handles: string[]): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.materialize.mockResolvedValue(materialized);
-  mocks.persist.mockResolvedValue(true);
   mocks.invalidate.mockResolvedValue(undefined);
   mocks.maybeIssue.mockResolvedValue(undefined);
   mocks.enqueueCollection.mockResolvedValue([]);

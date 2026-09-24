@@ -10,7 +10,6 @@ import {
 } from "react";
 import type {
   BadgeConfig,
-  CraftResult,
   StatsData,
 } from "@chapa/shared";
 import { useUnsavedNavigation } from "@/hooks/useUnsavedNavigation";
@@ -55,7 +54,6 @@ export interface StudioClientProps {
   /** The one v7.2 model the public badge draws; forwarded to the preview
    *  (#1311/#1335). */
   scoring: ScoreViewModel;
-  craftResult?: CraftResult | null;
   handle?: string;
   verification?: PreviewVerification | null;
   /**
@@ -198,7 +196,6 @@ export function StudioClient({
   initialConfig,
   stats,
   scoring,
-  craftResult = null,
   handle = "",
   verification = null,
   avatarDataUri,
@@ -575,9 +572,7 @@ export function StudioClient({
   const studioWebMcpTools = useStudioWebMcpTools({
     config,
     enabled: webmcpEnabled,
-    stats,
     scoring,
-    craftResult,
     handle,
     saveStatus: saveState.status,
     runCommand: handleSubmit,

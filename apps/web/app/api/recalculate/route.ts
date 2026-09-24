@@ -1,5 +1,3 @@
-import { SCORING_POLICY } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
@@ -58,16 +56,7 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     );
   }
 
-  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
-  // the only rendered policy.
-  const scoringSelection: ScoringRenderSelection = {
-    enabled: true,
-    machinePolicy: SCORING_POLICY,
-    cacheable: true,
-    capturedAt: Date.now(),
-  };
   const materialized = await materializeOrchestratedProfile(handle, {
-    scoringSelection,
     token: auth.token,
     ignoreSnapshot: true,
   });
@@ -96,7 +85,7 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
   // for the same reason a snapshot used to be rewritten here. Issuance
   // itself happens only from fan-in, once every connected source is
   // complete.
-  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh", scoringSelection);
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh");
 
   const craftResult = materialized.craftResult;
   if (craftResult) {

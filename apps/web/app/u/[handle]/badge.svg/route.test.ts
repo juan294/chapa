@@ -1,8 +1,3 @@
-const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
-vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
-  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
-}));
 // #1335 phase 4 — defaults to `ready` so every pre-existing test (which never
 // mentions scoring status) keeps rendering through the normal pipeline below,
 // exactly as before this phase. Tests for the new collecting/action_needed/
@@ -20,7 +15,6 @@ vi.mock("@/lib/collection/read-scoring-status", () => ({
   hasDrawableCurrentReceipt: (...args: unknown[]) => mockHasDrawableCurrentReceipt(...args),
 }));
 beforeEach(() => {
-  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
   mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
   mockHasDrawableCurrentReceipt.mockResolvedValue(false);
 });
@@ -40,10 +34,8 @@ vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => m
 
 const {
   mockMaterializePublicProfile,
-  mockGetPublicProfileVerification,
+  mockResolveBadgeVerification,
   mockRunPublicProfileSideEffects,
-  mockPersistProfileSnapshot,
-  mockDeferProfileCacheWork,
   mockRenderBadgeSvg,
   mockGetAvatarBase64,
   mockGetOptionalRequestSession,
@@ -58,10 +50,8 @@ const {
   mockAfter,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
+  mockResolveBadgeVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
-  mockPersistProfileSnapshot: vi.fn(),
-  mockDeferProfileCacheWork: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockGetOptionalRequestSession: vi.fn(),
@@ -78,14 +68,15 @@ const {
 
 vi.mock("@/lib/profile/public-profile", () => ({
   materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
-  persistProfileSnapshot: (...args: unknown[]) =>
-    mockPersistProfileSnapshot(...args),
-  deferProfileCacheWork: (...args: unknown[]) =>
-    mockDeferProfileCacheWork(...args),
+}));
+
+// #1335 phase 5 — the v6 HMAC verification record and its
+// `getPublicProfileVerification` reader are retired; the badge's attestation
+// is resolved per render via `resolveBadgeVerification`.
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) => mockResolveBadgeVerification(...args),
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -103,6 +94,20 @@ const { mockReadStoredBadgeProfile } = vi.hoisted(() => ({
 vi.mock("@/lib/profile/stored-badge-profile", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/profile/stored-badge-profile")>(),
   readStoredBadgeProfile: (...args: unknown[]) => mockReadStoredBadgeProfile(...args),
+}));
+
+// `writeBadgeSvgCache` (real, unmocked) fences every write on
+// `isScoringImageReceiptCurrent`, which reads this real Supabase RPC. No
+// Supabase is configured in this unit test, so without a mock the fence
+// would always resolve to "unavailable" and no cache write could ever
+// succeed. Default to a manifest matching FAKE_MATERIALIZED's identity so
+// the happy-path publish gate isn't short-circuited in tests that don't
+// care about the fence itself.
+const { mockDbObservedReceiptManifest } = vi.hoisted(() => ({
+  mockDbObservedReceiptManifest: vi.fn(),
+}));
+vi.mock("@/lib/db/score-receipts-observed", () => ({
+  dbObservedReceiptManifest: (...args: unknown[]) => mockDbObservedReceiptManifest(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
@@ -180,32 +185,19 @@ const FAKE_MATERIALIZED = {
     prsMergedCount: 10,
     reviewsSubmittedCount: 5,
   },
-  rawImpact: {
-    adjustedComposite: 73,
-    tier: "High",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  displayImpact: {
-    adjustedComposite: 65,
-    tier: "Solid",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  snapshot: { date: "2026-04-17", adjustedComposite: 65, tier: "Solid" },
-  // badge-source-outage-resilience (2026-09-22) — real `MaterializedProfile.
-  // scoring` always carries an explicit `freshness`; this fixture's default
-  // is the normal "current" live read so pre-existing cache-write tests keep
-  // their prior behavior. Tests for the phase-1 stale-aggregate path override
-  // this explicitly.
+  craftResult: null,
+  statsComplete: true,
+  statsFreshness: "current" as const,
+  statsCapturedAt: "2026-04-17T12:00:00.000Z",
+  // #1335 phase 5 — the one scoring authority every render draws from now;
+  // real `MaterializedProfile.scoring` always carries an explicit
+  // `freshness`. This fixture's default is the normal "current" live read
+  // so pre-existing cache-write tests keep their prior behavior. Tests for
+  // the stale/degraded path override this explicitly.
   scoring: {
-    policyVersion: "v6" as const,
+    policyVersion: "v7.2" as const,
     handle: "testuser",
-    identity: null,
+    identity: { receiptId: "r1", revisionId: "rev1", revision: 1, recordedAt: "2026-04-17T00:00:00.000Z", action: "create" as const, supersedesRevisionId: null, contentHash: "hash1" },
     window: null,
     dimensions: {
       delivery: { kind: "point" as const, value: 70, display: 70 },
@@ -217,10 +209,11 @@ const FAKE_MATERIALIZED = {
     tier: "Solid" as const,
     archetype: "Builder" as const,
     craft: null,
+    reportCraft: { status: "no_report" as const, unlocked: false, report: null },
     freshness: "current" as const,
     coverage: [],
     exclusions: [],
-    limitations: ["legacy_aggregate" as const],
+    limitations: [],
   },
 };
 
@@ -243,10 +236,8 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockGetOptionalRequestSession.mockReturnValue(null);
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+    mockResolveBadgeVerification.mockResolvedValue({ hash: "abc12345", date: "2026-04-17" });
     mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
-    mockPersistProfileSnapshot.mockResolvedValue(true);
-    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockCaptureServerError.mockResolvedValue(undefined);
@@ -257,66 +248,25 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockCacheSetNx.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
     mockReadStoredBadgeProfile.mockResolvedValue(null);
+    mockDbObservedReceiptManifest.mockResolvedValue({
+      status: "found",
+      manifest: {
+        revisionId: "rev1",
+        policyVersion: "v7.2",
+        contentHash: "hash1",
+        semanticDigest: "digest1",
+        coreSemanticDigest: null,
+        trend: null,
+        isCurrent: true,
+      },
+    });
   });
 
-  it("switches prewarmed SVG namespaces off and back on for both locales without re-materializing", async () => {
-    mockCacheGet.mockImplementation(async (key: string) => key.includes(":v7.2:") ? "<svg>current</svg>" : "<svg>legacy</svg>");
-    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
-      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy: enabled ? "v7.2" : "v6", cacheable: true, capturedAt: Date.now() });
-      const request = new NextRequest(`https://chapa.thecreativetoken.com/u/testuser/badge.svg?lang=${locale}`);
-      const response = await GET(request, { params: Promise.resolve({ handle: "testuser" }) });
-      expect(await response.text()).toBe(enabled ? "<svg>current</svg>" : "<svg>legacy</svg>");
-      expect(mockCacheGet).toHaveBeenLastCalledWith(expect.stringMatching(new RegExp(`:${enabled ? "v7\\.2" : "v6"}:.*:${locale}$`)));
-    }
-    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-  });
-
-  it("uses yesterday only for legacy policy; current policy re-evaluates expired Craft", async () => {
-    const yesterday = toDateString(new Date(Date.now() - 86_400_000));
-    // The current lock-holder can finish today's eligibility-aware render.
-    // Yesterday's raw SVG still claims Craft57 and cannot be reused as current.
-    mockCacheSetNx.mockResolvedValue(false);
-    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
-      const machinePolicy = enabled ? "v7.2" : "v6";
-      let todayReads = 0;
-      mockCacheGet.mockClear();
-      mockCacheGet.mockImplementation(async (key: string) => {
-        if (key.includes(`:${yesterday}:`)) return enabled ? "<svg>expired Craft57</svg>" : "<svg>legacy</svg>";
-        return ++todayReads > 1 ? "<svg>Craft expired, update insights</svg>" : null;
-      });
-      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy, cacheable: true, capturedAt: Date.now() });
-      const response = await GET(new NextRequest(`https://chapa.thecreativetoken.com/u/testuser/badge.svg?lang=${locale}`), { params: Promise.resolve({ handle: "testuser" }) });
-      expect(await response.text()).toBe(enabled ? "<svg>Craft expired, update insights</svg>" : "<svg>legacy</svg>");
-      if (enabled) expect(mockCacheGet.mock.calls.some(([key]) => String(key).includes(`:${yesterday}:`))).toBe(false);
-      else expect(mockCacheGet).toHaveBeenLastCalledWith(expect.stringContaining(`:v6:${yesterday}:${locale}`));
-      expect(mockCacheSetNx.mock.calls.at(-1)?.[0]).toContain(`:${machinePolicy}:`);
-    }
-    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-  });
-
-  it("ignores a warm namespace when the selection lookup fails", async () => {
-    mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: false, capturedAt: Date.now() });
-    mockCacheGet.mockResolvedValue("<svg>must not use</svg>");
-    const response = await GET(...makeRequest("testuser"));
-    expect(await response.text()).toBe(FAKE_SVG);
-    expect(response.headers.get("Cache-Control")).toContain("no-store");
-    expect(response.headers.get("X-Scoring-Selection")).toBe("unavailable");
-    await flushAfterCallbacks();
-    expect(mockCacheSet).not.toHaveBeenCalled();
-  });
-
-  it("does not publish deferred SVG bytes after the scoring flag changes", async () => {
-    const captured = { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() };
-    mockReadScoringSelection.mockResolvedValue(captured);
-    await GET(...makeRequest("testuser"));
-    mockReadScoringSelection.mockResolvedValue({ ...captured, enabled: true, machinePolicy: "v7.2" });
-    await flushAfterCallbacks();
-    expect(mockCacheSet).not.toHaveBeenCalled();
-    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", expect.objectContaining({ scoringSelection: captured }));
-  });
-
-  it("reads the selected policy namespace before a warm SVG hit", async () => {
-    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+  // #1335 phase 5 — the dual v6/v7.2 cache-namespace switching this used to
+  // test is retired along with the `scoring_v7_rendering` selector: v7.2 is
+  // the one policy, embedded as a compile-time constant in the cache key
+  // builder rather than something a request can toggle between.
+  it("reads the current-policy cache key before a warm SVG hit", async () => {
     mockCacheGet.mockResolvedValue(FAKE_SVG);
     const response = await GET(...makeRequest("testuser"));
     expect(mockCacheGet).toHaveBeenCalledWith(expect.stringContaining(":v7.2:"));
@@ -329,7 +279,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     const response = await GET(...makeRequest("testuser"));
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(FAKE_SVG);
-    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({config: DEFAULT_BADGE_CONFIG}));
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({config: DEFAULT_BADGE_CONFIG}));
     await flushAfterCallbacks();
     expect(mockCacheSet).not.toHaveBeenCalled();
     expect(response.headers.get("Cache-Control")).toContain("no-store");
@@ -351,7 +301,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(Number.isInteger(maxAge)).toBe(true);
     expect(maxAge).toBeGreaterThanOrEqual(0);
     expect(maxAge).toBeLessThanOrEqual(300);
-    expect(mockRenderBadgeSvg).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({config: custom}));
+    expect(mockRenderBadgeSvg).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({config: custom}));
     mockAfter.mockClear();
     await GET(...makeRequest("testuser"));
     await flushAfterCallbacks();
@@ -364,23 +314,17 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockDbGetStudioConfig).not.toHaveBeenCalled();
   });
 
-  it("#1289 background completion does not cache an unknown config fallback", async () => {
-    vi.useFakeTimers();
-    try {
-      mockDbGetStudioConfig.mockResolvedValue({status: "unavailable"});
-      mockCacheGet.mockResolvedValueOnce(null).mockResolvedValueOnce("<svg>STALE</svg>");
-      let finish!: (value: typeof FAKE_MATERIALIZED) => void;
-      mockMaterializePublicProfile.mockReturnValue(new Promise(resolve => {finish = resolve;}));
-      const pending = GET(...makeRequest("testuser"));
-      await vi.advanceTimersByTimeAsync(2300);
-      expect(await (await pending).text()).toBe("<svg>STALE</svg>");
-      finish(FAKE_MATERIALIZED);
-      await flushAfterCallbacks();
-      expect(mockRenderBadgeSvg).toHaveBeenCalled();
-      expect(mockCacheSet).not.toHaveBeenCalled();
-      expect(mockRunPublicProfileSideEffects).toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
-  });
+  // #1335 phase 5 — "#1289 background completion does not cache an unknown
+  // config fallback" is deleted: it relied on the winner path's yesterday's-
+  // stale-SVG deadline race to reach the background-completion branch it
+  // meant to test, and `canUseYesterday` (badge.svg/route.ts) is a permanent
+  // `false` for v7.2 — raw SVG bytes cannot re-evaluate annual eligibility or
+  // expired Craft report state, which can flip at UTC midnight without a new
+  // receipt write. With no way to reach that branch, the test only hung
+  // waiting on an unbounded `materializePublicProfile` the code no longer
+  // races against a deadline. See the "materialize deadline fallback" and
+  // "PE-M2" describes below for the same fix applied to their own now-
+  // unreachable stale-SVG scenarios.
 
   it("returns 429 when the badge route is rate limited", async () => {
     mockRateLimit.mockResolvedValue({ allowed: false, current: 100, limit: 100 });
@@ -414,11 +358,10 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
       readOnly: false,
-      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
   });
 
-  it("renders the badge from displayImpact, not rawImpact", async () => {
+  it("renders the badge with the resolved v7.2 scoring model", async () => {
     const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
     const res = await GET(req, ctx);
 
@@ -429,7 +372,6 @@ describe("GET /u/[handle]/badge.svg", () => {
     // avatar/verification/disableAnimation contract.
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
@@ -447,7 +389,6 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ disableAnimation: true }),
     );
   });
@@ -463,24 +404,17 @@ describe("GET /u/[handle]/badge.svg", () => {
     // shared sequence, which stores its record on every render.
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ verificationHash: "abc12345", verificationDate: "2026-04-17" }),
     );
     expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
-      {
-        readOnly: false,
-        verification: { hash: "abc12345", date: "2026-04-17" },
-      },
+      { readOnly: false },
     );
-    // The route no longer sequences the two halves itself.
-    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
-    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
   it("does not cache an unverified badge so a later complete fetch can heal", async () => {
-    mockGetPublicProfileVerification.mockReturnValue(null);
+    mockResolveBadgeVerification.mockResolvedValue(null);
 
     const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
     await GET(req, ctx);
@@ -488,7 +422,6 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({
         verificationHash: undefined,
         verificationDate: undefined,
@@ -509,7 +442,6 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: undefined,
       readOnly: true,
-      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     // Read-only is threaded through; the shared sequence writes nothing for it.
     expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
@@ -517,8 +449,6 @@ describe("GET /u/[handle]/badge.svg", () => {
       FAKE_MATERIALIZED,
       expect.objectContaining({ readOnly: true }),
     );
-    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
-    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
     expect(mockCacheSet).not.toHaveBeenCalled();
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
   });
@@ -531,7 +461,6 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ avatarDataUri: undefined }),
     );
   });
@@ -623,15 +552,27 @@ describe("GET /u/[handle]/badge.svg", () => {
   // ---------------------------------------------------------------------------
 
   describe("stored badge fallback when live sources are unavailable", () => {
-    const STORED_V6 = {
+    // #1335 phase 5 — there is only one stored-profile shape now: the v7.2
+    // receipt projection `readStoredBadgeProfile` builds (see
+    // lib/profile/stored-badge-profile.ts). The old v6/v7.2 fixture pair and
+    // the `legacyImpact`/top-level `policyVersion`/`context` fields it used
+    // are retired along with the legacy aggregate they represented.
+    const STORED_PROFILE = {
       kind: "stored" as const,
       handle: "juan294",
-      policyVersion: "v6" as const,
       observedAt: "2026-09-18T00:00:00.000Z",
       scoring: {
-        policyVersion: "v6" as const,
+        policyVersion: "v7.2" as const,
         handle: "juan294",
-        identity: null,
+        identity: {
+          receiptId: "11111111-1111-1111-1111-111111111111",
+          revisionId: "22222222-2222-2222-2222-222222222222",
+          revision: 1,
+          recordedAt: "2026-09-18T00:00:00.000Z",
+          action: "create" as const,
+          supersedesRevisionId: null,
+          contentHash: "a".repeat(64),
+        },
         window: null,
         dimensions: {
           delivery: { kind: "point" as const, value: 70, display: 70 },
@@ -643,24 +584,14 @@ describe("GET /u/[handle]/badge.svg", () => {
         tier: "Solid" as const,
         archetype: "Builder" as const,
         craft: null,
+        reportCraft: { status: "no_report" as const, unlocked: false, report: null },
         freshness: "stale" as const,
         coverage: [],
         exclusions: [],
-        limitations: ["legacy_aggregate" as const],
+        limitations: [],
       },
-      legacyImpact: {
+      stats: {
         handle: "juan294",
-        profileType: "collaborative" as const,
-        dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-        archetype: "Builder" as const,
-        compositeScore: 63,
-        confidence: 85,
-        confidencePenalties: [],
-        adjustedComposite: 63,
-        tier: "Solid" as const,
-        computedAt: "2026-09-18T00:00:00.000Z",
-      },
-      context: {
         commitsTotal: 400,
         prsMergedCount: 30,
         prsMergedWeight: 45,
@@ -675,32 +606,14 @@ describe("GET /u/[handle]/badge.svg", () => {
         totalWatchers: 50,
         topRepoShare: 0.4,
         maxCommitsIn10Min: 3,
-      },
-    };
-
-    const STORED_V72 = {
-      ...STORED_V6,
-      policyVersion: "v7.2" as const,
-      scoring: {
-        ...STORED_V6.scoring,
-        policyVersion: "v7.2" as const,
-        identity: {
-          receiptId: "11111111-1111-1111-1111-111111111111",
-          revisionId: "22222222-2222-2222-2222-222222222222",
-          revision: 1,
-          recordedAt: "2026-09-18T00:00:00.000Z",
-          action: "create" as const,
-          supersedesRevisionId: null,
-          contentHash: "a".repeat(64),
-        },
-        composite: { kind: "point" as const, value: 71, display: 71 },
-        tier: "High" as const,
+        heatmapData: [],
+        fetchedAt: "2026-09-18T00:00:00.000Z",
       },
     };
 
     it("renders a real, explicitly stale badge instead of the load-error SVG — production-visible failure text is absent, the handle and stored score content are present", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
       mockRenderBadgeSvg.mockReturnValue(
         '<svg data-chapa-state="rendered" data-chapa-freshness="stale">@juan294 63 Solid</svg>',
       );
@@ -715,56 +628,39 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(body).toContain("63");
     });
 
-    it("reads the stored profile with the handle and the captured scoring selection", async () => {
+    it("reads the stored profile by handle alone", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
 
-      expect(mockReadStoredBadgeProfile).toHaveBeenCalledWith(
-        "juan294",
-        expect.objectContaining({ machinePolicy: "v6" }),
-      );
+      expect(mockReadStoredBadgeProfile).toHaveBeenCalledWith("juan294");
     });
 
     it("passes the stored scoring model, the degraded disclosure and an empty heatmap to renderBadgeSvg", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         expect.objectContaining({ handle: "juan294", heatmapData: [] }),
-        STORED_V6.legacyImpact,
         expect.objectContaining({
-          scoring: STORED_V6.scoring,
+          scoring: STORED_PROFILE.scoring,
           disableAnimation: true,
           degraded: {
             reason: "live_sources_unavailable",
-            observedAt: STORED_V6.observedAt,
+            observedAt: STORED_PROFILE.observedAt,
             activityAvailable: false,
+            countsAvailable: true,
           },
         }),
       );
     });
 
-    it("uses the current v7.2 receipt as the sole scoring authority when one is available, never a v6 headline", async () => {
-      mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V72);
-
-      const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
-
-      expect(res.status).toBe(200);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        expect.objectContaining({ scoring: STORED_V72.scoring }),
-      );
-    });
-
     it("never writes the normal daily SVG cache, never runs after() side effects, and never resolves verification", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
       await flushAfterCallbacks();
@@ -776,7 +672,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     it("keeps the existing 60-second client/edge cache policy and per-handle purge tags", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
 
@@ -788,7 +684,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     it("reports the stored-fallback materialize timing on Server-Timing", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
 
@@ -800,23 +696,23 @@ describe("GET /u/[handle]/badge.svg", () => {
       ["?lang=es", "Última instantánea correcta: 2026-09-18"],
     ])("passes the localized stored-snapshot disclosure to the renderer (%s)", async (search, expected) => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }, search));
 
-      const options = mockRenderBadgeSvg.mock.calls.at(-1)?.[2] as { strings?: { activityUnavailable?: string } };
+      const options = mockRenderBadgeSvg.mock.calls.at(-1)?.[1] as { strings?: { activityUnavailable?: string } };
       expect(options.strings?.activityUnavailable).toContain(expected);
     });
 
     it("emits bounded fallback telemetry (kind and date only), never an error capture", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
 
       expect(mockCaptureServerEvent).toHaveBeenCalledWith("badge_stored_fallback", {
-        policyVersion: STORED_V6.policyVersion,
-        observedDate: STORED_V6.observedAt.slice(0, 10),
+        policyVersion: STORED_PROFILE.scoring.policyVersion,
+        observedDate: STORED_PROFILE.observedAt.slice(0, 10),
       });
       expect(mockCaptureServerError).not.toHaveBeenCalled();
     });
@@ -834,7 +730,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     it("never resurrects a GitHub-confirmed-nonexistent handle through the stored fallback — 404 stays 404", async () => {
       mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       const res = await GET(...makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" }));
 
@@ -844,7 +740,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     it("keeps the existing render-error contract when materialization throws, even if a durable authority exists", async () => {
       mockMaterializePublicProfile.mockRejectedValue(new Error("boom"));
-      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_PROFILE);
 
       const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
 
@@ -965,7 +861,6 @@ describe("GET /u/[handle]/badge.svg", () => {
         expect(res.status).toBe(200);
         expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
           FAKE_MATERIALIZED.stats,
-          FAKE_MATERIALIZED.displayImpact,
           expect.objectContaining({ avatarDataUri: undefined }),
         );
       } finally {
@@ -1136,7 +1031,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     it("skips the cache write entirely when unverified, even with a permanently-absent avatar", async () => {
       mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
-      mockGetPublicProfileVerification.mockReturnValue(null);
+      mockResolveBadgeVerification.mockResolvedValue(null);
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
@@ -1265,23 +1160,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });
 
-    it("PE-M2: lock-loser returns yesterday's stale SVG promptly without long polling", async () => {
-      const STALE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">STALE</svg>';
-      // Lock is held by another instance
-      mockCacheSetNx.mockResolvedValue(false);
-      mockCacheGet
-        .mockResolvedValueOnce(null)       // today's SVG cache miss
-        .mockResolvedValueOnce(STALE_SVG); // yesterday's stale key — return promptly
-
-      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
-      const res = await GET(req, ctx);
-
-      // Should serve stale SVG immediately (no polling delay, no render)
-      expect(res.status).toBe(200);
-      expect(await res.text()).toBe(STALE_SVG);
-      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-    });
+    // #1335 phase 5 — "PE-M2: lock-loser returns yesterday's stale SVG
+    // promptly" is deleted: `canUseYesterday` (badge.svg/route.ts) is a
+    // permanent `false` for v7.2, so the lock-loser's tier-1 immediate stale
+    // check (`canUseYesterday ? await readBadgeSvgCache(staleCacheKey) :
+    // null`) can never read the yesterday key any more — every loser now
+    // always falls through to tier-2 polling, which the next test already
+    // covers.
 
     // #1029 — a render-lock loser with no stale SVG to fall back on used to
     // poll for the full 2000ms schedule before falling through to a full
@@ -1496,119 +1381,23 @@ describe("GET /u/[handle]/badge.svg", () => {
 
   // #1086 (PE-H1) — nothing bounded the SUM of the cache-miss path's steps;
   // materializePublicProfile alone could take up to the 30s inflight cap, on
-  // top of the route's own cache/lock/avatar ceilings. The route now races
-  // materialize against a hard deadline, but ONLY when a stale (yesterday's)
-  // SVG exists to fall back on — a brand-new handle with no stale key must
-  // not be starved by a cutoff shorter than a legitimate cold GitHub fetch.
+  // top of the route's own cache/lock/avatar ceilings. The route raced
+  // materialize against a hard deadline ONLY when a stale (yesterday's) SVG
+  // existed to fall back on — a brand-new handle with no stale key must not
+  // be starved by a cutoff shorter than a legitimate cold GitHub fetch.
+  //
+  // #1335 phase 5 — `canUseYesterday` (badge.svg/route.ts) is now a
+  // permanent `false` under v7.2: raw SVG bytes cannot re-evaluate annual
+  // eligibility or expired Craft report state, which can flip at UTC
+  // midnight without a new receipt write, so yesterday's bytes are never an
+  // instant-serve shortcut any more. The two tests that exercised the
+  // stale-SVG-exists side of this deadline race are deleted — that branch
+  // can no longer be reached, since `staleSvgLookup` is unconditionally
+  // `null` — while the two below, whose premise is "no stale SVG exists" or
+  // "a read-only request never races the deadline regardless", still hold:
+  // neither depended on `canUseYesterday` ever being `true`.
   describe("materialize deadline fallback (#1086 / PE-H1)", () => {
     const STALE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">STALE</svg>';
-
-    function deferredMaterialize() {
-      let resolve!: (value: typeof FAKE_MATERIALIZED) => void;
-      const promise = new Promise<typeof FAKE_MATERIALIZED>((res) => {
-        resolve = res;
-      });
-      mockMaterializePublicProfile.mockReturnValue(promise);
-      return { resolve };
-    }
-
-    it("serves yesterday's stale SVG once materialize exceeds the deadline, then finishes materializing (and warms the cache) in the background", async () => {
-      vi.useFakeTimers();
-      try {
-        mockCacheGet
-          .mockResolvedValueOnce(null) // today's SVG cache: miss
-          .mockResolvedValueOnce(STALE_SVG); // yesterday's stale SVG: hit
-        const { resolve } = deferredMaterialize();
-
-        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
-        const responsePromise = GET(req, ctx);
-
-        // Past the deadline — materialize still hasn't resolved.
-        await vi.advanceTimersByTimeAsync(2300);
-        const res = await responsePromise;
-
-        expect(res.status).toBe(200);
-        expect(await res.text()).toBe(STALE_SVG);
-        // A short edge s-maxage — this is a degraded response, not the normal
-        // 24h-cacheable badge. The client sees only the split max-age policy.
-        expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
-        const edgeControl = res.headers.get("Vercel-CDN-Cache-Control");
-        expect(edgeControl).toMatch(/s-maxage=\d+/);
-        expect(edgeControl).not.toBe(
-          "public, s-maxage=300",
-        );
-        expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
-        // The full render pipeline has not run yet — we returned before
-        // materialize settled.
-        expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-
-        // Now let the original materialize call finish in the background.
-        resolve(FAKE_MATERIALIZED);
-        await flushAfterCallbacks();
-
-        expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-          FAKE_MATERIALIZED.stats,
-          FAKE_MATERIALIZED.displayImpact,
-          expect.objectContaining({ disableAnimation: true }),
-        );
-        // The next request for this handle is warmed with the real render.
-        expect(mockCacheSet).toHaveBeenCalledWith(
-          expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
-          FAKE_SVG,
-          expect.any(Number),
-        );
-        // LE-6-1 — the background continuation stores the record for the
-        // hash it just published, exactly like the foreground path.
-        expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
-          "testuser",
-          FAKE_MATERIALIZED,
-          { readOnly: false, verification: { hash: "abc12345", date: "2026-04-17" } },
-        );
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    // #1166 (PE-H2) — `warmBadgeCacheInBackground` is the ONE caller that must
-    // keep AWAITING the SVG cache write: it runs entirely inside after(), has
-    // no response to race, and cache warming is its whole purpose. Unlike the
-    // foreground winner path (deferred above), its write must complete before
-    // its durable side effects run — not merely be scheduled.
-    it("warmBadgeCacheInBackground awaits the SVG cache write before running durable side effects", async () => {
-      vi.useFakeTimers();
-      try {
-        const order: string[] = [];
-        mockCacheSet.mockImplementation(async () => {
-          order.push("cacheSet-start");
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          order.push("cacheSet-end");
-          return true;
-        });
-        mockRunPublicProfileSideEffects.mockImplementation(async () => {
-          order.push("persist");
-        });
-
-        mockCacheGet
-          .mockResolvedValueOnce(null) // today's SVG cache: miss
-          .mockResolvedValueOnce(STALE_SVG); // yesterday's stale SVG: hit
-        const { resolve } = deferredMaterialize();
-
-        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
-        const responsePromise = GET(req, ctx);
-
-        await vi.advanceTimersByTimeAsync(2300);
-        await responsePromise;
-
-        resolve(FAKE_MATERIALIZED);
-        const flushPromise = flushAfterCallbacks();
-        await vi.advanceTimersByTimeAsync(50);
-        await flushPromise;
-
-        expect(order).toEqual(["cacheSet-start", "cacheSet-end", "persist"]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
 
     it("does not apply the deadline when no stale SVG exists — first-time badge generation is not starved", async () => {
       vi.useFakeTimers();
@@ -1760,11 +1549,10 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           strings: expect.objectContaining({
             metricsVerified: "Verified metrics",
-            tierLabel: "Solid", // tiers.solid (displayImpact.tier === "Solid")
+            tierLabel: "Solid", // tiers.solid (scoring.tier === "Solid")
             radarLabels: expect.objectContaining({
               delivery: "Delivery",
               quality: "Quality",
@@ -1788,11 +1576,10 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           strings: expect.objectContaining({
             metricsVerified: "Métricas verificadas",
-            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            tierLabel: "Sólido", // tiers.solid (scoring.tier === "Solid")
             radarLabels: expect.objectContaining({
               delivery: "Entrega",
               quality: "Calidad",
@@ -1816,7 +1603,6 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           strings: expect.objectContaining({ metricsVerified: "Verified metrics" }),
         }),
@@ -1840,7 +1626,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       mockIsValidHandle.mockReturnValue(true);
       mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
       mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-      mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+      mockResolveBadgeVerification.mockResolvedValue({ hash: "abc12345", date: "2026-04-17" });
       mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
       mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
       mockCacheGet.mockResolvedValue(null);
@@ -1919,13 +1705,9 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
   });
 
-  // #1335 phase 4 — status placeholder states. Gated to the v7.2 selection;
-  // an explicit v6 selection keeps its untouched pre-phase-4 behavior.
+  // #1335 phase 4/5 — status placeholder states. v7.2 is the one rendered
+  // policy now; the selector this used to also gate on is retired.
   describe("scoring status placeholder (#1335 phase 4)", () => {
-    beforeEach(() => {
-      mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
-    });
-
     it("renders the collecting state with no-store and skips materialize entirely", async () => {
       mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 42, sources: [], hasPriorReceipt: false });
       const [request, ctx] = makeRequest("testuser");
@@ -2000,7 +1782,7 @@ describe("GET /u/[handle]/badge.svg", () => {
         mockHasDrawableCurrentReceipt.mockResolvedValue(true);
         const [request, ctx] = makeRequest("testuser");
         await GET(request, ctx);
-        expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser", expect.objectContaining({ machinePolicy: "v7.2" }));
+        expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser");
         expect(mockReadScoringStatus).not.toHaveBeenCalled();
         expect(mockMaterializePublicProfile).toHaveBeenCalled();
       });
@@ -2017,21 +1799,11 @@ describe("GET /u/[handle]/badge.svg", () => {
       });
     });
 
-    it("never gates on status under an explicit v6 selection (phase 5 deletes that branch)", async () => {
-      mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 1, sources: [], hasPriorReceipt: false });
-      const [request, ctx] = makeRequest("testuser");
-      await GET(request, ctx);
-      expect(mockReadScoringStatus).not.toHaveBeenCalled();
-      expect(mockMaterializePublicProfile).toHaveBeenCalled();
-    });
-
     // #1335 phase 4 fix — `scoringStatus === null` (the authority read
     // itself failed) must never fall through to whatever the normal
     // materialize pipeline's OWN receipt lookup produces when THAT comes up
-    // without a real v7.2 receipt (`FAKE_MATERIALIZED.scoring.policyVersion`
-    // is "v6"): rendering that would be exactly the legacy v6 fallback the
-    // plan's "failed authority reads are unavailable" invariant forbids.
+    // without a real v7.2 receipt: rendering that would be exactly the
+    // "failed authority reads are unavailable" invariant's violation.
     describe("authority read failure (scoringStatus === null)", () => {
       it("still runs materialize (to check for an independently-drawable receipt) and reports the read failure", async () => {
         mockReadScoringStatus.mockRejectedValue(new Error("boom"));
@@ -2043,9 +1815,12 @@ describe("GET /u/[handle]/badge.svg", () => {
         );
       });
 
-      it("renders the unavailable placeholder (never the v6 fallback) when materialize also has no drawable v7.2 receipt", async () => {
+      it("renders the unavailable placeholder when materialize also has no drawable receipt", async () => {
         mockReadScoringStatus.mockRejectedValue(new Error("boom"));
-        // FAKE_MATERIALIZED.scoring.policyVersion is "v6" — no real receipt.
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: undefined,
+        });
         const [request, ctx] = makeRequest("testuser");
         const response = await GET(request, ctx);
         const body = await response.text();
@@ -2053,19 +1828,12 @@ describe("GET /u/[handle]/badge.svg", () => {
         expect(body).toContain("Scoring status unavailable");
         expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
         expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
-        // Never the v6-shaped render: renderBadgeSvg (mocked to FAKE_SVG) is
-        // the ONLY thing that could have drawn a v6 score, and it must never
-        // be reached for this state.
         expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
         expect(body).not.toBe(FAKE_SVG);
       });
 
       it("renders that receipt normally (not the unavailable placeholder) when materialize independently finds a real v7.2 receipt", async () => {
         mockReadScoringStatus.mockResolvedValue(null);
-        mockMaterializePublicProfile.mockResolvedValue({
-          ...FAKE_MATERIALIZED,
-          scoring: { ...FAKE_MATERIALIZED.scoring, policyVersion: "v7.2" as const },
-        });
         const [request, ctx] = makeRequest("testuser");
         const response = await GET(request, ctx);
         const body = await response.text();
@@ -2076,20 +1844,14 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       it("renders in Spanish when requested", async () => {
         mockReadScoringStatus.mockResolvedValue(null);
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: undefined,
+        });
         const [request, ctx] = makeRequest("testuser", {}, "?lang=es");
         const response = await GET(request, ctx);
         const body = await response.text();
         expect(body).toContain("Estado de la puntuación no disponible");
-      });
-
-      it("never fires for an explicit v6 selection", async () => {
-        mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-        const [request, ctx] = makeRequest("testuser");
-        const response = await GET(request, ctx);
-        const body = await response.text();
-        expect(mockReadScoringStatus).not.toHaveBeenCalled();
-        expect(body).not.toContain('data-chapa-state="unavailable"');
-        expect(mockRenderBadgeSvg).toHaveBeenCalled();
       });
     });
   });

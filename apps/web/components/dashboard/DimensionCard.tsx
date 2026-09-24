@@ -2,11 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { CraftResult, DimensionScores, StatsData, ProfileType } from "@chapa/shared";
-import type { DimensionTrend } from "@/lib/history/trend";
 import { useAnimatedCounter } from "@/lib/effects/counters/use-animated-counter";
 import { useInView } from "@/lib/effects/counters/use-in-view";
-import { Sparkline } from "./Sparkline";
-import { DeltaIndicator } from "./DeltaIndicator";
 import { SubMetricPanel } from "./SubMetricPanel";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useTranslation } from "@/lib/i18n";
@@ -59,8 +56,6 @@ export interface DimensionCardProps {
   dimension: keyof DimensionScores;
   score: number;
   stats: StatsData;
-  trend?: DimensionTrend | null;
-  delta?: number | null;
   animationDelay?: number;
   className?: string;
   profileType?: ProfileType;
@@ -76,8 +71,6 @@ export function DimensionCard({
   dimension,
   score,
   stats,
-  trend,
-  delta,
   animationDelay = 0,
   className = "",
   profileType = "collaborative",
@@ -127,9 +120,6 @@ export function DimensionCard({
     ? t('dimensions.quality.soloTip') as string
     : t(`dimensions.${dimension}.tip`) as string;
 
-  const hasTrendRow =
-    !receiptPresentation && ((trend != null && trend.values.length > 0) || delta != null);
-
   return (
     <div
       ref={containerRef}
@@ -172,22 +162,6 @@ export function DimensionCard({
       </div>
 
       }
-
-      {/* Trend row — only if trend or delta data exists */}
-      {hasTrendRow && (
-        <div className="flex items-center justify-between px-4 pt-3">
-          <div>
-            {trend != null && trend.values.length > 0 && (
-              <Sparkline values={trend.values} color={colors.from} />
-            )}
-          </div>
-          <div>
-            {delta != null && (
-              <DeltaIndicator delta={delta} label={t('dashboard.vsLastWeek') as string} />
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Footer row — expand/collapse toggle */}
       <button

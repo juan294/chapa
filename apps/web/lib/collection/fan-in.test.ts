@@ -185,11 +185,11 @@ describe("maybeIssue — score-change notification (#1335 phase 5.7: keep notify
     expect(deps.notifyScoreChange).not.toHaveBeenCalled();
   });
 
-  it("never notifies when the baseline read reports unavailable", async () => {
+  it("never notifies when the baseline read reports unavailable (folded into null, #1335 phase 5)", async () => {
     const deps = harness();
     vi.mocked(deps.listJobsForDate).mockResolvedValue([job("github", "complete")]);
     vi.mocked(deps.issue).mockResolvedValue({ status: "issued" });
-    vi.mocked(deps.readReceipt).mockResolvedValue({ unavailable: true });
+    vi.mocked(deps.readReceipt).mockResolvedValue(null);
 
     await maybeIssue("alice", "2026-09-23", "2026-09-23T10:00:00.000Z", deps);
 

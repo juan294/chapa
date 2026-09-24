@@ -1,8 +1,3 @@
-const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
-vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
-  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
-}));
 // #1335 phase 4 — defaults to `ready` so pre-existing tests keep rendering
 // through the normal pipeline below, unaffected by this phase.
 // #1335 phase 4 perf fix — `mockHasDrawableCurrentReceipt` defaults to
@@ -17,7 +12,6 @@ vi.mock("@/lib/collection/read-scoring-status", () => ({
   hasDrawableCurrentReceipt: (...args: unknown[]) => mockHasDrawableCurrentReceipt(...args),
 }));
 beforeEach(() => {
-  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
   mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
   mockHasDrawableCurrentReceipt.mockResolvedValue(false);
 });
@@ -26,7 +20,7 @@ import { NextRequest } from "next/server";
 
 const {
   mockMaterializePublicProfile,
-  mockGetPublicProfileVerification,
+  mockResolveBadgeVerification,
   mockRenderBadgeSvg,
   mockIsValidHandle,
   mockGetAvatarBase64,
@@ -38,9 +32,10 @@ const {
   mockGetClientIp,
   mockCaptureServerError,
   mockResolveBadgeConfigSnapshot,
+  mockIsScoringImageReceiptCurrent,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
+  mockResolveBadgeVerification: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
@@ -52,12 +47,27 @@ const {
   mockGetClientIp: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockResolveBadgeConfigSnapshot: vi.fn(),
+  mockIsScoringImageReceiptCurrent: vi.fn(),
+}));
+
+// The image-receipt fence (`isScoringImageReceiptCurrent`) hits a real
+// Supabase read; the rest of this module (cache key/version builders) stays
+// real since it's pure. Default to "current" so the happy-path publish gate
+// isn't short-circuited in tests that don't care about the fence itself.
+vi.mock("@/lib/render/badge-svg-cache", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/render/badge-svg-cache")>(),
+  isScoringImageReceiptCurrent: (...args: unknown[]) => mockIsScoringImageReceiptCurrent(...args),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
   materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
+}));
+
+// #1335 phase 5 — the v6 HMAC verification record and its
+// `getPublicProfileVerification` reader are retired; the badge's attestation
+// is resolved per render via `resolveBadgeVerification`.
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) => mockResolveBadgeVerification(...args),
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -112,29 +122,37 @@ const FAKE_MATERIALIZED = {
     prsMergedCount: 10,
     reviewsSubmittedCount: 5,
   },
-  rawImpact: {
-    adjustedComposite: 73,
-    tier: "High",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
+  craftResult: null,
+  statsComplete: true,
+  statsFreshness: "current" as const,
+  statsCapturedAt: "2026-02-14T12:00:00.000Z",
+  scoring: {
+    policyVersion: "v7.2" as const,
+    handle: "testuser",
+    identity: { receiptId: "r1", revisionId: "rev1", revision: 1, recordedAt: "2026-02-14T00:00:00.000Z", action: "create" as const, supersedesRevisionId: null, contentHash: "hash1" },
+    window: null,
+    dimensions: {
+      delivery: { kind: "point" as const, value: 70, display: 70 },
+      quality: { kind: "point" as const, value: 60, display: 60 },
+      consistency: { kind: "point" as const, value: 65, display: 65 },
+      breadth: { kind: "point" as const, value: 55, display: 55 },
+    },
+    composite: { kind: "point" as const, value: 65, display: 65 },
+    tier: "Solid" as const,
+    archetype: "Builder" as const,
+    craft: null,
+    reportCraft: { status: "no_report" as const, unlocked: false, report: null },
+    freshness: "current" as const,
+    coverage: [],
+    exclusions: [],
+    limitations: [],
   },
-  displayImpact: {
-    adjustedComposite: 65,
-    tier: "Solid",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  snapshot: { date: "2026-02-14", adjustedComposite: 65, tier: "Solid" },
 };
 
 function makeRequest(
   handle: string,
   lang?: string,
-  version: string | null = "ice-terminal-v2-v6-2026-02-14-r7",
+  version: string | null = "ice-terminal-v2-v7.2-2026-02-14-r7",
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
   const query = new URLSearchParams();
   if (lang) query.set("lang", lang);
@@ -156,7 +174,7 @@ describe("GET /u/[handle]/og-image", () => {
 
     mockIsValidHandle.mockReturnValue(true);
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-02-14" });
+    mockResolveBadgeVerification.mockResolvedValue({ hash: "abc12345", date: "2026-02-14" });
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockSvgToPng.mockReturnValue(FAKE_PNG);
@@ -170,64 +188,26 @@ describe("GET /u/[handle]/og-image", () => {
       revision: 7,
       cacheable: true,
     });
+    // The image-receipt fence hits a real Supabase read; default to
+    // "current" so the happy-path publish gate isn't short-circuited in
+    // tests that don't care about the fence itself.
+    mockIsScoringImageReceiptCurrent.mockResolvedValue(true);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("keeps a late previous-day context out of today's PNG namespace", async () => {
-    vi.setSystemTime(new Date("2026-02-14T00:00:00.100Z"));
-    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-02-13T23:59:59.900Z") });
-    const version = "ice-terminal-v2-v7.2-2026-02-13-r7";
-    mockCacheGet.mockResolvedValue({ version, pngBase64: FAKE_PNG_BASE64 });
-    const response = await GET(...makeRequest("testuser", "en", version));
-    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v5:testuser:ice-terminal-v2:v7.2:2026-02-13:en");
-    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-    expect(response.headers.get("Cache-Control")).toContain("no-store");
-  });
-
-  it("switches prewarmed versioned PNGs off and back on in both locales", async () => {
-    mockCacheGet.mockImplementation(async (key: string) => ({ version: `ice-terminal-v2-${key.includes(":v7.2:") ? "v7.2" : "v6"}-2026-02-14-r7`, pngBase64: FAKE_PNG_BASE64 }));
-    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
-      const machinePolicy = enabled ? "v7.2" : "v6";
-      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy, cacheable: true, capturedAt: Date.now() });
-      const response = await GET(...makeRequest("testuser", locale, `ice-terminal-v2-${machinePolicy}-2026-02-14-r7`));
-      expect(response.headers.get("X-Scoring-Selection")).toBe(machinePolicy);
-      expect(mockCacheGet).toHaveBeenLastCalledWith(`og-image:v5:testuser:ice-terminal-v2:${machinePolicy}:2026-02-14:${locale}`);
-    }
-    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-  });
-
-  it("does not cache a render whose flag changes during PNG generation", async () => {
-    const captured = { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() };
-    mockReadScoringSelection.mockResolvedValueOnce(captured).mockResolvedValue({ ...captured, enabled: true, machinePolicy: "v7.2" });
-    const res = await GET(...makeRequest("testuser"));
-    expect(res.headers.get("Cache-Control")).toContain("no-store");
-    expect(mockCacheSet).not.toHaveBeenCalled();
-    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", { scoringSelection: captured });
-  });
-
-  it("removes a PNG when the flag changes during its cache write", async () => {
-    const captured = { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() };
-    mockReadScoringSelection.mockResolvedValueOnce(captured).mockResolvedValueOnce(captured).mockResolvedValue({ ...captured, enabled: true, machinePolicy: "v7.2" });
-    const res = await GET(...makeRequest("testuser"));
-    expect(mockCacheSet).toHaveBeenCalledOnce();
-    expect(mockCacheDel).toHaveBeenCalledWith(expect.stringContaining(":v6:"));
-    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
-  });
-
-  it("caps a cache hit by the age of the captured flag without stale extensions", async () => {
-    mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() - 120_000 });
-    mockCacheGet.mockResolvedValue({ version: "ice-terminal-v2-v6-2026-02-14-r7", pngBase64: FAKE_PNG_BASE64 });
-    const res = await GET(...makeRequest("testuser"));
-    expect(res.headers.get("Cache-Control")).toBe("public, max-age=180");
-    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("public, s-maxage=180");
-  });
+  // #1335 phase 5 — the dual v6/v7.2 selector-driven cache-version switching
+  // this used to test (and the "flag changes mid-request" races it exploited
+  // via an awaited, propagated `capturedAt`) is retired: v7.2 is the one
+  // policy, embedded as a compile-time constant in the cache version/key
+  // builders, and `capturedAt` is now `Date.now()` captured synchronously up
+  // front with no intervening await for a concurrent write to race against.
 
   it("returns the cached png when Redis already has the image", async () => {
     mockCacheGet.mockResolvedValue({
-      version: "ice-terminal-v2-v6-2026-02-14-r7",
+      version: "ice-terminal-v2-v7.2-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 
@@ -236,7 +216,7 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(200);
     expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v5:testuser:ice-terminal-v2:v6:2026-02-14:en");
+    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v5:testuser:ice-terminal-v2:v7.2:2026-02-14:en");
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser,scoring-images");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
@@ -247,7 +227,7 @@ describe("GET /u/[handle]/og-image", () => {
   it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
     // Cache hit — rate limiter must NOT be called (deferred to miss branch only)
     mockCacheGet.mockResolvedValue({
-      version: "ice-terminal-v2-v6-2026-02-14-r7",
+      version: "ice-terminal-v2-v7.2-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 
@@ -267,15 +247,15 @@ describe("GET /u/[handle]/og-image", () => {
     expect(mockRateLimit).toHaveBeenCalledOnce();
   });
 
-  it("renders the OG image from displayImpact, not rawImpact", async () => {
+  it("renders the OG image with the resolved v7.2 scoring model", async () => {
     const [req, ctx] = makeRequest("testuser");
     const res = await GET(req, ctx);
 
     expect(res.status).toBe(200);
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       {
+        scoring: FAKE_MATERIALIZED.scoring,
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2026-02-14",
@@ -289,9 +269,9 @@ describe("GET /u/[handle]/og-image", () => {
       },
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "og-image:v5:testuser:ice-terminal-v2:v6:2026-02-14:en",
+      "og-image:v5:testuser:ice-terminal-v2:v7.2:2026-02-14:en",
       {
-        version: "ice-terminal-v2-v6-2026-02-14-r7",
+        version: "ice-terminal-v2-v7.2-2026-02-14-r7",
         pngBase64: FAKE_PNG_BASE64,
       },
       172800,
@@ -308,7 +288,7 @@ describe("GET /u/[handle]/og-image", () => {
     const res = await GET(req, ctx);
 
     expect(mockCacheGet).toHaveBeenCalledWith(
-      "og-image:v5:mixedcase:ice-terminal-v2:v6:2026-02-14:en",
+      "og-image:v5:mixedcase:ice-terminal-v2:v7.2:2026-02-14:en",
     );
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-mixedcase,scoring-images");
   });
@@ -321,7 +301,6 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ disableAnimation: true }),
     );
   });
@@ -391,7 +370,6 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ avatarDataUri: undefined }),
     );
   });
@@ -408,7 +386,6 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-      expect.anything(),
       expect.anything(),
       expect.objectContaining({ avatarDataUri: undefined }),
     );
@@ -467,7 +444,7 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockCacheSet).toHaveBeenCalledOnce();
     expect(mockCacheDel).toHaveBeenCalledWith(
-      "og-image:v5:testuser:ice-terminal-v2:v6:2026-02-14:en",
+      "og-image:v5:testuser:ice-terminal-v2:v7.2:2026-02-14:en",
     );
     expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
@@ -476,7 +453,7 @@ describe("GET /u/[handle]/og-image", () => {
 
   it("does not use or publish cache entries without the revisioned metadata URL", async () => {
     mockCacheGet.mockResolvedValue({
-      version: "ice-terminal-v2-v6-2026-02-14-r7",
+      version: "ice-terminal-v2-v7.2-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 
@@ -522,7 +499,7 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     vi.setSystemTime(new Date("2026-02-14T12:00:00Z"));
     mockIsValidHandle.mockReturnValue(true);
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockGetPublicProfileVerification.mockReturnValue(null);
+    mockResolveBadgeVerification.mockResolvedValue(null);
     mockGetAvatarBase64.mockResolvedValue(undefined);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockSvgToPng.mockReturnValue(FAKE_PNG);
@@ -536,6 +513,10 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
       revision: 7,
       cacheable: true,
     });
+    // The image-receipt fence hits a real Supabase read; default to
+    // "current" so the happy-path publish gate isn't short-circuited in
+    // tests that don't care about the fence itself.
+    mockIsScoringImageReceiptCurrent.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -550,7 +531,7 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     vi.clearAllMocks();
     mockIsValidHandle.mockReturnValue(true);
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockGetPublicProfileVerification.mockReturnValue(null);
+    mockResolveBadgeVerification.mockResolvedValue(null);
     mockGetAvatarBase64.mockResolvedValue(undefined);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockSvgToPng.mockReturnValue(FAKE_PNG);
@@ -578,7 +559,7 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     const [req, ctx] = makeRequest("testuser", "es");
     await GET(req, ctx);
 
-    const options = mockRenderBadgeSvg.mock.calls[0]![2] as {
+    const options = mockRenderBadgeSvg.mock.calls[0]![1] as {
       strings?: { metricsVerified?: string };
     };
     expect(options.strings).toBeDefined();
@@ -593,10 +574,10 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     expect(key).toContain("en");
   });
 
-  // #1335 phase 4 — status placeholder states, gated to the v7.2 selection.
+  // #1335 phase 4/5 — status placeholder states. v7.2 is the one rendered
+  // policy now; the selector this used to also gate on is retired.
   describe("scoring status placeholder (#1335 phase 4)", () => {
     beforeEach(() => {
-      mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
       mockSvgToPng.mockImplementation(async (svg: string) => new TextEncoder().encode(svg));
     });
 
@@ -650,7 +631,7 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
         mockHasDrawableCurrentReceipt.mockResolvedValue(true);
         const [req, ctx] = makeRequest("testuser");
         await GET(req, ctx);
-        expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser", expect.objectContaining({ machinePolicy: "v7.2" }));
+        expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser");
         expect(mockReadScoringStatus).not.toHaveBeenCalled();
         expect(mockMaterializePublicProfile).toHaveBeenCalled();
       });
@@ -667,20 +648,10 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
       });
     });
 
-    it("never gates on status under an explicit v6 selection", async () => {
-      mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 1, sources: [], hasPriorReceipt: false });
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockReadScoringStatus).not.toHaveBeenCalled();
-      expect(mockMaterializePublicProfile).toHaveBeenCalled();
-    });
-
     // #1335 phase 4 fix — a failed authority read must never fall through
     // to whatever the normal materialize pipeline's OWN receipt lookup
-    // produces when THAT also has no v7.2 receipt (FAKE_MATERIALIZED has no
-    // `scoring` field at all here). See badge.svg's equivalent describe
-    // block for the full rationale.
+    // produces when THAT also has no v7.2 receipt. See badge.svg's
+    // equivalent describe block for the full rationale.
     describe("authority read failure (scoringStatus === null)", () => {
       it("still runs materialize and reports the read failure", async () => {
         mockReadScoringStatus.mockRejectedValue(new Error("boom"));
@@ -689,8 +660,12 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
         expect(mockMaterializePublicProfile).toHaveBeenCalled();
       });
 
-      it("rasterizes the unavailable placeholder (never the v6 fallback) when materialize also has no drawable v7.2 receipt", async () => {
+      it("rasterizes the unavailable placeholder when materialize also has no drawable receipt", async () => {
         mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: undefined,
+        });
         const [req, ctx] = makeRequest("testuser");
         const res = await GET(req, ctx);
         const body = new TextDecoder().decode(await res.arrayBuffer());
@@ -703,10 +678,6 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
 
       it("rasterizes that receipt normally when materialize independently finds a real v7.2 receipt", async () => {
         mockReadScoringStatus.mockResolvedValue(null);
-        mockMaterializePublicProfile.mockResolvedValue({
-          ...FAKE_MATERIALIZED,
-          scoring: { policyVersion: "v7.2" as const, tier: "Solid" },
-        });
         const [req, ctx] = makeRequest("testuser");
         const res = await GET(req, ctx);
         const body = new TextDecoder().decode(await res.arrayBuffer());
@@ -717,20 +688,14 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
 
       it("renders in Spanish when requested", async () => {
         mockReadScoringStatus.mockResolvedValue(null);
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: undefined,
+        });
         const [req, ctx] = makeRequest("testuser", "es");
         const res = await GET(req, ctx);
         const body = new TextDecoder().decode(await res.arrayBuffer());
         expect(body).toContain("Estado de la puntuación no disponible");
-      });
-
-      it("never fires for an explicit v6 selection", async () => {
-        mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-        const [req, ctx] = makeRequest("testuser");
-        const res = await GET(req, ctx);
-        const body = new TextDecoder().decode(await res.arrayBuffer());
-        expect(mockReadScoringStatus).not.toHaveBeenCalled();
-        expect(body).not.toContain('data-chapa-state="unavailable"');
-        expect(mockRenderBadgeSvg).toHaveBeenCalled();
       });
     });
   });

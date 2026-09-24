@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 const { mockReadPublicObservedScore, mockReadStats } = vi.hoisted(() => ({
   mockReadPublicObservedScore: vi.fn(),
@@ -19,13 +18,6 @@ import {
   storedBadgeRenderInputs,
   storedBadgeActivityUnavailable,
 } from "./stored-badge-profile";
-
-const V72_SELECTION: ScoringRenderSelection = {
-  enabled: true,
-  machinePolicy: "v7.2",
-  cacheable: true,
-  capturedAt: Date.parse("2026-09-22T10:00:00Z"),
-};
 
 const RECEIPT_MODEL = {
   policyVersion: "v7.2" as const,
@@ -88,18 +80,10 @@ beforeEach(() => {
 });
 
 describe("readStoredBadgeProfile", () => {
-  it("returns null when the selection is not cacheable (unknown policy authority is not a fallback opportunity)", async () => {
-    const result = await readStoredBadgeProfile("juan294", { ...V72_SELECTION, cacheable: false });
-
-    expect(result).toBeNull();
-    expect(mockReadPublicObservedScore).not.toHaveBeenCalled();
-    expect(mockReadStats).not.toHaveBeenCalled();
-  });
-
   it("returns null when there is no current receipt", async () => {
     mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
 
-    const result = await readStoredBadgeProfile("ghost", V72_SELECTION);
+    const result = await readStoredBadgeProfile("ghost");
 
     expect(result).toBeNull();
     expect(mockReadStats).not.toHaveBeenCalled();
@@ -112,7 +96,7 @@ describe("readStoredBadgeProfile", () => {
     });
     mockReadStats.mockResolvedValue({ status: "stale", stats: STALE_STATS, capturedAt: "2026-09-19T00:00:00.000Z" });
 
-    const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
+    const result = await readStoredBadgeProfile("juan294");
 
     expect(result?.kind).toBe("stored");
     expect(result?.scoring.policyVersion).toBe("v7.2");
@@ -131,7 +115,7 @@ describe("readStoredBadgeProfile", () => {
     });
     mockReadStats.mockResolvedValue({ status: "unavailable" });
 
-    const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
+    const result = await readStoredBadgeProfile("juan294");
 
     expect(result?.scoring.freshness).toBe("stale");
   });
@@ -143,7 +127,7 @@ describe("readStoredBadgeProfile", () => {
     });
     mockReadStats.mockResolvedValue({ status: "unavailable" });
 
-    const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
+    const result = await readStoredBadgeProfile("juan294");
 
     expect(result?.scoring.freshness).toBe("unavailable");
   });
@@ -155,7 +139,7 @@ describe("readStoredBadgeProfile", () => {
     });
     mockReadStats.mockResolvedValue({ status: "unavailable" });
 
-    const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
+    const result = await readStoredBadgeProfile("juan294");
 
     expect(result).not.toBeNull();
     expect(result?.stats).toBeNull();

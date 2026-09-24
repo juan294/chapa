@@ -3,8 +3,6 @@
 import { useMemo } from "react";
 import {
   type BadgeConfig,
-  type CraftResult,
-  type StatsData,
 } from "@chapa/shared";
 import {
   CATEGORY_KEY_TO_ALIAS,
@@ -41,10 +39,8 @@ export type StudioSaveStatus = "dirty" | "saving" | "saved" | "error";
 export interface UseStudioWebMcpToolsOptions {
   config: BadgeConfig;
   enabled: boolean;
-  stats: StatsData;
   /** #1335 — v7.2 is the one scoring policy Studio renders. */
   scoring: ScoreViewModel;
-  craftResult?: CraftResult | null;
   handle: string;
   saveStatus: StudioSaveStatus;
   runCommand: (input: string) => CommandResult<StudioCommandAction>;
@@ -92,9 +88,7 @@ function serializeCommandResult(
 export function useStudioWebMcpTools({
   config,
   enabled,
-  stats,
   scoring,
-  craftResult = null,
   handle,
   saveStatus,
   runCommand,
@@ -239,14 +233,12 @@ export function useStudioWebMcpTools({
         annotations: readOnly,
         execute: () => JSON.stringify(observedImprovementSuggestions(scoring)),
       },
-      createExplainDimensionTool({ scoring, stats, craftResult, t, annotations: readOnly }),
+      createExplainDimensionTool({ scoring, annotations: readOnly }),
     ];
   }, [
     config,
     enabled,
-    stats,
     scoring,
-    craftResult,
     handle,
     saveStatus,
     runCommand,

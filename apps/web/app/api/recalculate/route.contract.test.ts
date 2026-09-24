@@ -62,13 +62,11 @@ describe("POST /api/recalculate contract", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
       token: "contract-token",
       ignoreSnapshot: true,
-      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     });
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("octocat", { badgeSvg: true });
     expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(
       "octocat",
       "refresh",
-      expect.any(Object),
     );
   });
 

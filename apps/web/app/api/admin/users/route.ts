@@ -62,7 +62,7 @@ export const GET = withErrorCapture("/api/admin/users", async (request: NextRequ
     );
   }
 
-  // Single Supabase call replaces: dbGetUsers + cacheMGet + computeImpactV6 + EMA
+  // Single Supabase call replaces: dbGetUsers + cacheMGet + per-row v6 scoring + EMA
   const result = await dbTimeoutOr504(
     dbGetAdminUsers({ page, limit, sort, dir, search, tier, archetype }),
     "dbGetAdminUsers",

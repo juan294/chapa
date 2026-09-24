@@ -70,7 +70,6 @@ vi.mock("@/lib/effects/defaults", () => ({
 const previewLifecycle = vi.hoisted(() => ({ nextInstanceId: 0 }));
 
 interface StudioWebMcpOptionsCapture {
-  craftResult?: unknown;
   enabled: boolean;
   getCurrentConfig: () => Record<string, unknown>;
   runCommand: (input: string) => unknown;
@@ -268,7 +267,6 @@ import { parseRetryAfterSeconds, StudioClient } from "./StudioClient";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import type {
   BadgeConfig,
-  CraftResult,
   StatsData,
 } from "@chapa/shared";
 import { makeScoring } from "@/lib/test-helpers/fixtures";
@@ -302,15 +300,6 @@ const scoring: ScoreViewModel = makeScoring({
   tier: "Solid",
   archetype: "Builder",
 });
-
-const craftResult: CraftResult = {
-  tool: "claude-code",
-  dimensions: { proficiency: 91, effectiveness: 72, sophistication: 83 },
-  craftScore: 82,
-  tier: "Expert",
-  reportPeriod: { start: "2026-08-01", end: "2026-08-27" },
-  computedAt: "2026-08-27T00:00:00.000Z",
-};
 
 function languageValue(
   locale: "en" | "es",
@@ -400,19 +389,6 @@ describe("StudioClient render", () => {
       expect(model).toEqual(fixture.model);
       expect(model.composite.display).toBe(46);
       expect(model.reportCraft.report.result.point.exact).toBe(0);
-    });
-
-    it("forwards materialized Craft data to the Studio WebMCP tools", () => {
-      render(
-        <StudioClient
-          initialConfig={defaultConfig}
-          stats={stats}
-          scoring={scoring}
-          craftResult={craftResult}
-        />,
-      );
-
-      expect(studioWebMcpMocks.options?.craftResult).toBe(craftResult);
     });
 
     // #1329 — e2e observed `[data-save-state="saved"]`, `studio-demo-marker`,

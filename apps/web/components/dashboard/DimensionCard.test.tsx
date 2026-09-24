@@ -20,20 +20,6 @@ vi.mock("@/lib/effects/counters/use-animated-counter", () => ({
   }),
 }));
 
-vi.mock("./Sparkline", () => ({
-  Sparkline: (props: { values: unknown[]; color: string }) => (
-    <div data-testid="sparkline" data-color={props.color} />
-  ),
-}));
-
-vi.mock("./DeltaIndicator", () => ({
-  DeltaIndicator: (props: { delta: number; label?: string }) => (
-    <span data-testid="delta-indicator" data-delta={props.delta}>
-      {props.label}
-    </span>
-  ),
-}));
-
 vi.mock("./SubMetricPanel", () => ({
   SubMetricPanel: (props: { isOpen: boolean; dimension: string }) => (
     <div data-testid="sub-metric-panel" data-open={props.isOpen}>
@@ -76,15 +62,6 @@ const mockStats: StatsData = {
   fetchedAt: "2026-02-28T00:00:00Z",
 };
 
-const mockTrend = {
-  avgDelta: 2.5,
-  values: [
-    { date: "2026-02-21", value: 80 },
-    { date: "2026-02-22", value: 82 },
-    { date: "2026-02-23", value: 85 },
-  ],
-};
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -119,62 +96,6 @@ describe("DimensionCard", () => {
     // The fill element inside the progressbar should have width: 72%
     const fill = progressbar.firstElementChild as HTMLElement;
     expect(fill.style.width).toBe("72%");
-  });
-
-  // ----------------------------------------------------------------
-  // 3. Renders sparkline when trend data provided
-  // ----------------------------------------------------------------
-  it("renders sparkline when trend data provided", () => {
-    render(
-      <DimensionCard
-        dimension="delivery"
-        score={85}
-        stats={mockStats}
-        trend={mockTrend}
-      />,
-    );
-
-    expect(screen.getByTestId("sparkline")).toBeTruthy();
-  });
-
-  // ----------------------------------------------------------------
-  // 4. Hides sparkline when no trend data
-  // ----------------------------------------------------------------
-  it("hides sparkline when no trend data", () => {
-    render(
-      <DimensionCard dimension="delivery" score={85} stats={mockStats} />,
-    );
-
-    expect(screen.queryByTestId("sparkline")).toBeNull();
-  });
-
-  // ----------------------------------------------------------------
-  // 5. Renders delta indicator when diff data provided
-  // ----------------------------------------------------------------
-  it("renders delta indicator when diff data provided", () => {
-    render(
-      <DimensionCard
-        dimension="delivery"
-        score={85}
-        stats={mockStats}
-        delta={3.2}
-      />,
-    );
-
-    const delta = screen.getByTestId("delta-indicator");
-    expect(delta).toBeTruthy();
-    expect(delta.getAttribute("data-delta")).toBe("3.2");
-  });
-
-  // ----------------------------------------------------------------
-  // 6. Hides delta indicator when no diff data
-  // ----------------------------------------------------------------
-  it("hides delta indicator when no diff data", () => {
-    render(
-      <DimensionCard dimension="delivery" score={85} stats={mockStats} />,
-    );
-
-    expect(screen.queryByTestId("delta-indicator")).toBeNull();
   });
 
   // ----------------------------------------------------------------
@@ -298,46 +219,6 @@ describe("DimensionCard", () => {
 
     // The mocked useAnimatedCounter returns target directly
     expect(screen.getByText("68")).toBeTruthy();
-  });
-
-  // ----------------------------------------------------------------
-  // Bonus: trend row only rendered when trend or delta exists
-  // ----------------------------------------------------------------
-  it("does not render trend row when neither trend nor delta provided", () => {
-    render(
-      <DimensionCard dimension="delivery" score={85} stats={mockStats} />,
-    );
-
-    expect(screen.queryByTestId("sparkline")).toBeNull();
-    expect(screen.queryByTestId("delta-indicator")).toBeNull();
-  });
-
-  it("renders trend row when only delta is provided (no trend)", () => {
-    render(
-      <DimensionCard
-        dimension="delivery"
-        score={85}
-        stats={mockStats}
-        delta={-1.5}
-      />,
-    );
-
-    expect(screen.queryByTestId("sparkline")).toBeNull();
-    expect(screen.getByTestId("delta-indicator")).toBeTruthy();
-  });
-
-  it("renders trend row when only trend is provided (no delta)", () => {
-    render(
-      <DimensionCard
-        dimension="delivery"
-        score={85}
-        stats={mockStats}
-        trend={mockTrend}
-      />,
-    );
-
-    expect(screen.getByTestId("sparkline")).toBeTruthy();
-    expect(screen.queryByTestId("delta-indicator")).toBeNull();
   });
 
   // ----------------------------------------------------------------

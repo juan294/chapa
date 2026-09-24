@@ -5,11 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_BADGE_CONFIG,
   type BadgeConfig,
-  type CraftResult,
-  type StatsData,
 } from "@chapa/shared";
 import type { CommandResult } from "@/components/terminal/command-registry";
-import { DEMO_STATS } from "@/lib/render/demoData";
 import { WEBMCP_INVALID_INPUT_PREFIX } from "@/lib/webmcp/use-model-context-tools";
 import { OBSERVED_SIMULATE_SCORE_INPUT_SCHEMA } from "@/lib/webmcp/catalog";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
@@ -41,19 +38,6 @@ const READ_ONLY_TOOLS = [
   "suggest_improvements",
   "explain_dimension",
 ];
-
-const craftResult: CraftResult = {
-  tool: "claude-code",
-  dimensions: {
-    proficiency: 91,
-    effectiveness: 72,
-    sophistication: 83,
-  },
-  craftScore: 82,
-  tier: "Expert",
-  reportPeriod: { start: "2026-08-01", end: "2026-08-27" },
-  computedAt: "2026-08-27T00:00:00.000Z",
-};
 
 function line(text: string) {
   return { id: `line-${text}`, type: "success" as const, text };
@@ -93,9 +77,7 @@ function makeRunCommand() {
 
 function setup(overrides?: {
   scoring?: ScoreViewModel;
-  stats?: StatsData;
   config?: BadgeConfig;
-  craftResult?: CraftResult | null;
   saveStatus?: "dirty" | "saving" | "saved" | "error";
   enabled?: boolean;
 }) {
@@ -106,9 +88,7 @@ function setup(overrides?: {
   const { result } = renderHook(() =>
     useStudioWebMcpTools({
       config,
-      stats: overrides?.stats ?? { ...DEMO_STATS, heatmapData: [] },
       scoring,
-      craftResult: overrides?.craftResult ?? null,
       handle: "dev user",
       enabled: overrides?.enabled ?? true,
       saveStatus: overrides?.saveStatus ?? "dirty",
@@ -151,7 +131,6 @@ describe("useStudioWebMcpTools", () => {
   it("returns a memoized catalog with the nine planned names and annotations", () => {
     const options = {
       config: { ...DEFAULT_BADGE_CONFIG },
-      stats: DEMO_STATS,
       scoring: makeScoring(),
       handle: "developer",
       enabled: true,
@@ -391,7 +370,7 @@ describe("useStudioWebMcpTools", () => {
     [40, "Solid"],
     [10, "Emerging"],
   ] as const)("simulates a dimension scenario and applies the current v7.2 tier boundary %i", async (score, tier) => {
-    // makeScoring()'s default composite is a 65-point baseline.
+    // makeScoring()'s default composite is a 58-point baseline.
     const { getTool } = setup();
 
     const payload = JSON.parse(
@@ -406,7 +385,7 @@ describe("useStudioWebMcpTools", () => {
       scope: "dimension_scenario",
       displayScore: score,
       tier,
-      deltaVsCurrent: score - 65,
+      deltaVsCurrent: score - 58,
     });
   });
 
@@ -454,7 +433,7 @@ describe("useStudioWebMcpTools", () => {
   });
 
   it("explains craft as not yet reported when no report exists", async () => {
-    const { getTool } = setup({ craftResult });
+    const { getTool } = setup();
 
     const explanation = JSON.parse(
       await execute(getTool("explain_dimension"), { dimension: "craft" }),
@@ -466,7 +445,7 @@ describe("useStudioWebMcpTools", () => {
 
 it("Studio tools simulate and explain the selected receipt without legacy proficiency", async () => {
   const f = await scoringConsistencyFixture({ craft: 57 });
-  const { getTool } = setup({ scoring: f.model, stats: f.stats });
+  const { getTool } = setup({ scoring: f.model });
   const simulation = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { craft: 0 } }));
   expect(simulation).toMatchObject({ hypothetical: true, policyVersion: "v7.2", displayScore: 46, baselineRevision: f.model.identity!.revisionId });
   expect(JSON.parse(await execute(getTool("simulate_score"), { counts: {} }))).toMatchObject({ scope: "evidence_counts", displayScore: 46 });

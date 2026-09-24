@@ -46,7 +46,6 @@ describe("materializeOrchestratedProfile", () => {
 
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
-      scoringSelection: undefined,
       today: "2026-04-17",
       ignoreSnapshot: undefined,
     });
@@ -61,7 +60,6 @@ describe("materializeOrchestratedProfile", () => {
 
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: undefined,
-      scoringSelection: undefined,
       today: undefined,
       ignoreSnapshot: true,
     });

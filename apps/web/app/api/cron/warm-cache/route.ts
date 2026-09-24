@@ -1,4 +1,3 @@
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { sweepRevokedReceiptCachesV7, sweepRetiredSupplementalCachesV7 } from "@/lib/verification/cleanup";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
@@ -33,7 +32,6 @@ import { toDateString } from "@/lib/utils/date";
 import { enqueueCollection } from "@/lib/collection/enqueue";
 import { materializeOrchestratedProfile } from "@/lib/profile/orchestrated-profile";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
-import { deferProfileCacheWork } from "@/lib/profile/public-profile";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -411,18 +409,19 @@ async function warmHandle(
   requestId?: string,
 ): Promise<HandleResult> {
   try {
-    // #1335 phase 4 — the warm-cache cron no longer issues receipts inline.
+    // #1335 phase 4/5 — the warm-cache cron no longer issues receipts inline.
     // It enqueues a `daily` collection job for every connected provider (a
     // no-op against an already-queued/running/complete job for today); the
     // collect-evidence cron's own 5-minute tick runs the actual slices, and
     // fan-in issues once every one of them completes. This is the one
     // registered-handle enumeration point that is safe to enqueue from — see
     // enqueueCollection's own doc comment on why a public read must never do
-    // this.
-    const scoringSelection = await readScoringRenderSelection();
-    if (scoringSelection.enabled) await enqueueCollection(handle, "daily");
+    // this. v7.2 is the one rendered policy, so this always enqueues (the
+    // retired DB-backed render-selector flag used to gate it).
+    const capturedAt = Date.now();
+    await enqueueCollection(handle, "daily");
 
-    const materialized = await materializeOrchestratedProfile(handle, { scoringSelection });
+    const materialized = await materializeOrchestratedProfile(handle, {});
     if (!materialized) {
       const today = new Date().toISOString().slice(0, 10);
       const guardStatus = await cacheSetNxStatus(
@@ -470,7 +469,7 @@ async function warmHandle(
     // lib/auth/platform-oauth.ts for platform connect/disconnect) already
     // deletes this exact key — verified before landing this skip.
     try {
-      const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
+      const today = toDateString(new Date(capturedAt));
       // #1181 (UX-H3 follow-up) — this cron has no request/cookie context to
       // resolve a per-visitor locale from, so it only ever warms the
       // DEFAULT_LOCALE ('es') badge — the locale most real traffic reads
@@ -483,9 +482,9 @@ async function warmHandle(
       // default while writing it under `buildBadgeSvgCacheKey`'s separately
       // defaulted key, so the hourly pre-warm published an English badge
       // into the Spanish-keyed slot for every handle.
-      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE, scoringSelection.machinePolicy);
+      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE);
       const svgCacheKey = badgeLocale.cacheKey(handle, today);
-      const existingSvg = scoringSelection.cacheable ? await readBadgeSvgCache(svgCacheKey) : null;
+      const existingSvg = await readBadgeSvgCache(svgCacheKey);
 
       if (existingSvg === null) {
         const avatarOutcome = await resolveBadgeAvatar(
@@ -501,8 +500,8 @@ async function warmHandle(
           const configSnapshot = await resolveBadgeConfigSnapshot(handle);
           // Keep profile warming successful when styling storage is unavailable;
           // a fallback design must not overwrite the public SVG cache.
-          if (configSnapshot.cacheable && scoringSelection.cacheable && materialized.scoring?.freshness !== "unavailable") {
-            const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+          if (configSnapshot.cacheable && materialized.scoring && materialized.scoring.freshness !== "unavailable") {
+            const svg = renderBadgeSvg(materialized.stats, {
               scoring: materialized.scoring,
               avatarDataUri,
               // #1191 — the cron writes to the same cache slot as the request
@@ -514,26 +513,23 @@ async function warmHandle(
               // Mirrors the request path — this SVG is served to <img> embeds,
               // where SMIL <animate> never runs.
               disableAnimation: true,
-              strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
+              strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? null),
             });
+            const receiptIdentity = materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null;
             if (avatarCachePolicy === "short") {
               await writeBadgeSvgCache(svgCacheKey, svg, handle, {
                 ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
-                scoringSelection, configRevision: configSnapshot.revision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null,
+                configRevision: configSnapshot.revision, receiptIdentity,
               });
             } else {
-              await writeBadgeSvgCache(svgCacheKey, svg, handle, { scoringSelection, configRevision: configSnapshot.revision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null });
+              await writeBadgeSvgCache(svgCacheKey, svg, handle, { configRevision: configSnapshot.revision, receiptIdentity });
             }
             // LE-6-1 — this SVG is the public badge for the rest of the day,
             // and the hash it prints was minted here, by a materialization
-            // nothing else sees. The request path only stores what IT
-            // rendered, so this pass has to store its own record. A v7.2
-            // profile stores nothing here (its receipt is the attestation);
-            // `deferProfileCacheWork` enforces that.
-            await deferProfileCacheWork(handle, materialized, {
-              verification,
-              verificationOnly: true,
-            });
+            // nothing else sees. #1335 phase 5 — a v7.2 profile stores
+            // nothing further here: its issued receipt is the attestation,
+            // and there is no snapshot/verification-record side effect left
+            // for this cron path to defer.
           }
         }
       }

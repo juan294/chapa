@@ -58,8 +58,6 @@ function renderHost(
       scoring={DEMO_SCORING}
       stats={DEMO_STATS}
       verification={verification}
-      trend={null}
-      diff={null}
       embedMarkdown="![Chapa Badge of developer](https://chapa.thecreativetoken.com/u/developer/badge.svg)"
       embedHtml={'<img src="https://chapa.thecreativetoken.com/u/developer/badge.svg" alt="Chapa Badge of developer" width="600" height="315" />'}
       {...overrides}
@@ -112,7 +110,7 @@ afterEach(() => {
 });
 
 describe("SharePageWebMcpTools", () => {
-  it("registers exactly five read-only tools behind the WebMCP flag", () => {
+  it("registers exactly six read-only tools behind the WebMCP flag", () => {
     const { tools, enabled, getTool } = renderHost();
 
     expect(enabled).toBe(true);
@@ -120,6 +118,7 @@ describe("SharePageWebMcpTools", () => {
       "get_impact_profile",
       "get_impact_history",
       "verify_badge",
+      "explain_dimension",
       "compare_profiles",
       "get_embed_snippet",
     ]);
@@ -140,6 +139,18 @@ describe("SharePageWebMcpTools", () => {
     );
   });
 
+  it("registers explain_dimension with the untrusted annotation set on the share page", () => {
+    const { getTool } = renderHost();
+
+    // Share-page data (dimension sub-metrics) is currently all numeric, but the
+    // share page shows untrusted (owner-controlled) profile data throughout, so
+    // annotation choice must not be inferred per-field — it follows the page.
+    expect(getTool("explain_dimension").annotations).toEqual({
+      readOnlyHint: true,
+      untrustedContentHint: true,
+    });
+  });
+
   it("passes the disabled feature flag to registration", () => {
     mocks.useClientFeatureFlags.mockReturnValue({ webmcpEnabled: false });
 
@@ -150,9 +161,7 @@ describe("SharePageWebMcpTools", () => {
   });
 
   it("returns the on-page profile and freshness without fetching", async () => {
-    const trend = { direction: "improving", avgDelta: 2 } as never;
-    const diff = { adjustedComposite: 3 } as never;
-    const { getTool } = renderHost({ trend, diff });
+    const { getTool } = renderHost();
 
     const { output } = await execute(getTool("get_impact_profile"));
     const result = JSON.parse(output);
@@ -166,8 +175,6 @@ describe("SharePageWebMcpTools", () => {
         prsMergedCount: DEMO_STATS.prsMergedCount,
       },
       verification,
-      trend,
-      diff,
       freshness: {
         source: "current page render",
         statsFetchedAt: DEMO_STATS.fetchedAt,

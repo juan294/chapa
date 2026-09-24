@@ -62,6 +62,6 @@ export function ImpactDashboard({
     {!activityUnavailable && (
       <ActivityHeatmap heatmapData={stats.heatmapData} activeDays={stats.activeDays} descriptiveOnly />
     )}
-    <StatsGrid stats={stats} diff={null} />
+    <StatsGrid stats={stats} />
   </div>;
 }

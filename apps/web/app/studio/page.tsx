@@ -7,7 +7,7 @@ import {
 } from "@/lib/feature-flags";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
-import { getPublicProfileVerification } from "@/lib/profile/public-profile";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { loadStudioConfig } from "@/lib/db/studio";
 import {
   resolveBadgeAvatar,
@@ -20,7 +20,6 @@ import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { STUDIO_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { DEMO_STATS } from "@/lib/render/demoData";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +99,6 @@ export default async function StudioPage(
       initialConfig: DEFAULT_BADGE_CONFIG,
       stats: DEMO_STATS,
       scoring: STUDIO_OBSERVED_DEMO,
-      craftResult: null,
       handle: DEMO_STATS.handle,
       verification: null,
       demo: true,
@@ -117,11 +115,9 @@ export default async function StudioPage(
     redirect("/api/auth/login");
   }
 
-  const scoringSelection = await readScoringRenderSelection();
-
   // Fetch the live owner display projection and saved config in parallel.
   const [sessionMaterialized, savedConfigResult] = await Promise.all([
-    materializeDisplayProfile(session.login, { token, scoringSelection }),
+    materializeDisplayProfile(session.login, { token }),
     loadStudioConfig(session.login),
   ]);
 
@@ -137,7 +133,7 @@ export default async function StudioPage(
   // profile"). Retry once as the server GITHUB_TOKEN, which is private-
   // inclusive and classified `authenticated`, before giving up.
   const materialized =
-    sessionMaterialized ?? (await materializeDisplayProfile(session.login, { scoringSelection }));
+    sessionMaterialized ?? (await materializeDisplayProfile(session.login, {}));
 
   // #1335 — v7.2 is the one scoring policy Studio renders; a materialization
   // that produced no current receipt model is treated the same as a failed
@@ -146,7 +142,7 @@ export default async function StudioPage(
     throw new Error(`Unable to load Studio profile for ${session.login}`);
   }
 
-  const verification = getPublicProfileVerification(materialized);
+  const verification = await resolveBadgeVerification(materialized);
   const initialConfig = savedConfigResult.status === "found"
     ? savedConfigResult.config
     : DEFAULT_BADGE_CONFIG;
@@ -166,7 +162,6 @@ export default async function StudioPage(
     initialConfig,
     stats: materialized.stats,
     scoring: materialized.scoring,
-    craftResult: materialized.craftResult,
     handle: session.login,
     verification,
     avatarDataUri: getBadgeAvatarDataUri(avatarOutcome),

@@ -17,8 +17,8 @@ vi.mock("./LandingUrlEffects", () => ({ LandingUrlEffects: () => null }));
 afterEach(cleanup);
 
 const TOP_SCORED: LeaderboardPlace[] = [
-  { rank: 1, score: 91, tier: "Elite", handles: ["juan294"] },
-  { rank: 2, score: 84, tier: "High", handles: ["cdnkr", "octocat"] },
+  { rank: 1, score: 91, tier: "Elite", handles: ["juan294"], policyVersion: "v7.2" },
+  { rank: 2, score: 84, tier: "High", handles: ["cdnkr", "octocat"], policyVersion: "v7.2" },
 ];
 
 function renderLanding() {

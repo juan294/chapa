@@ -8,7 +8,6 @@
 
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { SCORING_OBSERVED_POLICY } from "@chapa/shared";
-import type { MetricsSnapshot } from "../history/types";
 import type { CoreDimensionKey, ScoreValue, ScoreViewModel } from "../profile/score-view-model";
 
 // ---------------------------------------------------------------------------
@@ -203,43 +202,5 @@ export function makeScoring(
     exclusions: [],
     limitations: [],
     ...rest,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// makeSnapshot — builds a valid MetricsSnapshot with sensible defaults
-// ---------------------------------------------------------------------------
-
-export function makeSnapshot(
-  overrides: Partial<MetricsSnapshot> = {},
-): MetricsSnapshot {
-  return {
-    date: "2025-06-15",
-    capturedAt: "2025-06-15T14:30:00.000Z",
-    commitsTotal: 150,
-    prsMergedCount: 30,
-    prsMergedWeight: 45,
-    reviewsSubmittedCount: 20,
-    issuesClosedCount: 10,
-    reposContributed: 8,
-    activeDays: 200,
-    linesAdded: 5000,
-    linesDeleted: 2000,
-    totalStars: 100,
-    totalForks: 25,
-    totalWatchers: 50,
-    topRepoShare: 0.4,
-    maxCommitsIn10Min: 3,
-    delivery: 75,
-    quality: 60,
-    consistency: 80,
-    breadth: 55,
-    archetype: "Builder",
-    profileType: "collaborative",
-    compositeScore: 67.5,
-    adjustedComposite: 60.75,
-    confidence: 90,
-    tier: "High",
-    ...overrides,
   };
 }

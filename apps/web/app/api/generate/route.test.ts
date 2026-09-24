@@ -237,7 +237,7 @@ describe("POST /api/generate", () => {
 
     const res = await POST(makeRequest("chapa_session=abc"));
 
-    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith("juan294", "signup", expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }));
+    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith("juan294", "signup");
     await expect(res.json()).resolves.toEqual({
       success: true,
       handle: "juan294",

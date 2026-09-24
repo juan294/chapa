@@ -1,4 +1,3 @@
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import {
   materializeProfile,
   type MaterializedProfile,
@@ -9,7 +8,6 @@ export async function materializeOrchestratedProfile(
   handle: string,
   options: {
     token?: string;
-    scoringSelection?: ScoringRenderSelection;
     today?: string;
     /** #1335 phase 5 — accepted for call-site compatibility only; there is no
      * snapshot lookup left to skip. */
@@ -18,7 +16,6 @@ export async function materializeOrchestratedProfile(
 ): Promise<MaterializedProfile | null> {
   const materialized = await materializeProfile(handle, {
     token: options.token,
-    scoringSelection: options.scoringSelection,
     today: options.today,
     ignoreSnapshot: options.ignoreSnapshot,
   });

@@ -70,7 +70,6 @@ describe("materializePublicProfile", () => {
 
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
-      scoringSelection: undefined,
       today: undefined,
       readOnly: undefined,
     });
@@ -85,7 +84,6 @@ describe("materializePublicProfile", () => {
 
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: undefined,
-      scoringSelection: undefined,
       today: undefined,
       readOnly: true,
     });

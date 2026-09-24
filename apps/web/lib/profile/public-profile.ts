@@ -1,5 +1,4 @@
 import { resolveScoreModel } from "./score-model";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import type { GitHubUserNotFound } from "@/lib/github/not-found";
 import { trackBadgeGenerated } from "@/lib/cache/redis";
 import { dbUpdateUserProfile } from "@/lib/db/users";
@@ -16,11 +15,10 @@ export interface PublicVerificationCode {
 
 export async function materializePublicProfile(
   handle: string,
-  options: { token?: string; today?: string; readOnly?: boolean; scoringSelection?: ScoringRenderSelection } = {},
+  options: { token?: string; today?: string; readOnly?: boolean } = {},
 ): Promise<MaterializedProfile | GitHubUserNotFound | null> {
   return materializeProfile(handle, {
     token: options.token,
-    scoringSelection: options.scoringSelection,
     today: options.today,
     readOnly: options.readOnly,
   });
@@ -43,7 +41,6 @@ export async function runPublicProfileSideEffects(
   options: {
     readOnly?: boolean;
     sendFirstBadgeNotification?: boolean;
-    scoringSelection?: ScoringRenderSelection;
   } = {},
 ): Promise<void> {
   if (options.readOnly) return;

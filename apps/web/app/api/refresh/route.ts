@@ -1,5 +1,3 @@
-import { SCORING_POLICY } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
@@ -76,16 +74,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
-  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
-  // the only rendered policy.
-  const scoringSelection: ScoringRenderSelection = {
-    enabled: true,
-    machinePolicy: SCORING_POLICY,
-    cacheable: true,
-    capturedAt: Date.now(),
-  };
   const materialized = await materializeOrchestratedProfile(handle, {
-    scoringSelection,
     token,
   });
   if (!materialized) {
@@ -138,7 +127,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
   // complete — never synchronously here. `scheduleCollectionAdvance` runs a
   // bounded slice in the background (`after()`) so the badge doesn't wait a
   // full 5-minute cron tick for its first progress.
-  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh", scoringSelection);
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh");
 
   const craftResult = materialized.craftResult;
   if (craftResult) {

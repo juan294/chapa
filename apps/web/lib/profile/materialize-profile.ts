@@ -1,6 +1,5 @@
 import "server-only";
 import type { CraftResult, StatsData } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { readRenderableReceipt, scoreModelFrom } from "./score-model";
 import type { ScoreViewModel } from "./score-view-model";
@@ -20,17 +19,6 @@ export type StatsFreshness = "current" | "stale";
 export interface MaterializeProfileOptions {
   token?: string;
   readOnly?: boolean;
-  /**
-   * #1335 phase 5 ("delete v6") — accepted for call-site compatibility only;
-   * none of these change behavior any more. There is one scoring policy
-   * (`SCORING_POLICY`, `@chapa/shared`) now, and no EMA/snapshot machinery
-   * left to select a rendering policy for, freeze inputs against, or bypass
-   * a same-day lock on. Existing unowned callers (warm-cache,
-   * `/api/refresh`, `/api/recalculate`, admin bulk-recalculate, Studio, the
-   * leaderboard, `/api/profile`) may still pass these; dropping them from
-   * every call site is a follow-up, not part of this change.
-   */
-  scoringSelection?: ScoringRenderSelection;
   today?: string;
   policy?: string;
   inputsChanged?: boolean;
@@ -39,7 +27,7 @@ export interface MaterializeProfileOptions {
 
 export type MaterializeDisplayProfileOptions = Pick<
   MaterializeProfileOptions,
-  "token" | "readOnly" | "scoringSelection"
+  "token" | "readOnly"
 >;
 
 interface MaterializedStatsState {

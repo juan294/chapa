@@ -191,13 +191,11 @@ describe("POST /api/refresh", () => {
     });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
-      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     });
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", { badgeSvg: true });
     expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(
       "testuser",
       "refresh",
-      expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     );
     expect(body).toEqual({ success: true, scoringStatus: SCORING_STATUS });
   });

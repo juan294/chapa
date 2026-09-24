@@ -100,7 +100,7 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoScoring, topS
             <span className="tracking-wider uppercase">{r("topScoresLabel")}</span>
             <ol className="flex flex-wrap items-center gap-x-4 gap-y-1">
               {topScored.map((place) => (
-                <li key={place.score} data-scoring-policy={place.policyVersion ?? "v6"} className="flex items-center gap-2">
+                <li key={place.score} data-scoring-policy={place.policyVersion} className="flex items-center gap-2">
                   <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-[2px] px-1 text-[10px] font-semibold text-forest ${MEDALS[place.rank - 1] ?? "bg-track"}`}>
                     {place.rank}
                   </span>

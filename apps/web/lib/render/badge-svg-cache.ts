@@ -1,6 +1,5 @@
 import { dbObservedReceiptManifest } from "@/lib/db/score-receipts-observed";
 import { SCORING_POLICY } from "@chapa/shared";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 /**
  * Shared full-response SVG cache for the badge — read by both the
  * `/u/[handle]/badge.svg` route and the share page (#720). Centralizing
@@ -206,9 +205,9 @@ const utcDay = (instant: number) => Math.floor(instant / DAY_MS);
 
 /**
  * The maximum age (seconds, capped at 300) a badge/OG response captured at
- * `capturedAt` may be cached for (#1335 phase 5 — replaces
- * `lib/scoring-render-selection.ts`'s `scoringResponseMaxAge`, which took a
- * whole `ScoringRenderSelection`; there is only one policy now). Capped by
+ * `capturedAt` may be cached for (#1335 phase 5 — there is only one policy
+ * now; the retired `scoring-render-selection.ts` selector this superseded
+ * used to take a whole selection object). Capped by
  * both the elapsed age since capture and the current UTC day's end — a
  * v7.2 receipt's report-Craft eligibility can expire at midnight without a
  * new receipt write, so a cached response must never outlive the day it was
@@ -220,21 +219,6 @@ export function scoringResponseMaxAge(capturedAt: number): number {
   const ageBudget = 300 - Math.max(0, now - capturedAt) / 1000;
   const dayBudget = ((utcDay(capturedAt) + 1) * DAY_MS - now) / 1000;
   return Math.max(0, Math.floor(Math.min(300, ageBudget, dayBudget)));
-}
-
-/**
- * A constant, structurally-valid `ScoringRenderSelection` for call sites
- * outside this workstream's ownership (`readStoredBadgeProfile`'s
- * `readPublicObservedScore`, `read-scoring-status.ts`'s
- * `hasDrawableCurrentReceipt`, `lib/render/badge-state.ts`'s
- * `needsUnavailablePlaceholder`) that still declare a parameter of this type
- * (#1335 phase 5 — "delete v6"). This is a plain literal, never a call to
- * `readScoringRenderSelection()`: there is one policy now, so nothing here
- * reads the retired flag. Shared by the badge, OG image and share page routes
- * so the three don't each redeclare it slightly differently.
- */
-export function constantScoringSelection(capturedAt: number): ScoringRenderSelection {
-  return { enabled: true, machinePolicy: SCORING_POLICY, cacheable: true, capturedAt };
 }
 
 /**

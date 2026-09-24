@@ -14,7 +14,6 @@
 import { unstable_cache } from "next/cache";
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import { withTimeout } from "./async/with-timeout";
-import { readScoringRenderSelection, invalidateScoringRenderSelection } from "./scoring-render-selection";
 import {
   getExperimentsEnabledEnv,
   getMcpServerEnabledEnv,
@@ -105,7 +104,6 @@ async function checkFlag(
 }
 
 export function invalidateFeatureFlagCache(key?: string): void {
-  if (!key || key === "scoring_v7_rendering") invalidateScoringRenderSelection();
   if (key) {
     flagCache.delete(key);
     return;
@@ -138,13 +136,6 @@ export async function isStudioDemoEnabled(): Promise<boolean> {
     "studio_demo_enabled",
     isStudioDemoEnabledSync() ? "true" : undefined,
   );
-}
-
-/** Compatibility boolean for non-image callers. Image and publication paths
- * carry the complete selection so lookup failure cannot be cached as success.
- */
-export async function isScoringV7RenderingEnabled(): Promise<boolean> {
-  return (await readScoringRenderSelection()).enabled;
 }
 
 /**

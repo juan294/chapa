@@ -29,35 +29,31 @@ describe("getLeaderboard", () => {
     expect(mockReceipt).not.toHaveBeenCalled();
   });
 
-  it("uses a constant v7.2 selection when the caller passes none", async () => {
+  it("reads every registered handle's current receipt", async () => {
     mockRegistered.mockResolvedValue(["alice"]);
 
     await getLeaderboard(3);
 
-    expect(mockReceipt).toHaveBeenCalledWith("alice", expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }));
+    expect(mockReceipt).toHaveBeenCalledWith("alice");
   });
 });
 
 describe("observed leaderboard policy isolation", () => {
-  const selection = { enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") };
-
   it("ranks all current registered receipts without a legacy top-pool cutoff", async () => {
     const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
     const low = await scoringConsistencyFixture();
     const boundary = await scoringConsistencyFixture({ boundary: true });
     mockRegistered.mockResolvedValue(["low", "missing", "boundary", "unavailable"]);
-    mockReceipt.mockImplementation(async handle => handle === "low" ? { receipt: low.envelope, trend: null } : handle === "boundary" ? { receipt: boundary.envelope, trend: null } : handle === "unavailable" ? { unavailable: true } : null);
+    // #1335 phase 5 — `readRenderableReceipt` already folds a failed
+    // authority read into `null` (score-model.ts); the leaderboard never
+    // sees a distinct "unavailable" shape.
+    mockReceipt.mockImplementation(async handle => handle === "low" ? { receipt: low.envelope, trend: null } : handle === "boundary" ? { receipt: boundary.envelope, trend: null } : null);
 
-    expect(await getLeaderboard(3, selection)).toEqual([
+    expect(await getLeaderboard(3)).toEqual([
       { rank: 1, score: 69.99, tier: "Solid", handles: ["boundary"], policyVersion: "v7.2" },
       { rank: 2, score: 46, tier: "Solid", handles: ["low"], policyVersion: "v7.2" },
     ]);
-    expect(mockReceipt).toHaveBeenCalledWith("boundary", selection);
-  });
-
-  it("publishes no standing when policy authority is unavailable", async () => {
-    expect(await getLeaderboard(3, { ...selection, cacheable: false })).toEqual([]);
-    expect(mockRegistered).not.toHaveBeenCalled();
+    expect(mockReceipt).toHaveBeenCalledWith("boundary");
   });
 
   // #1335 phase 4/5 — an owner whose collection is still in progress (no
@@ -71,7 +67,7 @@ describe("observed leaderboard policy isolation", () => {
     mockReceipt.mockImplementation(async (handle) =>
       handle === "ready-owner" ? { receipt: ready.envelope, trend: null } : null,
     );
-    expect(await getLeaderboard(3, selection)).toEqual([
+    expect(await getLeaderboard(3)).toEqual([
       { rank: 1, score: 46, tier: "Solid", handles: ["ready-owner"], policyVersion: "v7.2" },
     ]);
   });
@@ -81,9 +77,9 @@ describe("observed leaderboard policy isolation", () => {
     const ready = await scoringConsistencyFixture();
     mockRegistered.mockResolvedValue(["unavailable-owner", "ready-owner"]);
     mockReceipt.mockImplementation(async (handle) =>
-      handle === "ready-owner" ? { receipt: ready.envelope, trend: null } : { unavailable: true },
+      handle === "ready-owner" ? { receipt: ready.envelope, trend: null } : null,
     );
-    expect(await getLeaderboard(3, selection)).toEqual([
+    expect(await getLeaderboard(3)).toEqual([
       { rank: 1, score: 46, tier: "Solid", handles: ["ready-owner"], policyVersion: "v7.2" },
     ]);
   });
@@ -94,7 +90,7 @@ describe("observed leaderboard policy isolation", () => {
     mockRegistered.mockResolvedValue(["a", "b"]);
     mockReceipt.mockResolvedValue({ receipt: low.envelope, trend: null });
 
-    const board = await getLeaderboard(3, selection);
+    const board = await getLeaderboard(3);
 
     expect(board).toEqual([
       { rank: 1, score: 46, tier: "Solid", handles: ["a", "b"], policyVersion: "v7.2" },

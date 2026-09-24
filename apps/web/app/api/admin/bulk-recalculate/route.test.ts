@@ -7,7 +7,6 @@ const {
   mockGetClientIp,
   mockDbGetUserHandlePage,
   mockMaterializeOrchestratedProfile,
-  mockPersistOrchestratedSnapshot,
   mockVerifyAdminSecret,
   mockInvalidateProfileReadModels,
   mockRevalidatePath,
@@ -21,7 +20,6 @@ const {
   mockGetClientIp: vi.fn(),
   mockDbGetUserHandlePage: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
-  mockPersistOrchestratedSnapshot: vi.fn(),
   mockVerifyAdminSecret: vi.fn(),
   mockInvalidateProfileReadModels: vi.fn(),
   mockRevalidatePath: vi.fn(),
@@ -48,8 +46,6 @@ vi.mock("@/lib/db/users", () => ({
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: (...args: unknown[]) =>
     mockMaterializeOrchestratedProfile(...args),
-  persistOrchestratedSnapshot: (...args: unknown[]) =>
-    mockPersistOrchestratedSnapshot(...args),
 }));
 
 vi.mock("@/lib/auth/admin", () => ({
@@ -85,29 +81,6 @@ vi.mock("@/lib/profile/post-write-score", () => ({
 const FAKE_MATERIALIZED = {
   stats: { handle: "testuser" },
   craftResult: null,
-  rawImpact: {
-    adjustedComposite: 50,
-    compositeScore: 50,
-    dimensions: { delivery: 50, quality: 30, consistency: 40, breadth: 35 },
-    archetype: "Emerging",
-    tier: "Solid",
-    profileType: "solo",
-    confidence: 100,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  displayImpact: {
-    adjustedComposite: 42,
-    compositeScore: 50,
-    dimensions: { delivery: 50, quality: 30, consistency: 40, breadth: 35 },
-    archetype: "Emerging",
-    tier: "Solid",
-    profileType: "solo",
-    confidence: 100,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  snapshot: { date: "2026-04-17", adjustedComposite: 42, tier: "Solid" },
   statsComplete: true,
 };
 
@@ -151,11 +124,11 @@ describe("POST /api/admin/bulk-recalculate", () => {
       total: 2,
     });
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     // v7.2 is the only rendered policy (#1335 phase 5): every successful
-    // replace also runs the fan-in decision. Default to "already complete"
-    // so the generic mechanics tests below don't need to know about it.
+    // materialize also runs the fan-in decision. Default to "already
+    // complete" so the generic mechanics tests below don't need to know
+    // about it.
     resetCollectionMocksToDefaults();
   });
 
@@ -186,13 +159,8 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockDbGetUserHandlePage).toHaveBeenCalledWith({ limit: 101 });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
       ignoreSnapshot: true,
-      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }),
     });
-    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
-      "alice",
-      FAKE_MATERIALIZED,
-      { mode: "replace" },
-    );
+    expect(mockPostWriteScore).toHaveBeenCalledWith("alice");
   });
 
   it("invalidates public read models and the share page after a successful replace", async () => {
@@ -204,8 +172,6 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("alice", {
       stats: true,
       badgeSvg: true,
-      snapshot: true,
-      history: true,
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/u/alice");
   });
@@ -234,12 +200,12 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       1,
       "mona",
-      { ignoreSnapshot: true, scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }) },
+      { ignoreSnapshot: true },
     );
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       2,
       "zara",
-      { ignoreSnapshot: true, scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }) },
+      { ignoreSnapshot: true },
     );
   });
 
@@ -317,7 +283,6 @@ describe("POST /api/admin/bulk-recalculate", () => {
       total: 105,
     });
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     resetCollectionMocksToDefaults();
 
@@ -356,7 +321,6 @@ describe("POST /api/admin/bulk-recalculate", () => {
       total: 5,
     });
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     resetCollectionMocksToDefaults();
 
@@ -422,7 +386,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
       expect(body.completed).toEqual(sortedHandles.slice(0, 5));
       expect(body.pending).toEqual(sortedHandles.slice(5));
       expect(body.total).toBe(100);
-      expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledTimes(5);
+      expect(mockPostWriteScore).toHaveBeenCalledTimes(5);
     } finally {
       vi.useRealTimers();
     }
@@ -461,33 +425,18 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.completed).toEqual(["bob"]);
   });
 
-  it("reports snapshot replace failures explicitly", async () => {
-    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
-
-    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
-    const body = await res.json();
-
-    expect(body.recalculated).toBe(0);
-    expect(body.failed).toBe(1);
-    expect(body.errors[0]).toEqual({
-      handle: "alice",
-      error: "Snapshot replace failed",
-    });
-  });
-
   // ---------------------------------------------------------------------------
-  // #1076 — persistOrchestratedSnapshot's #1003 gate intentionally skips
-  // persistence when materialized.statsComplete is false. Distinguish that
-  // from a genuine write failure in the per-handle error message so an
-  // operator scanning bulk-recalculate output can tell them apart.
+  // #1076/#1335 phase 5 — there is no snapshot-replace step left to fail
+  // independently of materialize: a completed materialize with
+  // `statsComplete: false` skips (distinctly from a genuine per-handle
+  // error) rather than counting as recalculated.
   // ---------------------------------------------------------------------------
 
-  it("#1076: reports an incomplete-stats skip distinctly from a genuine snapshot replace failure", async () => {
+  it("#1076: reports an incomplete-stats skip distinctly from a genuine error", async () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue({
       ...FAKE_MATERIALIZED,
       statsComplete: false,
     });
-    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
 
     const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
     const body = await res.json();
@@ -496,7 +445,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.failed).toBe(1);
     expect(body.errors[0]).toEqual({
       handle: "alice",
-      error: "Snapshot skipped: stats incomplete",
+      error: "Recalculate skipped: stats incomplete",
     });
   });
 

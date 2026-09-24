@@ -10,7 +10,7 @@ import type { ScoreViewModel } from "@/lib/profile/score-view-model";
  * so these build real v7.2 `ScoreViewModel`s from tuned evidence counts
  * through the production `calculateObservedCoreV7` arithmetic (same
  * approach as `lib/render/observed-demo-data.ts`), rather than hand-picking
- * a display score the way the old `ImpactV6Result` constants did.
+ * a display score the way the old legacy aggregate constants did.
  *
  * `coreArchetypeV7` (lib/impact/v7.ts) derives the archetype purely from the
  * four core dimensions and never returns "Artificer" — that persona is

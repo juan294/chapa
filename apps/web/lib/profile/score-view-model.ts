@@ -70,7 +70,7 @@ export interface ScoreViewModel {
   /**
    * `"v7"` is the archived machine-v7/algorithm-v7.1 receipt engine — its
    * receipts remain immutable and replayable (CLAUDE.md goal #2), but it is
-   * never the current policy. `"v6"` was retired in #1335 phase 5 ("delete
+   * never the current policy. The legacy aggregate policy was retired in #1335 phase 5 ("delete
    * v6"): there is no legacy aggregate projection any more.
    */
   readonly policyVersion: "v7" | "v7.2";

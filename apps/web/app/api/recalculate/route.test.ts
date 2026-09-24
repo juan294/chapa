@@ -109,13 +109,11 @@ describe("POST /api/recalculate", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "cli-token",
       ignoreSnapshot: true,
-      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }),
     });
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", { badgeSvg: true });
     expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(
       "testuser",
       "refresh",
-      expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     );
     expect(body).toEqual({ success: true, scoringStatus: SCORING_STATUS });
   });

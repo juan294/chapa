@@ -1,9 +1,7 @@
-import { SCORING_POLICY } from "@chapa/shared";
 import { postWriteScore } from "@/lib/profile/post-write-score";
 import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 import { maybeIssue } from "@/lib/collection/fan-in";
 import { listCollectionJobsForDate } from "@/lib/db/collection-queue";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { verifyAdminSecret } from "@/lib/auth/admin";
@@ -13,10 +11,7 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUserHandlePage } from "@/lib/db/users";
 import { isValidHandle } from "@/lib/validation";
 import { toDateString } from "@/lib/utils/date";
-import {
-  materializeOrchestratedProfile,
-  persistOrchestratedSnapshot,
-} from "@/lib/profile/orchestrated-profile";
+import { materializeOrchestratedProfile } from "@/lib/profile/orchestrated-profile";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
@@ -32,9 +27,12 @@ const INLINE_DEADLINE_MS = 250_000;
 /**
  * POST /api/admin/bulk-recalculate
  *
- * Force-recalculates impact scores for all (or specified) users using
- * the current scoring formulas. Uses `dbReplaceSnapshot` to overwrite
- * today's snapshot so users immediately see updated scores.
+ * Force-recalculates impact scores for all (or specified) users using the
+ * current scoring formulas. #1335 phase 5 ("delete v6") — there is no
+ * `metrics_snapshots` row to replace any more: a re-materialize with
+ * `ignoreSnapshot: true` (bypassing GitHub's own stats cache) is the forcing
+ * function, and re-publishing the v7.2 receipt goes through the same
+ * fan-in issuance every other write route uses.
  *
  * Protected by ADMIN_SECRET bearer token (same as /api/admin/stats).
  *
@@ -60,18 +58,6 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
-  // the only rendered policy now. `materializeOrchestratedProfile` and
-  // `postWriteScore` (owned elsewhere in this phase) still take the
-  // `ScoringRenderSelection` shape, so this constant stands in for the old
-  // dynamic DB-backed read rather than every downstream signature changing
-  // in lockstep with this route.
-  const scoringSelection: ScoringRenderSelection = {
-    enabled: true,
-    machinePolicy: SCORING_POLICY,
-    cacheable: true,
-    capturedAt: Date.now(),
-  };
   const publications: { handle: string; result: Awaited<ReturnType<typeof postWriteScore>> }[] = [];
 
   // Optional cursor: ?after=<handle> continues an all-user page or resumes a
@@ -142,16 +128,18 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       // silently if batch ordering ever diverges from handles order. A Set-based filter
       // is correct regardless of insertion order.
       const completedSet = new Set(completed);
-      // #1335 phase 4 — one bounded background tick per response, not one
+      // #1335 phase 4/5 — one bounded background tick per response, not one
       // per enqueued handle: this route can enqueue dozens of handles in a
       // single batch, and scheduling a full tick after every one of them
-      // would be redundant work for the same `after()` callback.
-      if (scoringSelection.enabled && recalculated > 0) scheduleCollectionAdvance();
+      // would be redundant work for the same `after()` callback. v7.2 is
+      // the one rendered policy, so this always runs (the retired
+      // retired DB-backed render-selector flag used to gate it).
+      if (recalculated > 0) scheduleCollectionAdvance();
       return NextResponse.json(
         {
           partial: true,
           completed,
-          ...(scoringSelection.enabled && { publications }),
+          publications,
           pending: handles.filter((h) => !completedSet.has(h)),
           recalculated,
           failed: errors.length,
@@ -168,7 +156,6 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       batch.map(async (handle) => {
         try {
           const materialized = await materializeOrchestratedProfile(handle, {
-            scoringSelection,
             // #930 — Admin recalculates must bypass the EMA same-day lock.
             // A stored today-snapshot may contain wrong data (e.g. from a
             // timed-out platform fetch); ignoring it ensures the fresh score
@@ -181,56 +168,44 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             return;
           }
 
-          const replaced = await persistOrchestratedSnapshot(handle, materialized, {
-            mode: "replace",
-          });
-          if (replaced) {
-            // #1335 phase 4 — bulk-recalculate exists to make published
-            // numbers current after a scoring-code fix, which needs no new
-            // evidence: when every one of today's jobs is already complete,
-            // call fan-in's issuance directly (it recomputes the receipt
-            // fresh from already-stored observations and republishes if the
-            // result differs — no collection required). Only a subject with
-            // no job yet, or one still in progress, gets an `admin`-reason
-            // enqueue instead; `admin` is idempotent against an
-            // already-queued/running/complete job for today, since forcing a
-            // full re-collection for every handle in a batch would be a very
-            // different (and far more expensive) operation than "recompute
-            // the score from what's already known". Either path records its
-            // outcome through the same scoring_issuance_attempts table.
-            if (scoringSelection.enabled) {
-              const today = toDateString(new Date());
-              const referenceTime = new Date().toISOString();
-              const jobs = await listCollectionJobsForDate(handle, today);
-              const allComplete = jobs.length > 0 && jobs.every((job) => job.state === "complete");
-              if (allComplete) {
-                await maybeIssue(handle, today, referenceTime);
-              } else {
-                await enqueueCollection(handle, "admin");
-              }
-            }
-            publications.push({ handle, result: await postWriteScore(handle, scoringSelection) });
-            await invalidateProfileReadModels(handle, {
-              stats: true,
-              badgeSvg: true,
-              snapshot: true,
-              history: true,
-            });
-            revalidatePath(`/u/${handle}`);
-            recalculated++;
-            completed.push(handle);
-          } else {
-            // #1076 — persistOrchestratedSnapshot's #1003 gate intentionally
-            // skips persistence when the fetched stats look incomplete/
-            // poisoned. Distinguish that from a genuine write failure so an
-            // operator scanning this batch's errors can tell them apart.
-            errors.push({
-              handle,
-              error: materialized.statsComplete
-                ? "Snapshot replace failed"
-                : "Snapshot skipped: stats incomplete",
-            });
+          if (!materialized.statsComplete) {
+            // #1076 — distinguish incomplete/poisoned stats from a genuine
+            // failure so an operator scanning this batch's errors can tell
+            // them apart.
+            errors.push({ handle, error: "Recalculate skipped: stats incomplete" });
+            return;
           }
+
+          // #1335 phase 4/5 — bulk-recalculate exists to make published
+          // numbers current after a scoring-code fix, which needs no new
+          // evidence: when every one of today's jobs is already complete,
+          // call fan-in's issuance directly (it recomputes the receipt
+          // fresh from already-stored observations and republishes if the
+          // result differs — no collection required). Only a subject with
+          // no job yet, or one still in progress, gets an `admin`-reason
+          // enqueue instead; `admin` is idempotent against an
+          // already-queued/running/complete job for today, since forcing a
+          // full re-collection for every handle in a batch would be a very
+          // different (and far more expensive) operation than "recompute
+          // the score from what's already known". Either path records its
+          // outcome through the same scoring_issuance_attempts table.
+          const today = toDateString(new Date());
+          const referenceTime = new Date().toISOString();
+          const jobs = await listCollectionJobsForDate(handle, today);
+          const allComplete = jobs.length > 0 && jobs.every((job) => job.state === "complete");
+          if (allComplete) {
+            await maybeIssue(handle, today, referenceTime);
+          } else {
+            await enqueueCollection(handle, "admin");
+          }
+          publications.push({ handle, result: await postWriteScore(handle) });
+          await invalidateProfileReadModels(handle, {
+            stats: true,
+            badgeSvg: true,
+          });
+          revalidatePath(`/u/${handle}`);
+          recalculated++;
+          completed.push(handle);
         } catch (err) {
           errors.push({
             handle,
@@ -241,13 +216,13 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  if (scoringSelection.enabled && recalculated > 0) scheduleCollectionAdvance();
+  if (recalculated > 0) scheduleCollectionAdvance();
 
   return NextResponse.json(
     {
       partial: hasMore,
       completed,
-      ...(scoringSelection.enabled && { publications }),
+      publications,
       recalculated,
       failed: errors.length,
       total: totalAvailable,

@@ -61,7 +61,7 @@ describe("observed revision notifications", () => {
     const { model } = await scoringConsistencyFixture({ boundary: true });
     const current = scoringObservation(model)!;
     const previous = { ...current, composite: { exact: 46, display: 46 } };
-    await notifyObservedScoreChange("alice", compareScoringObservations(previous, { ...current, policyVersion: "v6" }));
+    await notifyObservedScoreChange("alice", compareScoringObservations(previous, { ...current, policyVersion: "v7" }));
     expect(mockSend).not.toHaveBeenCalled();
     await notifyObservedScoreChange("alice", compareScoringObservations(previous, current));
     expect(mockSend.mock.calls[0]![0].text).toContain("69.99");
@@ -137,7 +137,7 @@ describe("observed revision notifications", () => {
     const { model } = await scoringConsistencyFixture({ boundary: true });
     const current = scoringObservation(model)!;
 
-    const result = await notifyObservedScoreChange("alice", compareScoringObservations(current, { ...current, policyVersion: "v6" }));
+    const result = await notifyObservedScoreChange("alice", compareScoringObservations(current, { ...current, policyVersion: "v7" }));
 
     expect(result).toBe(false);
     expect(mockSend).not.toHaveBeenCalled();

@@ -62,7 +62,7 @@ export type ReceiptIssuanceOutcome =
  * exists. Every other non-`issued` outcome is an explicit `failed{reason}`,
  * because a durable write that fails but reports success is always a bug.
  *
- * #1335 phase 5 — the render-half gate (the retired `scoring_v7_rendering`
+ * #1335 phase 5 — the render-half gate (the retired DB-backed render-selector
  * selector) is gone: there is one policy now, and it always renders, so
  * issuing was never inert to begin with.
  *
