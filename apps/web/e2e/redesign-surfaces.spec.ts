@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { badgeTheme } from '../lib/render/theme';
 import { DEFAULT_BADGE_CONFIG } from '@chapa/shared';
 import { REDESIGN_VALID_HASH, setRedesignSession, redesignFixtureClient } from './helpers/redesign-fixtures';
-import { studioRoot, studioControl } from './helpers/studio';
+import { studioRoot, studioControl, studioBadgePreview } from './helpers/studio';
 
 // These checks require the explicit disposable bootstrap and server-only replay.
 // The final local gate enables them; ordinary unseeded CI does not claim them.
@@ -46,8 +46,8 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await page.goto(`/studio?lang=${locale}`, { waitUntil: 'networkidle' });
     await expect(page.locator('html')).toHaveAttribute('lang', locale);
     await expect(page.locator('#terminal-command-input')).toBeVisible();
-    await expect(page.getByTestId('badge-preview').locator('svg')).toHaveCount(1);
-    await expect(page.getByTestId('badge-preview').locator('svg')).toBeVisible();
+    await expect(studioBadgePreview(page).locator('svg')).toHaveCount(1);
+    await expect(studioBadgePreview(page).locator('svg')).toBeVisible();
     await expect(studioRoot(page)).toBeVisible();
     expect(await page.getByTestId('studio-stage').evaluate(e => e.getBoundingClientRect().top)).toBeGreaterThanOrEqual(69);
     await command(page, '/reset');
@@ -63,8 +63,8 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await command(page, '/set palette jade');
     for (const change of ['/set card frost', '/set border gradient-rotating', '/set score chrome', '/set heatmap ripple', '/set tier enhanced']) await command(page, change);
     await expect(studioRoot(page).locator('[data-save-state="dirty"]')).toBeVisible();
-    await expect(page.getByTestId('badge-preview').locator('[data-element=archetype] rect')).toHaveAttribute('fill', badgeTheme('jade').bg);
-    expect(await page.getByTestId('badge-preview').locator('svg').evaluate((e: SVGSVGElement) => e.animationsPaused())).toBe(true);
+    await expect(studioBadgePreview(page).locator('[data-element=archetype] rect')).toHaveAttribute('fill', badgeTheme('jade').bg);
+    expect(await studioBadgePreview(page).locator('svg').evaluate((e: SVGSVGElement) => e.animationsPaused())).toBe(true);
     await page.route('**/api/studio/config', route => route.request().method() === 'PUT' ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Local test failure' }) }) : route.continue());
     await studioControl(page, 'studio-save').click();
     await expect(studioRoot(page).locator('[data-save-state="error"]')).toBeVisible();
@@ -79,7 +79,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     expect(serialized.colorPalette).toBe('jade');
     await expect(studioRoot(page).locator('[data-save-state="saved"]')).toBeVisible();
     await page.reload();
-    await expect(page.getByTestId('badge-preview').locator('[data-element=archetype] rect')).toHaveAttribute('fill', badgeTheme('jade').bg);
+    await expect(studioBadgePreview(page).locator('[data-element=archetype] rect')).toHaveAttribute('fill', badgeTheme('jade').bg);
     // Hold the real save response after the local DB write, then edit again.
     // The in-flight snapshot is persisted; the later preview must remain dirty.
     let releaseSave!: () => void;
@@ -147,7 +147,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await capture(page, `verify-${locale}-${theme}-${width}`);
     await page.goto(`/studio?demo=1&lang=${locale}`);
     await expect(studioRoot(page).getByTestId('studio-demo-marker')).toBeVisible();
-    await expect(page.getByTestId('badge-preview').locator('[data-element=score]')).toHaveText('82');
+    await expect(studioBadgePreview(page).locator('[data-element=score]')).toHaveText('82');
     await capture(page, `studio-demo-${locale}-${theme}-${width}`);
     const controls = page.getByRole('button', { name: locale === 'en' ? 'Quick Controls' : 'Controles rápidos', exact: true });
     await controls.click();

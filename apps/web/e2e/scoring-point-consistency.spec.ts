@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { setRedesignSession, redesignFixtureClient } from "./helpers/redesign-fixtures";
 import { assertScoringFixtureEnvironment, scoringReportHtml, enqueueGithubJob, seedFailedGithubJob } from "./helpers/scoring-point-fixtures";
-import { studioRoot, studioControl } from "./helpers/studio";
+import { studioRoot, studioControl, studioBadgePreview } from "./helpers/studio";
 
 const admitted = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
 if (process.env.RELEASE_VERIFICATION_MODE === "local-candidate" && !admitted) throw new Error("Local scoring qualification requires disposable fixtures");
@@ -134,9 +134,10 @@ async function upload(page: Page, point: 57 | 0, referenceTime: string) {
   return body;
 }
 
-test("real report57 then explicit correction0 preserves one core across surfaces, saves and withdraws", async ({ page, context, baseURL }, testInfo) => {
+test("real report57 then explicit correction0 preserves one core across surfaces, saves and stays published", async ({ page, context, baseURL }, testInfo) => {
   // This is the longest browser contract: it publishes twice, saves and
-  // restores Studio state, verifies two locales and withdraws the receipt.
+  // restores Studio state, verifies two locales and confirms the retired
+  // publication-withdrawal action leaves the receipt published.
   // Leave headroom when the full suite is concurrent.
   test.setTimeout(240_000);
   assertScoringFixtureEnvironment(process.env);
@@ -184,8 +185,8 @@ test("real report57 then explicit correction0 preserves one core across surfaces
   expect(configBefore.error).toBeNull();
   try {
     await page.goto("/studio?lang=en");
-    await expect(page.getByTestId("badge-preview").locator('[data-element="score"]')).toHaveText("46");
-    await expect(page.getByTestId("badge-preview").locator('[data-axis="craft"]')).toHaveAttribute("data-value", "0");
+    await expect(studioBadgePreview(page).locator('[data-element="score"]')).toHaveText("46");
+    await expect(studioBadgePreview(page).locator('[data-axis="craft"]')).toHaveAttribute("data-value", "0");
     const input = page.locator("#terminal-command-input");
     await input.fill("/set palette jade"); await input.press("Enter");
     const saved = page.waitForResponse(r => r.url().includes("/api/studio/config") && r.request().method() === "PUT");
@@ -228,13 +229,20 @@ test("real report57 then explicit correction0 preserves one core across surfaces
   await page.goto(`/u/${owner}?lang=en`);
   const tokenLink = await page.locator(`a[href*="${tokenPath}"]`).first().getAttribute("href");
   expect(tokenLink).toBeTruthy();
-  await page.goto("/settings?lang=en");
-  const withdrawal = page.waitForResponse(r => r.url().endsWith("/api/evidence") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Withdraw publication", exact: true }).click();
-  expect((await withdrawal).status()).toBe(200);
-  expect((await page.request.get(`/api${new URL(tokenLink!, baseURL).pathname}`)).status()).toBe(410);
+  // Publication consent, and the "Withdraw publication" action that used to
+  // depend on it, are retired (#1335 phase 2 -- see the `withdraw` branch in
+  // apps/web/app/api/evidence/route.ts): every registered subject publishes
+  // with no opt-in, so there is no UI action left to withdraw it. `withdraw`
+  // stays a recognized command shape only so it answers a specific
+  // retired_action error instead of a generic parse failure; the receipt
+  // this test built stays published and its verify link stays resolvable.
+  const retiredWithdraw = await page.request.post("/api/evidence", { data: { action: "withdraw", owner } });
+  expect(retiredWithdraw.status()).toBe(400);
+  expect((await retiredWithdraw.json()).error).toBe("retired_action");
+  expect((await page.request.get(`/api${new URL(tokenLink!, baseURL).pathname}`)).status()).toBe(200);
   const remaining = await db.from("scoring_v7_receipts").select("id").eq("owner_handle", owner);
-  expect(remaining.error).toBeNull(); expect(remaining.data).toEqual([]);
+  expect(remaining.error).toBeNull();
+  expect(remaining.data!.length).toBeGreaterThan(0);
 });
 
 test("expired Craft retains five labels and boundary69.99 fits EN/ES narrow themes", async ({ page, context, baseURL }, testInfo) => {

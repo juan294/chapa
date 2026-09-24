@@ -32,3 +32,18 @@ export function studioControl(
 ) {
   return studioRoot(page).getByTestId(testId);
 }
+
+/**
+ * #1335 phase 5 e2e — `badge-preview` (rendered inside the same
+ * `StudioClient` tree as `studio-root`) is subject to the identical #1329
+ * stale-pre-hydration-copy duplication, but every existing lookup used a
+ * raw `page.getByTestId('badge-preview')` instead of scoping through
+ * `studioRoot()`. Observed as an intermittent Playwright strict-mode
+ * violation ("resolved to 2 elements") on the `[data-element=archetype]
+ * rect` assertion, reproduced on two different locale/theme combinations
+ * across separate runs — not a fixture or residue issue. Scope every
+ * badge-preview lookup through this helper instead of the raw testid.
+ */
+export function studioBadgePreview(page: Page) {
+  return studioRoot(page).getByTestId("badge-preview");
+}

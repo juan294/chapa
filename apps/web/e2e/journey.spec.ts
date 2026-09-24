@@ -129,12 +129,16 @@ test.describe("full impact journey", () => {
         expect(share).not.toBeNull();
         expect(share!.status()).toBeLessThan(500);
         await expect(page.locator("body")).toContainText(shape.handle);
-        // LE-8-2 — the fixture handle has no GitHub account, so the honest
-        // share page is the not-found state (streamed, so still HTTP 200),
-        // for the owner exactly as for a visitor. A handle GitHub knows
-        // renders the profile with its embed snippets instead.
+        // #1335 phase 5 — with v6 deleted, this fixture handle (never
+        // registered as a scoring subject) never reaches a GitHub fetch or
+        // materialize at all: the share page's status gate answers
+        // "unregistered" before any of that runs, and shows the owner's
+        // scoring-status panel ("You haven't started scoring yet.") rather
+        // than the old not-found state a stats-fetch failure used to
+        // produce. This is what LE-8-2's honest-render invariant looks like
+        // now that the badge/share pipeline is v7.2-only.
         await expect(page.locator("body")).toContainText(
-          /Page not found|Página no encontrada|Markdown|HTML/,
+          /Not on Chapa yet|Aún no está en Chapa|haven.t started scoring yet|no has empezado a puntuar/,
         );
 
         await context.setOffline(true);
