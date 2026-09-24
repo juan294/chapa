@@ -66,8 +66,6 @@ v6 scoring is retired. See `docs/decisions/2026-09-23-universal-v72-no-consent.m
 - **An empty collection never replaces an established score.** A recompute
   with zero evidence keeps the last receipt, dated, and records the reason
   `empty_evidence`.
-- **The share page no longer carries two `og:image` tags** on the first visit
-  in a new language. The language cookie is now saved through `POST /api/locale`.
 - **Studio's live controls are anchored to the hydrated tree**, so a brief
   stale copy left over from server rendering is never read or acted on (#1329).
 
