@@ -56,6 +56,7 @@ export async function SharePageScoringStatus({
       : buildBadgeUnavailableStrings((key) => t(key) as string),
   });
   const badgeLabelId = `share-badge-status-label-${handle}`;
+  const badgeStateId = `share-badge-status-state-${handle}`;
 
   return (
     <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
@@ -63,12 +64,19 @@ export async function SharePageScoringStatus({
 
       <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
         <div className="relative rounded-[3px] border border-stroke bg-card p-4">
+          {/* Named like the ready badge on every share page, so assistive
+              technology (and the release probes) find the same localized
+              badge in every scoring state; the state is its description. */}
           <div
             role="img"
             aria-labelledby={badgeLabelId}
+            aria-describedby={badgeStateId}
             className="w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:block"
           >
             <span id={badgeLabelId} className="sr-only">
+              {interpolate(t("sharePage.badgeAriaLabel") as string, { handle })}
+            </span>
+            <span id={badgeStateId} className="sr-only">
               {t(VISITOR_KEYS[badgeState]) as string}
             </span>
             <InlineBadgeSvg svg={svg} />

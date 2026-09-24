@@ -45,8 +45,12 @@ export async function assertCoreDependencies(
 export function assertRenderableBadgeBody(body: string): void {
   expect(body).toContain("<svg");
   expect(body).toContain("</svg>");
-  expect(body).not.toContain('data-chapa-state="fallback"');
-  expect(body).toContain('data-chapa-state="rendered"');
+  // #1335: a subject without a drawable receipt renders a real v7.2 product
+  // state (a badge, a scoring-in-progress card, an action-needed card, or
+  // "not on Chapa yet"). The generic load-error `fallback` and the
+  // `unavailable` authority failure are the no-data artifacts this rejects.
+  const state = body.match(/data-chapa-state="([a-z_]+)"/)?.[1];
+  expect(["rendered", "collecting", "action_needed", "unregistered"]).toContain(state);
 }
 
 export async function assertBadgeSvg(

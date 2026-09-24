@@ -32,6 +32,22 @@ const ACTION_NEEDED: NonReadyScoringStatus = {
 const UNREGISTERED: NonReadyScoringStatus = { kind: "unregistered" };
 
 describe("SharePageScoringStatus", () => {
+  it("names the status badge like the ready badge, in each locale, with the state as its description", async () => {
+    render(
+      await SharePageScoringStatus({ handle: "octocat", locale: "en", status: UNREGISTERED, badgeState: "unregistered", isOwner: false }),
+    );
+    const badge = screen.getByRole("img", { name: "Chapa badge for octocat" });
+    expect(badge.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(badge.getAttribute("aria-describedby")!)?.textContent).toBe(
+      "This person hasn’t set up a Chapa badge yet.",
+    );
+    cleanup();
+    render(
+      await SharePageScoringStatus({ handle: "octocat", locale: "es", status: COLLECTING, badgeState: "collecting", isOwner: false }),
+    );
+    expect(screen.getByRole("img", { name: "Chapa de octocat" })).toBeDefined();
+  });
+
   it("renders the collecting badge with data-chapa-state and a visitor sentence", async () => {
     render(
       await SharePageScoringStatus({ handle: "octocat", locale: "en", status: COLLECTING, badgeState: "collecting", isOwner: false }),

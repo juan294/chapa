@@ -6,4 +6,3 @@ export { LangSync } from './lang-sync';
 export { LocaleSync } from './locale-sync';
 export { DEFAULT_LOCALE } from './types';
 export type { Locale, Translations } from './types';
-export { interpolate } from './interpolate';
