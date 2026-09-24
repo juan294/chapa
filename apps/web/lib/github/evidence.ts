@@ -130,7 +130,9 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   // in-window authored commit; inWindow() stays the authored-date filter.
   const commitHistorySince = new Date(Date.parse(`${window.startInclusive.slice(0, 10)}T00:00:00.000Z`) - COMMIT_HISTORY_SINCE_MARGIN_MS).toISOString();
   const login = input.requestedSource.login;
-  if (!/^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i.test(login)) throw new RangeError("Invalid GitHub handle");
+  // Enterprise Managed User logins are "<idp-handle>_<shortcode>": they may
+  // contain underscores and run longer than an ordinary 39-character login.
+  if (!/^[a-z\d](?:[a-z\d_-]{0,98}[a-z\d])?$/i.test(login)) throw new RangeError("Invalid GitHub handle");
   const explicit = input.scope.discovery === "explicit_repositories";
   const signal = AbortSignal.timeout(Math.max(0, budget.deadlineAt - Date.now()));
   const diag = createDiagnosticRecorder("github");

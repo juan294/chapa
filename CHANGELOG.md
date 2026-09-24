@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.6] - 2026-09-24
+
+### Fixed
+
+- **A job whose collector throws no longer loops forever.** The worker
+  recorded the error but left the job running, so its lease expired and every
+  cron tick claimed it again. It now fails the job under the same 3-try rule as
+  other structural errors, and still reports the cause.
+- **Enterprise Managed User accounts can be collected.** Their GitHub logins
+  contain an underscore (`<idp-handle>_<shortcode>`), which the collector
+  rejected on every slice.
+
 ## [4.0.5] - 2026-09-24
 
 ### Fixed
