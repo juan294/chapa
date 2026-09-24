@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.2] - 2026-09-24
+
+### Fixed
+
+- **Bitbucket collection no longer stops at pull request activity.** The
+  activity endpoint also allows at most 50 items per page and answered HTTP 400
+  to 100.
+- **Jobs that saved their place before v4.0.1 no longer stay stuck.** A saved
+  Bitbucket list position with a different page size now restarts that list
+  from the first page. Items that are read again are not counted twice.
+- **GitHub commit collection no longer times out on large histories.** It now
+  reads only commits from the scoring window (with a 30-day margin, because
+  GitHub filters by commit date, not authored date) in pages of 50. It also
+  uses far fewer API requests.
+
+### Changed
+
+- **Scoring status shows retry and resume times in your local time zone**,
+  with the zone name, instead of UTC.
+
 ## [4.0.1] - 2026-09-24
 
 ### Fixed
