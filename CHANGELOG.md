@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.4] - 2026-09-24
+
+### Fixed
+
+- **Large histories no longer fail collection.** One source could hold at most
+  10,000 events, and a developer with more in-window activity than that got no
+  score. The limit is now 50,000. Migration `057_raise_source_event_limit`
+  changes only the limit in the three database functions that check it.
+  Measured locally at 30,000 events: finishing a job took 4.7 s and reading
+  the source back took 3.6 s.
+- **Staged event keys are read in full.** The database API returns at most
+  1,000 rows per request, so a large job's later slices re-sent events that
+  were already stored. The keys are now read page by page.
+
 ## [4.0.3] - 2026-09-24
 
 ### Fixed
