@@ -144,25 +144,6 @@ test("real report57 then explicit correction0 preserves one core across surfaces
   const db = redesignFixtureClient();
   await installTools(page);
   await setRedesignSession(context, baseURL!, owner);
-  // #1335 phase 5 e2e — useOwnerCacheWarm (hooks/useOwnerCacheWarm.ts) fires a
-  // silent POST /api/refresh the first time the owner visits their own share
-  // page, exactly like production. That enqueues a real "refresh"-reason
-  // GitHub collection job; this fixture seeds only a receipt (a fixed
-  // CoreCountInputs core of 46) with no matching scoring_v7_evidence for a
-  // real collection run to reconstruct, so the auto-refresh's real,
-  // evidence-less collection completes and fan-in overwrites the fixture's
-  // receipt with a genuinely zero-evidence core the moment the owner's first
-  // page.goto('/u/...') runs -- observed as compositeScore silently
-  // collapsing from 46 to 0 on the very first report upload afterward. This
-  // test is scoped to Craft/report behavior over a frozen core, not live
-  // collection consistency (that is scoring-point-consistency.spec.ts's
-  // "registered owner with a queued job..." test's job, with its own
-  // internally-consistent fixture). Pre-mark the tab as already warmed, the
-  // same gate `markCacheWarmed()` sets after /api/generate, so the hook's
-  // own once-per-tab guard skips the call entirely.
-  await page.addInitScript((handle: string) => {
-    try { sessionStorage.setItem(`chapa:refreshed:${handle}`, "1"); } catch { /* storage blocked */ }
-  }, owner);
   const initial = await currentSurface(page, owner, null);
   const referenceTime = initial.window.referenceTime;
   await recordPublicReceipt(page, owner, initial, "baseline", testInfo);
