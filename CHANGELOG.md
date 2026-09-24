@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-09-24
+
+### Fixed
+
+- **Bitbucket collection no longer stops at pull requests.** The collector
+  asked for 100 pull requests per page, but Bitbucket allows at most 50 and
+  answers HTTP 400. Every Bitbucket job stopped there. This was also the cause
+  of the earlier Bitbucket `source_error`.
+- **GitHub collection no longer fails on issues closed from a project board.**
+  The closures query read a project id, which needs the `read:project` scope
+  that the server token does not have, so GitHub rejected the whole query.
+  Only a merged pull request closer earns credit, so the field was never used.
+- **A credential that cannot be resolved now reports its real cause** instead
+  of only `not_accessible`.
+
 ## [4.0.0] - 2026-09-24
 
 Every signed-up user is now scored with Impact v7.2, collected reliably. Legacy

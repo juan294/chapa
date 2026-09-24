@@ -218,7 +218,8 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
   async function runPullRequests(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
     const repositoryId = op.key.slice("pullrequests:".length);
     const url = new URL(`${API}/repositories/%7B%7D/${encodeURIComponent(repositoryId)}/pullrequests`);
-    url.searchParams.set("pagelen", "100");
+    // The pullrequests endpoint caps pagelen at 50 and answers 400 above it.
+    url.searchParams.set("pagelen", "50");
     for (const state_ of ["OPEN", "MERGED", "DECLINED", "SUPERSEDED"]) url.searchParams.append("state", state_);
     const outcome = await runPagedList(op, "pullrequests", url.toString(), (pr) => {
       const prId = numericId(pr.id); if (!prId) { reasons.add(diag.record("pullrequests", "protocol")); return; }

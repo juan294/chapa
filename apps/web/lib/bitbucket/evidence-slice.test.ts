@@ -56,6 +56,9 @@ function setupFetch(options: { readonly repos?: readonly string[]; readonly comm
       void repositoryId;
     }
     if (path.endsWith("/pullrequests")) {
+      // The real API caps pullrequests pagelen at 50 and answers 400 above it
+      // (production, 2026-09-24: every Bitbucket job stopped here).
+      if (Number(url.searchParams.get("pagelen") ?? "10") > 50) return new Response(JSON.stringify({ type: "error", error: { message: "Invalid pagelen" } }), { status: 400 });
       return new Response(JSON.stringify({ values: [
         { id: 7, state: "MERGED", author: { uuid: PROFILE.uuid }, created_on: "2026-01-01T00:00:00.000Z", description: "fix it" },
       ], next: null }), { status: 200 });
