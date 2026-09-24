@@ -63,7 +63,6 @@ export const GITHUB_EVIDENCE_QUERIES = {
         closer { __typename
           ... on PullRequest { id author { ... on User { id } } merged mergedAt headRefOid repository { id nameWithOwner } }
           ... on Commit { id }
-          ... on ProjectV2 { id }
         }
       } }
     } } }

@@ -78,7 +78,17 @@ export const resolveCredential: ResolveCredential = async (owner, provider, refe
         link: authorization.link ? { id: authorization.link.id, updatedAt: authorization.link.updatedAt } : null,
       },
     };
-  } catch { return { status: "not_accessible" }; }
+  } catch (error) {
+    // Still terminal for this job, but never silent: the real cause (a bad
+    // stored reference time, an unreadable link row, a refresh failure) is
+    // what an operator needs, not a blanket not_accessible.
+    void captureServerError({
+      route: "lib/collection/worker:resolveCredential",
+      statusCode: 500,
+      error: new Error(`resolveCredential failed for ${owner}/${provider}: ${(error as Error)?.message ?? String(error)}`),
+    });
+    return { status: "not_accessible" };
+  }
 };
 
 export interface CollectionWorkerDeps {

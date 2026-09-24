@@ -137,6 +137,18 @@ budget or timeout stop is never recorded as a genuine error), and a
 `waiting_rate_limit` job is not "stuck", it is working as designed until the
 provider's own reset time.
 
+## Enqueueing by hand
+
+Prefer the app's own paths: owner refresh, admin bulk-recalculate, or the
+`/api/scoring/status` retry. When an operator must call
+`scoring_collection_enqueue` directly in SQL, pass a millisecond-precision
+reference time, for example `date_trunc('milliseconds', now())`. A plain
+`now()` has microsecond precision. The worker rebuilds the scoring window from
+the stored reference time, rejects it, and fails the job at
+`resolve_credential`, which raises one `scoring_collection_failed` alert per job
+(2026-09-24: 23 jobs). A `retry` re-enqueue keeps the stored reference time. To
+recover, delete the affected failed rows and enqueue them again.
+
 ## Related docs
 
 [Current spec](../impact-v7.md), [the no-consent decision](../decisions/2026-09-23-universal-v72-no-consent.md),
