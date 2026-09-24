@@ -158,7 +158,8 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
       }
       const payload = object(await response.json());
       if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-        return { data: object(payload.data), stop: makeStop(queryName, isGraphqlRateLimited(payload.errors) ? "rate_limited" : "graphql", response.status) };
+        const limited = isGraphqlRateLimited(payload.errors);
+        return { data: object(payload.data), stop: makeStop(queryName, limited ? "rate_limited" : "graphql", response.status, limited ? retryAfterSeconds(response.headers) : null) };
       }
       return { data: object(payload.data), stop: null };
     } catch (error) {

@@ -94,6 +94,10 @@ describe("isRateLimitedResponse", () => {
 });
 
 describe("isGraphqlRateLimited", () => {
+  it("is true for GitHub's observed RATE_LIMIT type and graphql_rate_limit code", () => {
+    expect(isGraphqlRateLimited([{ type: "RATE_LIMIT", code: "graphql_rate_limit" }])).toBe(true);
+    expect(isGraphqlRateLimited([{ code: "graphql_rate_limit" }])).toBe(true);
+  });
   it("is true when an errors entry reports RATE_LIMITED via type", () => {
     expect(isGraphqlRateLimited([{ type: "RATE_LIMITED" }])).toBe(true);
   });
