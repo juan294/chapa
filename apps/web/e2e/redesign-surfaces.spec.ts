@@ -137,9 +137,13 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     expect(profile.ok()).toBe(true);
     expect(await profile.text()).not.toMatch(/"confidence(?:Penalties)?"/);
     await capture(page, `share-${locale}-${theme}-${width}`);
+    // #1335 phase 5 — a well-formed pre-v7 hash is a retired v6 verification
+    // code, not a lookup miss: `verification_records` no longer exists, so
+    // this page never looks the owner up and shows a generic retirement
+    // notice with the hash itself, not an owner link.
     await page.goto(`/verify/${REDESIGN_VALID_HASH}?lang=${locale}`);
-    await expect(page.locator('h1')).toHaveText(locale === 'en' ? 'Legacy verification record' : 'Registro de verificación antiguo');
-    await expect(page.getByRole('link', { name: '@chapa-redesign-owner', exact: true })).toBeVisible();
+    await expect(page.locator('h1')).toHaveText(locale === 'en' ? 'Retired verification code' : 'Código de verificación retirado');
+    await expect(page.getByText(REDESIGN_VALID_HASH)).toBeVisible();
     await capture(page, `verify-${locale}-${theme}-${width}`);
     await page.goto(`/studio?demo=1&lang=${locale}`);
     await expect(studioRoot(page).getByTestId('studio-demo-marker')).toBeVisible();

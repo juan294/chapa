@@ -134,10 +134,10 @@ async function upload(page: Page, point: 57 | 0, referenceTime: string) {
   return body;
 }
 
-test("real report57 then explicit correction0 preserves one core across surfaces, saves and rollback", async ({ page, context, baseURL }, testInfo) => {
+test("real report57 then explicit correction0 preserves one core across surfaces, saves and withdraws", async ({ page, context, baseURL }, testInfo) => {
   // This is the longest browser contract: it publishes twice, saves and
-  // restores Studio state, verifies two locales, rolls the flag back and
-  // withdraws the receipt. Leave headroom when the full suite is concurrent.
+  // restores Studio state, verifies two locales and withdraws the receipt.
+  // Leave headroom when the full suite is concurrent.
   test.setTimeout(240_000);
   assertScoringFixtureEnvironment(process.env);
   const owner = `chapa-score-${testInfo.project.name}`;
@@ -212,25 +212,10 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     expect((await servedImage(page)).digest).toBe(imageBeforePalette.digest);
   }
 
-  const verificationBeforeRollback = await verifyIdentity(page, zero);
-  try {
-    expect((await db.from("feature_flags").update({ enabled: false }).eq("key", "scoring_v7_rendering")).error).toBeNull();
-    await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 8_000 }).toBe("v6");
-    const legacy = await api(page, owner);
-    for (const locale of ["en", "es"]) {
-      const off = await page.request.get(`/u/${owner}/badge.svg?lang=${locale}`);
-      expect(off.status()).toBe(200);
-      const svg = await off.text();
-      expect(svg).toContain(`>${legacy.displayScore}</text>`);
-      expect(svg).not.toContain('data-axis="craft" data-value="0"');
-      await page.goto(`/u/${owner}?lang=${locale}`);
-      const image = await servedImage(page);
-      await testInfo.attach(`rollback-${locale}.png`, { body: image.bytes, contentType: "image/png" });
-    }
-    expect((await page.request.get(`/api${verificationBeforeRollback}`)).status()).toBe(200);
-
-  } finally { expect((await db.from("feature_flags").update({ enabled: true }).eq("key", "scoring_v7_rendering")).error).toBeNull(); }
-  await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 8_000 }).toBe("v7.2");
+  // #1335 phase 5 — the `scoring_v7_rendering` selector this used to flip to
+  // roll back to a v6 render is retired; v7.2 is the one rendered policy
+  // unconditionally now, so there is no rollback path left to exercise here.
+  expect((await api(page, owner)).policyVersion).toBe("v7.2");
   expect((await api(page, owner)).identity.revisionId).toBe(zero.identity.revisionId);
   for (const locale of ["en", "es"]) {
     const svg = await page.request.get(`/u/${owner}/badge.svg?lang=${locale}`);
