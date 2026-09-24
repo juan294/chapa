@@ -20,6 +20,12 @@ Archetypes remain exactly as the historical calculator classifies the original b
 
 ## Report Craft and visual state
 
+> **Superseded in part by 2026-09-23** (`docs/decisions/2026-09-23-universal-v72-no-consent.md`):
+> publication consent, referenced below as the gate on removal/withdrawal and
+> as a later-phase requirement, is removed. Every signed-up subject is
+> scored and published with no opt-in step; withdrawal (deleting a subject's
+> own evidence and receipts) is a separate, unaffected lifecycle action.
+
 The versioned classifier trims ASCII whitespace, lowercases ASCII letters, and collapses ASCII spaces/hyphens/underscores. Only fully_achieved, mostly_achieved, partially_achieved, not_achieved and failed are recognized; failed maps to not_achieved. Duplicate mapped categories reject before map construction. Counts are finite safe nonnegative integers and their checked sum cannot exceed total sessions. Unknown labels stay private; public calculation inputs contain only their aggregate count.
 
 Outcome credits are1/0.7/0.3/0 over all report sessions. Positive total and positive recognized count are required. T10 with fully4, mostly2, partially1, failed1, unknown1 and unclassified1 yields Craft57 and recognized coverage8/10. Failed10 yields a valid scored0. Unknown-only or empty outcomes yield insufficient_report_data, never a fabricated0. Unknown/unclassified sessions are not proven failures. Craft is `report_derived` / `model_estimate`, not independently verified mastery. Tool names, tokens, lines, files, speed and satisfaction are descriptive only.

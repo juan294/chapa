@@ -40,9 +40,11 @@ migration or recompute is separately authorized. See [migrations.md](migrations.
 
 Identify the previous actual production deployment/commit and annotated
 rollback reference. Confirm its proof/artifact is retrievable, distinguish code
-rollback from schema recovery, and name the operator and triggers. Scoring
-selection rollback uses [the flag protocol](scoring-v7-transition.md), not
-receipt deletion or a migration rollback.
+rollback from schema recovery, and name the operator and triggers. There is no
+scoring-selection flag to roll back (#1335 retired it); a scoring regression
+is a code rollback like any other. Collection-queue operational issues (stuck
+or failed jobs, retries) are [the collection queue runbook](scoring-collection-queue.md),
+not receipt deletion or a migration rollback.
 
 ## Operational readiness
 

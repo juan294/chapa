@@ -238,5 +238,6 @@ the tracked candidate. No release is complete until final readback passes.
 
 No outcome authorizes remote actions. Operational detail:
 `docs/runbooks/release-checklist.md`, `deployment-smoke.md`, `migrations.md`,
-`rollback.md`; current scoring: `docs/release/scoring-v7-release-packet.md` and
-`docs/runbooks/scoring-v7-transition.md`.
+`rollback.md`; current scoring: `docs/release/scoring-v7-release-packet.md`
+(superseded in part, see `docs/decisions/2026-09-23-universal-v72-no-consent.md`)
+and `docs/runbooks/scoring-collection-queue.md`.

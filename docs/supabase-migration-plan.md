@@ -7,6 +7,12 @@
 **Created:** 2026-02-17
 **Target:** Incremental (no big-bang cutover)
 
+> **Historical.** This plan's `metrics_snapshots` and `verification_records`
+> tables are retired (#1335 phase 5, 2026-09-23): v6 scoring code no longer
+> reads or writes them, and a post-release contract migration drops them.
+> Kept for the original Redis-to-Postgres migration rationale, not as a
+> description of the current schema.
+
 ---
 
 ## 1. What's Moving and What's Staying

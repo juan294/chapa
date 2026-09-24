@@ -16,7 +16,7 @@ A successful v2 response includes `persisted: true`, the immutable `uploadId` an
 
 Every cached read first checks the current authorized database manifest. A stale cache, withdrawn document or historical request cannot bypass that manifest. Both Redis hits and database fallback age the same immutable events. Failed cache publication never rolls back a successful durable upload; `cacheRefreshed: false` reports a deferred rebuild. A manifest exceeding 1,000 upload rows fails explicitly rather than silently truncating the portfolio or reporting zero; capacity failure must remain unavailable coverage in the consumer.
 
-Legacy scalar uploads remain durably stored and return `eligibility: "historical_only"`, `coverage: "legacy"`, `reasonCode: "legacy_aggregate"`. Their annual totals cannot be converted into dated v7 events or prorated into the current year. Legacy v6 consumers remain separate until the mandatory consumer migration; the v7 reader only reads versioned dated rows.
+Legacy scalar uploads remain durably stored and return `eligibility: "historical_only"`, `coverage: "legacy"`, `reasonCode: "legacy_aggregate"`. Their annual totals cannot be converted into dated v7 events or prorated into the current year. v6 consumers no longer exist (#1335 phase 5 deleted them); the v7 reader only reads versioned dated rows.
 
 ## Executable fixture client
 

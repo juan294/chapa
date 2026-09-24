@@ -1,4 +1,4 @@
-> **Deprecated:** This document describes Impact v4/v5 scoring. The current scoring system is **Impact v6** — see `docs/impact-v6.md`. The function has been renamed to `computeImpactV6` in `apps/web/lib/impact/v6.ts`.
+> **Deprecated:** This document describes Impact v4/v5 scoring. Impact v6 (which this note originally pointed to as current) is itself retired as of 2026-09-23 — see `docs/impact-v6.md`. The current scoring system is **Impact v7.2** — see `docs/impact-v7.md`.
 
 # Impact v4: Developer Impact Profile
 

@@ -3,10 +3,24 @@
 The current machine policy is `v7.2`, governed by the frozen
 [September8 policy](plans/2026-09-08-v7-single-score-consistency-phases/policy.md)
 and its [decision record](decisions/2026-09-08-scoring-v7-observed-point-policy.md).
-The earlier machine `v7` / algorithm `v7.1` retains its original immutable
-receipts, range arithmetic and replay. [Legacy v6](impact-v6.md) remains the
-rollout-off policy and an explicitly labelled fallback when no current receipt
-exists. An unavailable authoritative read is not genuine absence.
+It is the only rendered or selectable policy: there is no flag-selected legacy
+render and no rollout-off fallback
+([2026-09-23 decision](decisions/2026-09-23-universal-v72-no-consent.md)). The
+earlier machine `v7` / algorithm `v7.1` retains its original immutable
+receipts, range arithmetic and replay, unaffected by any of this. [Legacy
+v6](impact-v6.md) is retired: its scoring code and stored data no longer
+exist, and its records are historical reference only.
+
+Every signed-up subject (a handle with a `user_platforms` row for `github`) is
+scored, with no publication opt-in. Evidence collection is durable and
+resumable, so a subject with no issued receipt yet is not "no score" but one
+of a small set of explicit states: `unregistered` (never signed up),
+`collecting` (evidence gathering in progress, shown with per-provider
+progress), `action_needed` (collection stalled on something only the owner
+can fix, such as a lost platform connection), or `ready` (a current receipt
+exists). An unavailable authoritative read is a distinct fifth case, never
+collapsed into any of the above: it means the status read itself failed, not
+that no evidence exists.
 
 This index describes recorded evidence in a declared source scope. It does not
 certify developer ability, causal impact, architecture, reliability or security.
@@ -107,7 +121,7 @@ Current source modules: `lib/impact/observed-v7.ts`,
 `lib/insights/report-craft.ts`, `lib/profile/score-receipt-observed.ts`,
 `lib/profile/score-view-model.ts`. See [reproduction](scoring-reproduction.md),
 [consumer inventory](scoring-consumer-inventory.md),
-[flag rollback](runbooks/scoring-v7-transition.md) and
+[the collection queue runbook](runbooks/scoring-collection-queue.md) and
 [local release proof](release/release-playbook.md).
 
 ## Archived generated v7 / v7.1 figures
