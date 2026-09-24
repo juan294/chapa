@@ -165,9 +165,19 @@ export async function assertShareVerification(
 
   const apiResponse = await request.get(`/api/verify/${hash}`, { maxRedirects: 0 });
   expect(apiResponse.status()).toBe(200);
-  expect(await apiResponse.json()).toMatchObject({
+  const apiBody = await apiResponse.json();
+  expect(apiBody).toMatchObject({
     version: "v7", status: "current", signatureAuthenticated: true,
   });
+  // #1335 phase 5 retired the verify page's owner-identity display entirely
+  // ("There is nothing left to embed at render time" — VerifyPageWebMcpTools):
+  // ReceiptCard shows the receipt itself (policy/revision, score, verified
+  // state), never the owner handle. Assert against that real rendered
+  // content, cross-checked against the API's own receipt so this stays a
+  // specific proof, not a loosened one.
+  const receipt = apiBody.envelope.receipt;
+  const composite = receipt.core.composite;
+  const expectedScore = composite.kind === "point" ? String(composite.displayValue) : `${composite.displayLower}–${composite.displayUpper}`;
   const verifyResponse = await request.get(`/verify/${hash}?lang=en`, { maxRedirects: 0 });
   expect(verifyResponse.status()).toBe(200);
   const verifyBody = await verifyResponse.text();
@@ -175,7 +185,13 @@ export async function assertShareVerification(
   // its translation dictionary, which names every state it can render.
   await withBodyAttachment("verify-page.html", verifyBody, () => {
     expect(hasRenderedText(verifyBody, "Signature authenticated"), "verify page did not render the authenticated signature state").toBe(true);
-    expect(hasRenderedText(verifyBody, "octocat"), "verify page did not render the linked profile identity").toBe(true);
+    expect(hasRenderedText(verifyBody, "Current revision"), "verify page did not render the current-revision status").toBe(true);
+    // The rendered `/api/verify/<token>` path is this exact receipt's own
+    // policy prefix ("v7.") plus revision id and content-authenticating
+    // signature — the closest the page comes to a linked identity, since it
+    // never names an owner.
+    expect(hasRenderedText(verifyBody, `/api/verify/${hash}`), "verify page did not render this receipt's own revision/content-hash token").toBe(true);
+    expect(hasRenderedText(verifyBody, expectedScore), "verify page did not render the receipt's core score").toBe(true);
     expect(hasRenderedText(verifyBody, "Invalid hash"), "verify page rendered the invalid-hash callout").toBe(false);
     expect(hasRenderedText(verifyBody, "Not found"), "verify page rendered the not-found callout").toBe(false);
   });

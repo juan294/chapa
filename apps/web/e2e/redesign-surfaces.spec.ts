@@ -162,10 +162,21 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
 test('the accessible activity table does not add blank space below the profile footer', async ({ page }) => {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/u/octocat?lang=en', { waitUntil: 'networkidle' });
+  // `networkidle` needs 500ms of total network silence, which the shared
+  // dev/prod server under full parallel load rarely reaches inside the 30s
+  // navigation budget (see redesign-reflow.spec.ts for the same fix). The
+  // real readiness gate this test needs is the actual content ("Embed this
+  // badge") replacing the route's loading skeleton, which is already a
+  // web-first assertion below.
+  await page.goto('/u/octocat?lang=en');
   await expect(page.getByText('Embed this badge', { exact: false })).toBeVisible();
   await expect(page.locator('table.sr-only, .sr-only table')).toHaveCount(1);
   expect(await page.locator('table.sr-only tbody tr, .sr-only table tbody tr').count()).toBe(91);
+  // The footer-overflow measurement below reads final layout geometry, so it
+  // must not run while a web font swap or an unfinished avatar image
+  // decode is still able to reflow the page — the same settling wait
+  // `capture()` above does before any of its own layout assertions.
+  await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(img => img.decode().catch(() => undefined))); });
   const extra = await page.evaluate(() => document.documentElement.scrollHeight - (document.querySelector('footer')!.getBoundingClientRect().bottom + scrollY));
   expect(extra).toBeLessThanOrEqual(128);
 });
