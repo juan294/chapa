@@ -29,11 +29,12 @@ export async function materializeCurrentObservedReceipt(handle: string, options:
   });
 }
 
-/** A recorded preserve/storage reason narrows to these three (#1335 phase 4)
- * -- `no_receipt` is not a failure of issuance itself (there is nothing to
- * preserve or publish), so it is folded into `storage_error` below rather
- * than exposed as a fourth reason nothing else needs to handle. */
-export type ReceiptFailureReason = "storage_error" | "source_error" | "craft_error";
+/** A recorded preserve/storage reason narrows to these four (#1335 phase 4;
+ * `empty_evidence` added phase 5) -- `no_receipt` is not a failure of
+ * issuance itself (there is nothing to preserve or publish), so it is folded
+ * into `storage_error` below rather than exposed as a fifth reason nothing
+ * else needs to handle. */
+export type ReceiptFailureReason = "storage_error" | "source_error" | "craft_error" | "empty_evidence";
 
 /**
  * Every fan-in issuance outcome, with no silent skip (#1335 phase 4): a

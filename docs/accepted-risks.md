@@ -389,6 +389,49 @@ exception means the rule, not the chunk, is wrong.
 
 **Refs:** [#1319](https://github.com/juan294/chapa/issues/1319)
 
+---
+
+## A subject with zero collected evidence for a scoring day keeps its last non-zero receipt, stale-dated (2026-09-24)
+
+**Risk / trade-off:** phase 3 made the source coordinator read-only — collection
+happens exclusively in the durable queue worker now, and a full recompute can
+only read whatever it already durably observed. That recompute has no way to
+distinguish "nothing was collected" (a disconnected/unlinked source, or a
+collection round that completed but genuinely produced nothing to read) from
+real, complete evidence that happens to total zero events and zero
+assessments. `materializeObservedScoreReceipt` (`lib/profile/score-receipt-observed.ts`)
+therefore refuses to publish — reason `empty_evidence`, distinct from a real
+`source_error` — whenever that would replace an established, non-trivial
+receipt (`core.composite.exact > 0`) with one built from literally no
+evidence. The owner keeps seeing their last real, non-zero score, dated to
+when it was actually computed (`ScoringStatus.kind: "ready"` with the older
+`receiptDate`), not a fresh zero for today.
+
+**Why accepted:** the alternative is publishing zero over a real score on the
+same shape of failure the #1002/#1004 lineage already treats as unacceptable
+— a blinded or degraded fetch collapsing a real score. A subject that has
+*truly* gone to zero activity across an entire rolling 365-day window is
+exceedingly rare and not urgent to reflect same-day; a subject hitting this
+from a genuine collection defect is exactly the failure mode this guard
+exists to catch. A subject's first-ever issuance is unaffected — there is no
+established receipt yet to regress away from, so a genuine first zero is
+still recorded normally.
+
+**Mitigation:** every refusal is fully observable, never a silent skip: it is
+recorded as a `failed{reason: "empty_evidence"}` fan-in outcome, written to
+`scoring_issuance_attempts` (migration `057`), emitted as a
+`scoring_issuance_outcome` event, and pages the `scoring_issuance_failed`
+operational alert exactly like any other fan-in failure. `runCollectionTick`'s
+retry sweep (`retryPendingFanIns`) picks the day back up on the next tick, so
+a transient defect self-heals once real evidence is collectable again.
+
+**Revisit if:** this reason starts firing routinely for real, especially-quiet
+subjects rather than rarely for degraded collection — that would mean the
+zero-evidence heuristic needs a softer signal (e.g. distinguishing "definitely
+zero" from "defect" some other way) rather than a blanket refusal.
+
+**Refs:** #1335
+
 ## Review schedule
 
 These accepted risks should be re-evaluated:

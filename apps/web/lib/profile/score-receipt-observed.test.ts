@@ -80,7 +80,7 @@ describe("observed receipt materialization", () => {
       reportUpdate: { endExclusive: "2026-09-09T09:00:00.000Z" },
       readCraft,
     });
-    expect(result).toMatchObject({ status: "stored", snapshot: { receipt: established }, freshness: "stale", reason: "source_error" });
+    expect(result).toMatchObject({ status: "stored", snapshot: { receipt: established }, freshness: "stale", reason: "empty_evidence" });
     expect(saved!.envelope).toEqual(established);
   });
   it("never guesses missing Craft authority", async () => {

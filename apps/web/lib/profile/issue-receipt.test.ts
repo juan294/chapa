@@ -31,7 +31,7 @@ describe("issueScoreReceipt", () => {
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
   });
 
-  it("folds a no_receipt reason into storage_error, since it is not one of the three recorded failure reasons", async () => {
+  it("folds a no_receipt reason into storage_error, since it is not one of the four recorded failure reasons", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "unavailable", reason: "no_receipt" });
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
   });
@@ -39,6 +39,12 @@ describe("issueScoreReceipt", () => {
   it("reports a preserved-but-stale receipt (an error occurred, a prior current receipt was kept) as an explicit failure, not unchanged", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "stored", freshness: "stale", reason: "craft_error", snapshot: { receipt: {} } as never });
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "craft_error" });
+    expect(issueReceiptVerificationV7).not.toHaveBeenCalled();
+  });
+
+  it("reports empty_evidence distinctly from source_error when a recompute would have regressed an established receipt to zero", async () => {
+    vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "stored", freshness: "stale", reason: "empty_evidence", snapshot: { receipt: {} } as never });
+    expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "empty_evidence" });
     expect(issueReceiptVerificationV7).not.toHaveBeenCalled();
   });
 
