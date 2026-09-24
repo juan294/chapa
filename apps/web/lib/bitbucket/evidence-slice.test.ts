@@ -64,6 +64,8 @@ function setupFetch(options: { readonly repos?: readonly string[]; readonly comm
       ], next: null }), { status: 200 });
     }
     if (path.endsWith("/activity")) {
+      // The real activity endpoint also caps pagelen at 50 (production, 2026-09-24).
+      if (Number(url.searchParams.get("pagelen") ?? "10") > 50) return new Response(JSON.stringify({ type: "error", error: { message: "Invalid pagelen" } }), { status: 400 });
       return new Response(JSON.stringify({ values: [
         { update: { state: "MERGED", date: "2026-01-05T00:00:00.000Z" } },
         { comment: { id: 55, user: { uuid: PROFILE.uuid }, created_on: "2026-01-04T00:00:00.000Z", deleted: false } },

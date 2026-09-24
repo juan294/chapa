@@ -255,7 +255,8 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     state.activityAcc = activityAcc;
     const acc = activityAcc[key] ?? (activityAcc[key] = { dates: [], invalidMergeDate: false });
     const url = new URL(`${API}/repositories/%7B%7D/${encodeURIComponent(meta.repositoryId)}/pullrequests/${meta.prId}/activity`);
-    url.searchParams.set("pagelen", "100");
+    // Like pullrequests, the activity endpoint caps pagelen at 50.
+    url.searchParams.set("pagelen", "50");
     const outcome = await runPagedList(op, "activity", url.toString(), (entry) => {
       const update = row(entry.update);
       if (update.state === "MERGED") { const date = instant(update.date, "activity"); if (date) acc.dates.push(date); else acc.invalidMergeDate = true; }
