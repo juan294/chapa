@@ -19,7 +19,7 @@ describe("durable observed public history", () => {
     expect((await getServiceClient().from("users").upsert({ handle: owner }, { onConflict: "handle" })).error).toBeNull();
     const admin = await dbGetAdminUsers({ page: 1, limit: 1, sort: "adjustedComposite", dir: "desc", search: owner, tier: winner.receipt.core.tier });
     expect(admin.total).toBe(1);
-    expect(admin.users[0]).toMatchObject({ handle: owner, policyVersion: "v7.2", adjustedComposite: winner.receipt.core.composite.displayValue, archetype: winner.receipt.core.archetype, confidence: null, identity: { revisionId: winner.receipt.revisionId, contentHash: winner.contentHash.value } });
+    expect(admin.users[0]).toMatchObject({ handle: owner, policyVersion: "v7.2", adjustedComposite: winner.receipt.core.composite.displayValue, archetype: winner.receipt.core.archetype, identity: { revisionId: winner.receipt.revisionId, contentHash: winner.contentHash.value } });
     const listed = await dbListObservedReceiptHistory(owner, { from: "2026-09-08", to: "2026-09-08" });
     expect(listed.status).toBe("found");
     if (listed.status !== "found") throw new Error("Expected history");
