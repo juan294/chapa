@@ -1,38 +1,46 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('next/cache', () => ({
-  revalidatePath: vi.fn(),
-}));
-
-vi.mock('./cookie', () => ({
-  writeLocaleCookie: vi.fn(),
-}));
-
-import { revalidatePath } from 'next/cache';
-import { writeLocaleCookie } from './cookie';
 import { setLocaleAction } from './set-locale-action';
 
 describe('setLocaleAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('writes valid locale "es" without invalidating static routes', async () => {
+  it('POSTs valid locale "es" to /api/locale', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
+
     await setLocaleAction('es');
-    expect(writeLocaleCookie).toHaveBeenCalledWith('es');
-    expect(revalidatePath).not.toHaveBeenCalled();
+
+    expect(fetch).toHaveBeenCalledWith('/api/locale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locale: 'es' }),
+    });
   });
 
-  it('writes valid locale "en" without invalidating static routes', async () => {
+  it('POSTs valid locale "en" to /api/locale', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
+
     await setLocaleAction('en');
-    expect(writeLocaleCookie).toHaveBeenCalledWith('en');
-    expect(revalidatePath).not.toHaveBeenCalled();
+
+    expect(fetch).toHaveBeenCalledWith('/api/locale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locale: 'en' }),
+    });
   });
 
-  it('does NOT call writeLocaleCookie for invalid locale "fr"', async () => {
+  it('does NOT fetch for invalid locale "fr"', async () => {
     // Cast to bypass TypeScript — testing runtime guard
     await setLocaleAction('fr' as never);
-    expect(writeLocaleCookie).not.toHaveBeenCalled();
-    expect(revalidatePath).not.toHaveBeenCalled();
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('throws when the persistence request fails, so the caller can mark persistence as failed', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 500 }));
+
+    await expect(setLocaleAction('es')).rejects.toThrow();
   });
 });
