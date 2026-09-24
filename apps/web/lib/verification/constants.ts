@@ -2,8 +2,6 @@ export const CURRENT_VERIFICATION_HASH_HEX_LENGTH = 32;
 export const VERIFICATION_HASH_PATTERN =
   /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 export const VERIFICATION_RECORD_TTL_DAYS = 30;
-export const VERIFICATION_RECORD_TTL_MS =
-  VERIFICATION_RECORD_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 /** Versioned tokens bind a full HMAC to an immutable receipt revision. */
 export const VERIFICATION_V7_PATTERN = /^v7\.([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([0-9a-f]{64})$/;

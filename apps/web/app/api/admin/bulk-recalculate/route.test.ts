@@ -157,9 +157,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.failed).toBe(0);
     expect(body.total).toBe(2);
     expect(mockDbGetUserHandlePage).toHaveBeenCalledWith({ limit: 101 });
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
-      ignoreSnapshot: true,
-    });
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice");
     expect(mockPostWriteScore).toHaveBeenCalledWith("alice");
   });
 
@@ -197,16 +195,8 @@ describe("POST /api/admin/bulk-recalculate", () => {
 
     expect(res.status).toBe(200);
     expect(body.completed).toEqual(["mona", "zara"]);
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
-      1,
-      "mona",
-      { ignoreSnapshot: true },
-    );
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
-      2,
-      "zara",
-      { ignoreSnapshot: true },
-    );
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(1, "mona");
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(2, "zara");
   });
 
   it("recalculates only explicitly provided handles", async () => {
@@ -560,22 +550,10 @@ describe("POST /api/admin/bulk-recalculate", () => {
       const body = await res.json();
       // Only "carol" and "dave" are after "bob" alphabetically
       expect(body.total).toBe(2);
-      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith(
-        "carol",
-        expect.any(Object),
-      );
-      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith(
-        "dave",
-        expect.any(Object),
-      );
-      expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalledWith(
-        "alice",
-        expect.any(Object),
-      );
-      expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalledWith(
-        "bob",
-        expect.any(Object),
-      );
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("carol");
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("dave");
+      expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalledWith("alice");
+      expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalledWith("bob");
     });
 
     it("returns cursor info in the response when after param is used", async () => {

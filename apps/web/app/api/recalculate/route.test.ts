@@ -108,7 +108,6 @@ describe("POST /api/recalculate", () => {
     expect(resp.status).toBe(200);
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "cli-token",
-      ignoreSnapshot: true,
     });
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", { badgeSvg: true });
     expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(

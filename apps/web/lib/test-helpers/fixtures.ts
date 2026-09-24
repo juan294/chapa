@@ -6,7 +6,7 @@
  * pass an `overrides` partial to customize only what the test cares about.
  */
 
-import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 import { SCORING_OBSERVED_POLICY } from "@chapa/shared";
 import type { CoreDimensionKey, ScoreValue, ScoreViewModel } from "../profile/score-view-model";
 
@@ -60,33 +60,6 @@ export function makeFullStats(overrides: Partial<StatsData> = {}): StatsData {
     medianPrLeadTimeHours: 12,
     hasSupplementalData: false,
     fetchScope: "authenticated",
-    ...overrides,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// makeImpact — builds a valid ImpactV6Result with sensible defaults
-// ---------------------------------------------------------------------------
-
-export function makeImpact(
-  overrides: Partial<ImpactV6Result> = {},
-): ImpactV6Result {
-  return {
-    handle: "testuser",
-    profileType: "collaborative",
-    dimensions: {
-      delivery: 72,
-      quality: 55,
-      consistency: 68,
-      breadth: 48,
-    },
-    archetype: "Builder",
-    compositeScore: 61,
-    confidence: 85,
-    confidencePenalties: [],
-    adjustedComposite: 58,
-    tier: "Solid",
-    computedAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -146,11 +119,12 @@ function toScoreValue(value: number | ScoreValue): ScoreValue {
 /**
  * Factory for a v7.2 `ScoreViewModel` (#1335 phase 5 — "delete v6").
  * `renderBadgeSvg` and every other scored consumer take this model, never a
- * legacy `ImpactV6Result` — this fixture matches `makeImpact`'s historical
- * default magnitudes (dimensions 72/55/68/48, archetype Builder, tier Solid)
- * so tests written against the old aggregate keep the same drawn geometry.
- * `composite` defaults to 58 — the historical `adjustedComposite` value the
- * badge actually drew (v6's raw `compositeScore` was never rendered).
+ * legacy `ImpactV6Result` — this fixture matches the retired `makeImpact`
+ * fixture's historical default magnitudes (dimensions 72/55/68/48, archetype
+ * Builder, tier Solid) so tests written against the old aggregate keep the
+ * same drawn geometry. `composite` defaults to 58 — the historical
+ * `adjustedComposite` value the badge actually drew (v6's raw
+ * `compositeScore` was never rendered).
  *
  * `composite` and each `dimensions` entry accept either a plain number
  * (wrapped as a point's displayed value — the common case, one magnitude at

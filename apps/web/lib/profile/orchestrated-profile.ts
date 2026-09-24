@@ -8,16 +8,10 @@ export async function materializeOrchestratedProfile(
   handle: string,
   options: {
     token?: string;
-    today?: string;
-    /** #1335 phase 5 — accepted for call-site compatibility only; there is no
-     * snapshot lookup left to skip. */
-    ignoreSnapshot?: boolean;
   } = {},
 ): Promise<MaterializedProfile | null> {
   const materialized = await materializeProfile(handle, {
     token: options.token,
-    today: options.today,
-    ignoreSnapshot: options.ignoreSnapshot,
   });
   // LE-8-2 — for the refresh, recalculate and warm-cache writers a handle
   // GitHub does not know is "nothing to persist", exactly as an unavailable

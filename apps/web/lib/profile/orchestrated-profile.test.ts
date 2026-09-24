@@ -41,28 +41,12 @@ describe("materializeOrchestratedProfile", () => {
 
     const result = await materializeOrchestratedProfile("testuser", {
       token: "oauth-token",
-      today: "2026-04-17",
     });
 
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
-      today: "2026-04-17",
-      ignoreSnapshot: undefined,
     });
     expect(result).toBe(materialized);
-  });
-
-  it("#930: forwards ignoreSnapshot — accepted for call-site compatibility only, no snapshot lookup left to skip", async () => {
-    const materialized = makeMaterializedProfile();
-    mockMaterializeProfile.mockResolvedValue(materialized);
-
-    await materializeOrchestratedProfile("testuser", { ignoreSnapshot: true });
-
-    expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
-      token: undefined,
-      today: undefined,
-      ignoreSnapshot: true,
-    });
   });
 });
 

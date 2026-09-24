@@ -58,7 +58,6 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
 
   const materialized = await materializeOrchestratedProfile(handle, {
     token: auth.token,
-    ignoreSnapshot: true,
   });
 
   if (!materialized) {

@@ -19,10 +19,6 @@ export type StatsFreshness = "current" | "stale";
 export interface MaterializeProfileOptions {
   token?: string;
   readOnly?: boolean;
-  today?: string;
-  policy?: string;
-  inputsChanged?: boolean;
-  ignoreSnapshot?: boolean;
 }
 
 export type MaterializeDisplayProfileOptions = Pick<

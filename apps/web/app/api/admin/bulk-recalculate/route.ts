@@ -29,9 +29,8 @@ const INLINE_DEADLINE_MS = 250_000;
  *
  * Force-recalculates impact scores for all (or specified) users using the
  * current scoring formulas. #1335 phase 5 ("delete v6") — there is no
- * `metrics_snapshots` row to replace any more: a re-materialize with
- * `ignoreSnapshot: true` (bypassing GitHub's own stats cache) is the forcing
- * function, and re-publishing the v7.2 receipt goes through the same
+ * `metrics_snapshots` row to replace any more: a plain re-materialize is the
+ * forcing function, and re-publishing the v7.2 receipt goes through the same
  * fan-in issuance every other write route uses.
  *
  * Protected by ADMIN_SECRET bearer token (same as /api/admin/stats).
@@ -155,13 +154,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     await Promise.all(
       batch.map(async (handle) => {
         try {
-          const materialized = await materializeOrchestratedProfile(handle, {
-            // #930 — Admin recalculates must bypass the EMA same-day lock.
-            // A stored today-snapshot may contain wrong data (e.g. from a
-            // timed-out platform fetch); ignoring it ensures the fresh score
-            // always lands rather than freezing the bad value in place.
-            ignoreSnapshot: true,
-          });
+          const materialized = await materializeOrchestratedProfile(handle);
 
           if (!materialized) {
             errors.push({ handle, error: "Stats fetch returned null" });

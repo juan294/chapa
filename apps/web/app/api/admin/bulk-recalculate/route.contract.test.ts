@@ -54,9 +54,7 @@ describe("POST /api/admin/bulk-recalculate contract", () => {
       failed: 0,
       total: 1,
     });
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
-      ignoreSnapshot: true,
-    });
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat");
   });
 
   it("records incomplete-stats skips without claiming recalculation success", async () => {
