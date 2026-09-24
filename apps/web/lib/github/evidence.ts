@@ -20,6 +20,16 @@ const object = (value: unknown): ObjectData => value !== null && typeof value ==
 const at = (value: unknown, ...keys: string[]): unknown => keys.reduce<unknown>((v, key) => object(v)[key], value);
 const string = (value: unknown): string | null => typeof value === "string" && value.length > 0 ? value : null;
 const number = (value: unknown): number | null => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+/** True when every GraphQL error only says GitHub could not count one node's
+ * lines (SERVICE_UNAVAILABLE at an additions/deletions path; observed
+ * 2026-09-24 on very large commits). The rest of the page is valid data.
+ */
+function onlyLineCountsUnavailable(errors: readonly unknown[]): boolean {
+  return errors.every((entry) => {
+    const error = object(entry); const path = Array.isArray(error.path) ? error.path : [];
+    return error.type === "SERVICE_UNAVAILABLE" && (path.at(-1) === "additions" || path.at(-1) === "deletions");
+  });
+}
 const observedNumber = (value: unknown): Observation<number> => number(value) === null ? unknown("partial", "source_error") : observed(value as number, "complete", "source_observed");
 const emptyMeasurements = emptySliceMeasurements;
 
@@ -96,6 +106,21 @@ const RATE_LIMIT_FLOOR = 200;
  * on every query stops the slice once `remaining` drops below 200, with
  * `retryAfterSeconds` computed from `resetAt`.
  */
+/** Replaces each null node in `primary`'s connection at `path` with the
+ * node at the same index of `fallback`'s (the same page, same cursor). Pages
+ * of different lengths are left unchanged, so their nulls stay unaccounted.
+ */
+function fillNullNodes(primary: ObjectData, fallback: ObjectData, path: readonly string[]): ObjectData {
+  const connection = object(at(primary, ...path)); const nodes = connection.nodes; const recovered = object(at(fallback, ...path)).nodes;
+  if (!Array.isArray(nodes) || !Array.isArray(recovered) || nodes.length !== recovered.length) return primary;
+  const filled = nodes.map((node, i) => node ?? recovered[i]);
+  const rebuilt: ObjectData = { ...primary };
+  let parent = rebuilt;
+  for (const key of path.slice(0, -1)) { const child = { ...object(parent[key]) }; parent[key] = child; parent = child; }
+  parent[path.at(-1)!] = { ...connection, nodes: filled };
+  return rebuilt;
+}
+
 const COMMIT_HISTORY_SINCE_MARGIN_MS = 30 * 86_400_000;
 
 export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
@@ -143,7 +168,7 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     try { return isWithinScoringWindow(date as string, window); } catch { reasons.add(diag.record(operation, "parse")); return false; }
   }
 
-  async function request(queryName: keyof typeof queries, variables: Record<string, unknown>): Promise<{ data: ObjectData; stop: SourceDiagnostic | null }> {
+  async function request(queryName: keyof typeof queries, variables: Record<string, unknown>): Promise<{ data: ObjectData; stop: SourceDiagnostic | null; lineCountsUnavailable?: boolean }> {
     const budgetStop = budgetOrDeadlineStop(requestCount, budget.maxRequests, signal);
     if (budgetStop) return { data: {}, stop: makeStop(queryName, budgetStop) };
     requestCount++;
@@ -158,6 +183,7 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
       }
       const payload = object(await response.json());
       if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+        if (onlyLineCountsUnavailable(payload.errors)) return { data: object(payload.data), stop: null, lineCountsUnavailable: true };
         const limited = isGraphqlRateLimited(payload.errors);
         return { data: object(payload.data), stop: makeStop(queryName, limited ? "rate_limited" : "graphql", response.status, limited ? retryAfterSeconds(response.headers) : null) };
       }
@@ -188,12 +214,20 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   async function runPagedList(
     op: MutableCollectorOperation, queryName: keyof typeof queries, variables: Record<string, unknown>, path: readonly string[],
     onNode: (node: ObjectData) => void,
-    options: { readonly search?: boolean; readonly onPage?: (data: ObjectData) => void; readonly emptyOk?: (data: ObjectData) => boolean } = {},
+    options: {
+      readonly search?: boolean; readonly onPage?: (data: ObjectData) => void; readonly emptyOk?: (data: ObjectData) => boolean;
+      /** The same query without line counts, to recover nodes GitHub nulled because it could not count their lines. */
+      readonly withoutLineCounts?: keyof typeof queries;
+    } = {},
   ): Promise<ListOutcome> {
     let cursor = op.cursor;
     let isFirstFetch = cursor === null;
     for (;;) {
-      const r = await request(queryName, { ...variables, after: cursor });
+      let r = await request(queryName, { ...variables, after: cursor });
+      if (r.lineCountsUnavailable && options.withoutLineCounts) {
+        const fallback = await request(options.withoutLineCounts, { ...variables, after: cursor });
+        r = fallback.stop ? fallback : { data: fillNullNodes(r.data, fallback.data, path), stop: null };
+      }
       options.onPage?.(r.data);
       if (!r.stop && options.emptyOk?.(r.data)) { op.done = true; op.cursor = null; return { kind: "done", totalCount: 0 }; }
       const connection = object(at(r.data, ...path));
@@ -386,7 +420,7 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
           measurements: { ...emptyMeasurements(), additions: observedNumber(node.additions), deletions: observedNumber(node.deletions) },
           categories: [], acceptance: unknown("unavailable", "acceptance_time_unknown"),
         });
-      }, { emptyOk: (data) => at(data, "node", "isEmpty") === true && at(data, "node", "defaultBranchRef") === null });
+      }, { emptyOk: (data) => at(data, "node", "isEmpty") === true && at(data, "node", "defaultBranchRef") === null, withoutLineCounts: "commitsWithoutLines" });
       if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
       return "done";
     }

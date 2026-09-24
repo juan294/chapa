@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.5] - 2026-09-24
+
+### Fixed
+
+- **A commit too large for GitHub to count no longer fails collection.** GitHub
+  returns such a commit as `null` with a `SERVICE_UNAVAILABLE` error on its
+  line count, and the rest of the page as normal. The collector treated this
+  as a structural error and failed the job on every retry. It now keeps the
+  page, fetches the same page again without line counts, and records that
+  commit with unknown line counts.
+
 ## [4.0.4] - 2026-09-24
 
 ### Fixed
