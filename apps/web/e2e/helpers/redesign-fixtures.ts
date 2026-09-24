@@ -92,17 +92,53 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
     if (result.error) throw result.error;
     return result;
   };
+  // #1335 phase 5 — "Receipt binding mismatch" from
+  // scoring_v7_issue_verification was traced to leftover scoring_v7_receipts/
+  // scoring_v7_subjects rows from a PRIOR run of this same launcher: the
+  // cleanup() below now withdraws every receiptOwner, which removes the root
+  // cause. This retry is kept as cheap defense-in-depth against any other
+  // transient PostgREST error shaped like the same message, not as the fix.
+  const issueObservedVerificationRetrying = async (handle: string, now: Date): Promise<string> => {
+    const isBindingMismatch = (error: unknown): boolean => {
+      const message = error && typeof error === 'object' && 'message' in error ? String((error as { message: unknown }).message) : '';
+      return message.includes('Receipt binding mismatch');
+    };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await issueObservedVerification(db, handle, now);
+      } catch (error) {
+        if (attempt >= 2 || !isBindingMismatch(error)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+      }
+    }
+  };
   const existing = await check(db.from('users').select('handle').in('handle', [...REDESIGN_HANDLES]));
   if (existing.data?.length) throw new Error('Refusing to overwrite existing redesign users');
   const flags = await check(db.from('feature_flags').select('*').in('key', flagKeys));
+  // #1335 phase 5 — octocat and REDESIGN_OWNERS now publish a real v7.2
+  // receipt (issueObservedVerification*), same as the SCORING_POINT_HANDLES/
+  // COLLECTION_QUEUE_HANDLES fixtures already do. Without an explicit
+  // withdraw, scoring_v7_receipts/scoring_v7_subjects rows for these handles
+  // never get cleaned (unlike users/studio_configs/etc. above), so a LATER
+  // run's fresh publish for the SAME handle collides with the leftover row
+  // and fails deterministically with "Receipt binding mismatch" -- this was
+  // observed as a residue bug, not a transient flake, once octocat was no
+  // longer the only owner receiving a receipt.
+  const receiptOwners = ['octocat', ...REDESIGN_OWNERS];
   const cleanup = async () => {
     const errors: unknown[] = [];
+    for (const owner of receiptOwners) await check(db.rpc('scoring_v7_withdraw', { p_owner: owner })).catch(error => errors.push(error));
     const tables = ['verification_records', 'user_platforms', 'studio_configs', 'metrics_snapshots', 'users'];
     for (const table of tables) {
       await check(db.from(table).delete().in('handle', [...REDESIGN_HANDLES])).catch(error => errors.push(error));
     }
     await check(db.from('feature_flags').delete().in('key', flagKeys)).catch(error => errors.push(error));
     if (flags.data?.length) await check(db.from('feature_flags').upsert(flags.data, { onConflict: 'key' })).catch(error => errors.push(error));
+    for (const table of ['scoring_v7_subjects', 'scoring_v7_sources', 'scoring_v7_evidence', 'scoring_v7_raw_artifacts', 'scoring_v7_receipts', 'scoring_observed_current']) {
+      await check(db.from(table).select('owner_handle').in('owner_handle', receiptOwners))
+        .then(result => { if (result.data?.length) errors.push(new Error(`Redesign receipt residue in ${table}`)); })
+        .catch(error => errors.push(error));
+    }
     for (const table of tables) {
       await check(db.from(table).select('handle').in('handle', [...REDESIGN_HANDLES]))
         .then(result => { if (result.data?.length) errors.push(new Error(`Redesign residue in ${table}`)); })
@@ -143,7 +179,20 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
       // receipt via the same RPCs the scoring-point fixtures use, rather than
       // a hand-picked hash/scores.
       if (handle === 'octocat') {
-        octocatVerificationToken = await issueObservedVerification(db, handle, new Date(stats.fetchedAt));
+        octocatVerificationToken = await issueObservedVerificationRetrying(handle, new Date(stats.fetchedAt));
+      }
+      // #1335 phase 5 — with v6 deleted there is no legacy stats-derived
+      // fallback score any more: a handle with no registered scoring
+      // subject/receipt renders the "unregistered" status placeholder (a
+      // real <svg>, but with no archetype/score to draw) instead of a
+      // computed badge. redesign-surfaces.spec.ts's Studio test asserts a
+      // real archetype-bearing badge preview for each of REDESIGN_OWNERS
+      // (owners viewing their OWN Studio), which a real production owner
+      // always has via the OAuth callback's subject registration — these
+      // synthetic fixture handles need the same v7.2 receipt octocat
+      // already gets, or Studio has nothing to draw.
+      if (REDESIGN_OWNERS.includes(handle)) {
+        await issueObservedVerificationRetrying(handle, new Date(stats.fetchedAt));
       }
     }
     for (const handle of SCORING_POINT_HANDLES) github[handle] = buildRedesignGitHubFixture(handle, new Date().toISOString()).response;
