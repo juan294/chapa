@@ -184,6 +184,17 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
     }
     throw new Error("no graphql stop");
   });
+  // EMU logins are "<idp-handle>_<shortcode>" (2026-09-24: a signed-up EMU
+  // account made every slice throw "Invalid GitHub handle").
+  it("accepts an Enterprise Managed User login with an underscore", async () => {
+    mockApi();
+    const emu = { ...input, requestedSource: { ...input.requestedSource, login: "Juan-GonzalezPonce_avoltagh" } };
+    await expect(collectGitHubSlice(emu, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set())).resolves.toBeDefined();
+  });
+  it("still rejects a login that is not a GitHub login shape", async () => {
+    const bad = { ...input, requestedSource: { ...input.requestedSource, login: "-bad_" } };
+    await expect(collectGitHubSlice(bad, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set())).rejects.toThrow("Invalid GitHub handle");
+  });
   it("classifies an unparseable accepted-change date as a parse stop, still source_error-equivalent", async () => {
     mockApi({ V7MergedChanges: () => ({ search: { ...page([pr("PR1", { mergedAt: "" })]), issueCount: 1 } }) });
     const result = await runToCompletion();

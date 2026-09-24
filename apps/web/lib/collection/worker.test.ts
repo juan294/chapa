@@ -272,6 +272,23 @@ describe("runCollectionSlice", () => {
     expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.any(String));
   });
 
+  // 2026-09-24: an EMU login made the GitHub collector throw on every slice.
+  // The job was never failed, so its lease expired and it was re-claimed
+  // every tick, forever.
+  it("fails a job whose collector throws, with the structural 3-try budget, and still rethrows", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockRejectedValue(new RangeError("Invalid GitHub handle"));
+    await expect(runCollectionSlice(makeJob({ attempt: 0 }), Date.now() + 60_000, deps)).rejects.toThrow("Invalid GitHub handle");
+    expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: "collect", stopKind: "protocol" }), expect.any(String));
+  });
+
+  it("fails a throwing collector terminally once the 3-try budget is spent", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockRejectedValue(new RangeError("Invalid GitHub handle"));
+    await expect(runCollectionSlice(makeJob({ attempt: 2 }), Date.now() + 60_000, deps)).rejects.toThrow();
+    expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: "collect" }), null);
+  });
+
   it("resumes from exactly the checkpoint persisted before an outcome-processing crash", async () => {
     const deps = harness();
     const midCheckpoint: CollectorCheckpoint = { version: 1, operations: [{ key: "repositories", cursor: "page2", done: false }], discovered: { repositoryIds: ["r1"] } };

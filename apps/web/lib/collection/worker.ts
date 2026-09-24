@@ -320,13 +320,23 @@ export async function runCollectionSlice(
     }
   }
 
-  const result = await deps.collect(
-    resolved.context,
-    { token: resolved.token },
-    checkpoint,
-    { maxRequests: MAX_REQUESTS_PER_SLICE, deadlineAt },
-    stagedKeys,
-  );
+  let result: Awaited<ReturnType<typeof deps.collect>>;
+  try {
+    result = await deps.collect(
+      resolved.context,
+      { token: resolved.token },
+      checkpoint,
+      { maxRequests: MAX_REQUESTS_PER_SLICE, deadlineAt },
+      stagedKeys,
+    );
+  } catch (error) {
+    // A collector that throws instead of returning a stop must still move
+    // the job: left running, its lease expires and every tick re-claims it
+    // (2026-09-24, an EMU login the GitHub collector rejected). Treat it as a
+    // structural failure, then rethrow so the tick still captures the cause.
+    await failJob(lease, { provider: job.provider, operation: "collect", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null }, structuralRetryAt(job, deps));
+    throw error;
+  }
 
   const progress: CollectionProgress = {
     operationsDone: result.checkpoint.operations.filter((op) => op.done).length,
@@ -412,8 +422,12 @@ export async function runCollectionSlice(
   // terminal. (evidence-diagnostics.ts's reasonFor() already groups
   // "graphql" with "protocol"/"parse" as source_error, distinct from the
   // honest-incompleteness budget/deadline/rate_limited group.)
-  const retryAt = job.attempt < 2 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
-  await failJob(lease, stop, retryAt);
+  await failJob(lease, stop, structuralRetryAt(job, deps));
+}
+
+/** The structural (graphql/protocol/parse/thrown) retry rule: 3 tries, then terminal. */
+function structuralRetryAt(job: CollectionJob, deps: CollectionWorkerDeps): string | null {
+  return job.attempt < 2 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
 }
 
 /**
