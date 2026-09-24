@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, cleanup } from "@testing-library/react";
 
 // Mock the animations module to avoid heavy imports
 vi.mock("@/lib/effects/heatmap/animations", () => ({
@@ -14,6 +14,8 @@ vi.mock("@/lib/effects/heatmap/animations", () => ({
     Array.from({ length: 13 }, () => Array.from({ length: 7 }, () => 0)),
   INTENSITY_COLORS: ["#eee", "#ddd", "#ccc", "#bbb", "#aaa"],
 }));
+
+afterEach(cleanup);
 
 describe("heatmap-wave experiment page", () => {
   it("renders without throwing", async () => {
