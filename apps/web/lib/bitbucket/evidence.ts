@@ -127,7 +127,12 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     // The checkpoint is pure data with no URLs that carry a host (plan.ts) --
     // store only path+query and rebuild against the fixed API origin on resume.
     const toRelative = (absolute: string): string => { const u = new URL(absolute); return `${u.pathname}${u.search}`; };
-    let url = op.cursor ? new URL(op.cursor, initial.origin).toString() : initialUrl;
+    // A cursor saved under a different page size (pre-v4.0.1 pullrequests
+    // cursors kept pagelen=100, which the API rejects) cannot be resized in
+    // place: page=N addresses different rows at another size. Restart the
+    // list from page 1; event keys dedupe anything read twice.
+    const saved = op.cursor ? new URL(op.cursor, initial.origin) : null;
+    let url = saved && saved.searchParams.get("pagelen") === initial.searchParams.get("pagelen") ? saved.toString() : initialUrl;
     for (;;) {
       const r = await request(operation, url);
       if (r.stop) {
