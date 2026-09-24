@@ -15,7 +15,7 @@ CREATE TABLE public.scoring_issuance_attempts (
   owner_handle text NOT NULL REFERENCES public.scoring_v7_subjects(owner_handle) ON DELETE CASCADE,
   reference_date date NOT NULL,
   outcome text NOT NULL CHECK (outcome IN ('issued','unchanged','failed')),
-  reason text CHECK (reason IS NULL OR reason IN ('storage_error','source_error','craft_error')),
+  reason text CHECK (reason IS NULL OR reason IN ('storage_error','source_error','craft_error','empty_evidence')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_scoring_issuance_attempts_owner_date ON public.scoring_issuance_attempts (owner_handle, reference_date, created_at DESC);

@@ -419,7 +419,8 @@ still recorded normally.
 
 **Mitigation:** every refusal is fully observable, never a silent skip: it is
 recorded as a `failed{reason: "empty_evidence"}` fan-in outcome, written to
-`scoring_issuance_attempts` (migration `057`), emitted as a
+`scoring_issuance_attempts` (its `reason` CHECK constraint, migration `056`),
+emitted as a
 `scoring_issuance_outcome` event, and pages the `scoring_issuance_failed`
 operational alert exactly like any other fan-in failure. `runCollectionTick`'s
 retry sweep (`retryPendingFanIns`) picks the day back up on the next tick, so
