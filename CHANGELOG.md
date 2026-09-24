@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.3] - 2026-09-24
+
+### Fixed
+
+- **GitHub collection waits out the GraphQL rate limit instead of failing.**
+  GitHub answers its GraphQL rate limit with HTTP 200 and the error type
+  `RATE_LIMIT` (code `graphql_rate_limit`). The collector only recognised
+  `RATE_LIMITED`, so jobs failed as structural errors when the hourly
+  allowance ran out. They now pause until the reset time from the response
+  headers.
+
 ## [4.0.2] - 2026-09-24
 
 ### Fixed
