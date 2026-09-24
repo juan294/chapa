@@ -125,19 +125,28 @@ Receipt schema and scoring math are unchanged by any of this.
 byte-identical, including the 15 files `scoring-consumer-inventory.test.ts`
 lists as byte-digested (`apps/web/lib/impact/{observed-v7,v7,v7-evidence}.ts`,
 the three `lib/insights/report-craft*.ts` files, and nine
-`packages/shared/src/*.ts` modules). This plan changed collection, gating and
-rendering only.
+`packages/shared/src/*.ts` modules), plus the policy document
+`docs/plans/2026-09-08-v7-single-score-consistency-phases/policy.md`, whose bytes
+are pinned by the policy digest. Its "Consent and privacy" section is therefore
+superseded by this record rather than edited. This plan changed collection, gating
+and rendering only.
 
 ## Migrations
 
 `054_remove_publication_consent.sql` drops the consent predicates.
 `055_scoring_collection_queue.sql` adds the job table. `056_scoring_status_and_fan_in.sql`
-adds fan-in issuance tracking. `057_retire_v6_selector.sql` forces the
-`scoring_v7_rendering` flag on for the running release during the deploy
-window, so the flag's own row still exists but nothing new reads it. The
-tables and columns this plan retires (`metrics_snapshots`, `verification_records`,
-the consent columns, the flag row itself) are dropped by
-`058_contract_v6_and_consent.sql` only after production is confirmed running
-the new code (expand-migrate-contract, `docs/runbooks/migrations.md:203-215`).
-That migration is a phase-7 production action requiring its own explicit
-authorization; it has not been run as of this document.
+adds fan-in issuance tracking. The plan's pre-release `057_retire_v6_selector.sql`,
+which forced `scoring_v7_rendering` on during the deploy window, was not written:
+the owner switched the production flag off on 2026-09-23, and the new code never
+reads the flag.
+
+The tables, views and columns this plan retires (`metrics_snapshots`,
+`verification_records`, `latest_snapshots`, `admin_users`, the consent columns and
+the flag row) are dropped by `057_contract_v6_and_consent.sql`. That migration
+first rebuilds `admin_users_observed` from `users` so the dependent views can be
+dropped. It ships in a follow-up release, after production is confirmed to be
+running the new code (expand-migrate-contract, `docs/runbooks/migrations.md:203-215`).
+It is kept out of the first release because the release PR's pending-migrations
+gate requires the repository to match the production schema. Applying it is a
+production action that needs its own explicit authorization; it has not been run
+as of this document.
