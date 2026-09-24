@@ -135,6 +135,12 @@ describe("retired v6 tokens do not reappear (#1335 phase 5.12)", () => {
     "machinePolicy",
     "scoring_v7_rendering",
     '"v6"',
+    // #1335 phase 5 step 5.10 — retired with lib/impact/{heatmap-evenness,utils}.ts
+    // and lib/dashboard/dimension-sub-metrics.ts. DimensionScores itself is NOT
+    // listed here: RadarChart.ts, generate-insights.ts, public-score-projection.ts
+    // and simulate.ts still import it, so it isn't fully gone.
+    "computeHeatmapEvenness",
+    "computeWeekCoverage",
   ] as const;
 
   // Digested artifacts (score-receipt-observed.test.ts enforces byte

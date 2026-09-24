@@ -1,8 +1,10 @@
 import {
   DIMENSION_KEYS,
 } from "@chapa/shared";
-import type { DimensionKey } from "@/lib/dashboard/dimension-sub-metrics";
+import type { DimensionScores } from "@chapa/shared";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+
+type DimensionKey = keyof DimensionScores;
 import { publicScoreProjection } from "@/lib/profile/public-score-projection";
 import { calculateObservedCoreV7 } from "@/lib/impact/observed-v7";
 import { invalidInput } from "./errors";

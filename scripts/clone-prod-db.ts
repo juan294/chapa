@@ -175,7 +175,7 @@ export async function cloneProdDb(sourcePath: string, targetPath: string): Promi
       }
     } catch (error) {
       // #1335 — `metrics_snapshots` and `verification_records` are dropped by
-      // a held contract migration (058) not yet applied to either side. A
+      // a held contract migration (057) not yet applied to either side. A
       // table present in production but missing on this local target (already
       // migrated ahead) must not abort every table after it in this loop.
       console.log(`${table}: skipped, target write failed (${String(error).slice(0, 120)})`);

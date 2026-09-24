@@ -50,7 +50,7 @@ export function ImpactDashboard({
       <p className="mt-2 text-sm text-text-secondary leading-relaxed">{t("observedScoring.coreSeparate") as string}</p>
       {scoring.freshness === "stale" && scoring.window && <p className="mt-2 text-sm text-text-secondary">{interpolate(t("observedScoring.stale") as string, { date: scoring.window.referenceDate })}</p>}
     </div>
-    <DimensionCardsRow stats={stats} scoring={scoring} receiptExplanation={receiptExplanation} />
+    <DimensionCardsRow scoring={scoring} receiptExplanation={receiptExplanation} />
     {report && report.status !== "scored" && (!report.unlocked || isOwner) && <section className="text-sm text-text-secondary">
       {!report.unlocked && <p>{t(report.status === "no_report" ? "observedScoring.craftNone" : report.status === "insufficient_report_data" ? "observedScoring.craftInsufficient" : "observedScoring.craftUnavailable") as string}</p>}
       {isOwner && <Link href="/settings" className="mt-2 inline-flex min-h-11 items-center underline underline-offset-4 hover:text-text-primary">{t(report.status === "no_report" ? "observedScoring.uploadInsights" : "observedScoring.updateInsights") as string}</Link>}

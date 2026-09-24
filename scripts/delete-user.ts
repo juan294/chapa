@@ -195,13 +195,13 @@ async function scanAllKeys(cfg: Config, pattern: string): Promise<string[]> {
 
 /**
  * #1335 — `metrics_snapshots` and `verification_records` are dropped by a
- * held contract migration (058) not yet applied to production. PostgREST
+ * held contract migration (057) not yet applied to production. PostgREST
  * answers a query against a table/relation it cannot find with 404
  * (`PGRST205`); every other failure mode this script needs to keep failing
  * loudly on (auth, permission, malformed query) uses a different status
  * (401/403/400/406). A HEAD response (used by `supaCount`) carries no body to
  * confirm the error code against, so the status alone is the signal. Once
- * migration 058 lands, this lets the same table list keep working without
+ * migration 057 lands, this lets the same table list keep working without
  * another edit here.
  */
 function isMissingTableStatus(status: number): boolean {

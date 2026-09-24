@@ -4,7 +4,27 @@ import type {
   CraftResult,
   CraftTier,
 } from "@chapa/shared";
-import { normalize } from "@/lib/impact/utils";
+
+/**
+ * Logarithmic normalization: maps a raw count to 0--1 with diminishing returns.
+ *
+ * Formula: `ln(1 + min(x, cap)) / ln(1 + cap)`.
+ * This gives strong credit for early activity and progressively less credit
+ * as the value approaches the cap, preventing outliers from dominating.
+ *
+ * #1335 phase 5 step 5.10 — this was previously imported from the retired
+ * `lib/impact/utils.ts`; this AI-insights scoring module is its only
+ * remaining consumer, so the helper now lives here instead of in `lib/impact`.
+ *
+ * @param x - The raw metric value (e.g. commits, PRs merged)
+ * @param cap - The saturation point beyond which additional activity has no effect
+ * @returns A value between 0 and 1 inclusive; returns 0 when x or cap is non-positive
+ */
+function normalize(x: number, cap: number): number {
+  if (x <= 0 || cap <= 0) return 0;
+  const clamped = Math.min(x, cap);
+  return Math.log(1 + clamped) / Math.log(1 + cap);
+}
 
 /**
  * Shannon entropy of a distribution, normalized to 0–1.
@@ -176,8 +196,6 @@ export function computeCraftScore(data: InsightsUpload): CraftResult {
 // Export helpers for isolated testing
 export {
   normalize as _normalize,
-} from "@/lib/impact/utils";
-export {
   normalizedEntropy as _normalizedEntropy,
   scoreResponseTime as _scoreResponseTime,
   getCraftTier as _getCraftTier,
