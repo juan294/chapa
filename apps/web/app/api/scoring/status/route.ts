@@ -54,8 +54,11 @@ export const GET = withErrorCapture("/api/scoring/status", async (request: NextR
  * POST /api/scoring/status
  *
  * Body: `{ action: "retry", provider }`. Enqueues a `retry`-reason
- * collection job for the given provider (resets an existing failed job for
- * it, per migration 055's enqueue semantics) and runs a bounded slice in the
+ * collection job for the given provider, per migration 058's enqueue
+ * semantics (#1351 phase 3): a retry after a transient stop (http, network,
+ * deadline, budget) resumes from the saved checkpoint instead of starting
+ * over, while a retry after a structural stop, or after a reconnect, still
+ * clears the checkpoint. Either way it runs a bounded slice in the
  * background so the retry makes progress without the caller waiting a full
  * 5-minute collect-evidence cron tick.
  */

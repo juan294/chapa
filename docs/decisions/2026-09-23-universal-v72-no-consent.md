@@ -142,7 +142,7 @@ reads the flag.
 
 The tables, views and columns this plan retires (`metrics_snapshots`,
 `verification_records`, `latest_snapshots`, `admin_users`, the consent columns and
-the flag row) are dropped by `057_contract_v6_and_consent.sql`. That migration
+the flag row) are dropped by `059_contract_v6_and_consent.sql`. That migration
 first rebuilds `admin_users_observed` from `users` so the dependent views can be
 dropped. It ships in a follow-up release, after production is confirmed to be
 running the new code (expand-migrate-contract, `docs/runbooks/migrations.md:203-215`).

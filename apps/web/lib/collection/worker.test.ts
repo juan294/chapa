@@ -240,6 +240,37 @@ describe("runCollectionSlice", () => {
     );
   });
 
+  // #1351 (phase 3): migration 058 redefines `attempt` as "failures since
+  // the last progress" -- a `rate_limited` stop never increments it. This
+  // fake `fail()` applies that rule (the real rule lives in SQL, proven by
+  // collection-queue.contract.test.ts); what this test proves is that
+  // runCollectionSlice's own rate_limited branch never computes a null
+  // retryAt on its own, no matter how high `attempt` climbs, so a job that
+  // only ever sees rate limiting can never become terminal.
+  it("rate-limited stops never make a job terminal, however many slices see one", async () => {
+    const deps = harness();
+    let attempt = 0;
+    let state: "running" | "retrying" | "waiting_rate_limit" | "failed" = "running";
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "github", operation: "merged", stopKind: "rate_limited", httpStatus: 403, retryAfterSeconds: 60 },
+    }));
+    deps.fail = vi.fn().mockImplementation(async (_lease, stop: { stopKind: string }, retryAt: string | null) => {
+      if (retryAt === null) {
+        state = "failed";
+        return { status: "failed" };
+      }
+      attempt = stop.stopKind === "rate_limited" ? attempt : attempt + 1;
+      state = stop.stopKind === "rate_limited" ? "waiting_rate_limit" : "retrying";
+      return { status: state };
+    });
+
+    for (let i = 0; i < 20; i++) {
+      await runCollectionSlice(makeJob({ attempt, leaseToken: "lease-1" }), Date.now() + 60_000, deps);
+      expect(state).not.toBe("failed");
+    }
+    expect(attempt).toBe(0);
+  });
+
   it("fails a 5xx (http) stop with exponential backoff while attempts remain", async () => {
     const deps = harness();
     deps.collect = vi.fn().mockResolvedValue(sliceResult({ stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 503, retryAfterSeconds: null } }));
