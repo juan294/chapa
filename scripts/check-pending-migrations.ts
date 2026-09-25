@@ -61,122 +61,51 @@ export interface DiffResult {
 /**
  * #1064 — the single tolerated migra artifact.
  *
- * migra emits this drop/recreate of `public.admin_users` on every run against
- * the production project even though nothing differs. Since migration 052,
- * the dependent `public.admin_users_observed` view must be dropped and
- * recreated around that same false positive, so the pinned artifact includes
- * both exact view bodies. Evidence was gathered read-only against production:
+ * migra emits a drop/recreate of the admin view on every run against the
+ * production project even though nothing differs. Until migration 059 it was
+ * a four-statement chain: `public.admin_users` (identical to what
+ * `014_views_security_invoker.sql` produces) and its dependent
+ * `public.admin_users_observed`. 059 dropped `admin_users` and rebuilt
+ * `admin_users_observed` directly on `users`, so the same false positive is
+ * now this two-statement drop/recreate. Evidence, read-only against
+ * production on 2026-09-25 after 058 and 059 were applied:
  *
- *  - `pg_get_viewdef('public.admin_users')` is textually identical to what
- *    `014_views_security_invoker.sql` produces.
- *  - `pg_class.reloptions` is `{security_invoker=true}`, matching that migration.
- *  - The original emitted block was byte-for-byte identical whether or not a
- *    migration recreated the view. After applying migrations 049-052, the
- *    linked-production diff emits the same block plus the exact dependent view.
- *    No migration content can silence the underlying artifact, which is why
- *    `032_reconcile_remote_schema.sql` deliberately omits the view.
+ *  - `pg_get_viewdef('public.admin_users_observed')` matches this body and
+ *    059's definition (the only textual difference is the `public.` prefix,
+ *    which Postgres omits for objects on the search path).
+ *  - `pg_class.reloptions` is `{security_invoker=true}`, as 059 sets.
+ *  - This exact text is what the v4.1.0 release PR's check emitted.
  *
- * The tolerance is pinned to this EXACT four-statement view chain,
- * whitespace-normalized. A genuine change to either view, a recreate of any
- * other view, or this artifact accompanied by any additional statement all
- * still block — see the `#1064` cases in
- * `check-pending-migrations.test.ts`, which exist specifically to keep this
- * narrow.
+ * The tolerance is pinned to this EXACT text, whitespace-normalized. A
+ * genuine change to the view, a recreate of any other view, the retired
+ * pre-059 chain, or this artifact accompanied by any additional statement all
+ * still block — see the `#1064` cases in `check-pending-migrations.test.ts`.
  *
- * ACCEPTED RISK: a view-chain change that normalizes to precisely this text
- * would pass unnoticed. That is only reachable by changing the views to what
- * they already are. Recorded in `docs/accepted-risks.md`.
+ * ACCEPTED RISK: a view change that normalizes to precisely this text would
+ * pass unnoticed. That is only reachable by changing the view to what it
+ * already is. Recorded in `docs/accepted-risks.md`.
  */
 export const TOLERATED_MIGRA_ARTIFACT = `drop view if exists "public"."admin_users_observed";
 
-drop view if exists "public"."admin_users";
-
-create or replace view "public"."admin_users" as  SELECT u.handle,
+create or replace view "public"."admin_users_observed" as  SELECT u.handle,
     u.registered_at,
     u.display_name,
     u.avatar_url,
-    ls.date AS snapshot_date,
-    ls.captured_at AS snapshot_captured_at,
-    ls.commits_total,
-    ls.prs_merged_count,
-    ls.reviews_submitted,
-    ls.repos_contributed,
-    ls.active_days,
-    ls.total_stars,
-    ls.archetype,
-    ls.tier,
-    ls.adjusted_composite,
-    ls.composite_score,
-    ls.confidence,
-    ls.building,
-    ls.guarding,
-    ls.consistency AS consistency_score,
-    ls.breadth
-   FROM (public.users u
-     LEFT JOIN public.latest_snapshots ls ON ((ls.handle = u.handle)));
-
-create or replace view "public"."admin_users_observed" as  SELECT a.handle,
-    a.registered_at,
-    a.display_name,
-    a.avatar_url,
-    a.snapshot_date,
-    a.snapshot_captured_at,
-    a.commits_total,
-    a.prs_merged_count,
-    a.reviews_submitted,
-    a.repos_contributed,
-    a.active_days,
-    a.total_stars,
-    a.archetype,
-    a.tier,
-    a.adjusted_composite,
-    a.composite_score,
-    a.confidence,
-    a.building,
-    a.guarding,
-    a.consistency_score,
-    a.breadth,
-        CASE
-            WHEN (r.id IS NULL) THEN 'v6'::text
-            ELSE 'v7.2'::text
-        END AS current_policy_version,
-        CASE
-            WHEN (r.id IS NULL) THEN (a.adjusted_composite)::double precision
-            ELSE ((r.public_receipt #>> '{core,composite,displayValue}'::text[]))::double precision
-        END AS current_display_score,
-        CASE
-            WHEN (r.id IS NULL) THEN (a.composite_score)::double precision
-            ELSE ((r.public_receipt #>> '{core,composite,exact}'::text[]))::double precision
-        END AS current_exact_score,
-        CASE
-            WHEN (r.id IS NULL) THEN a.tier
-            ELSE (r.public_receipt #>> '{core,tier}'::text[])
-        END AS current_tier,
-        CASE
-            WHEN (r.id IS NULL) THEN a.archetype
-            ELSE (r.public_receipt #>> '{core,archetype}'::text[])
-        END AS current_archetype,
-        CASE
-            WHEN (r.id IS NULL) THEN a.confidence
-            ELSE NULL::real
-        END AS current_confidence,
-        CASE
-            WHEN (r.id IS NULL) THEN a.snapshot_date
-            ELSE ((r.reference_time AT TIME ZONE 'UTC'::text))::date
-        END AS current_snapshot_date,
-        CASE
-            WHEN (r.id IS NULL) THEN a.snapshot_captured_at
-            ELSE r.reference_time
-        END AS current_fetched_at,
     r.id AS current_revision_id,
+    ((r.public_receipt #>> '{core,composite,displayValue}'::text[]))::double precision AS current_display_score,
+    ((r.public_receipt #>> '{core,composite,exact}'::text[]))::double precision AS current_exact_score,
+    (r.public_receipt #>> '{core,tier}'::text[]) AS current_tier,
+    (r.public_receipt #>> '{core,archetype}'::text[]) AS current_archetype,
+    ((r.reference_time AT TIME ZONE 'UTC'::text))::date AS current_snapshot_date,
+    r.reference_time AS current_fetched_at,
         CASE
             WHEN (r.id IS NOT NULL) THEN encode(sha256(convert_to(r.canonical_receipt, 'UTF8'::name)), 'hex'::text)
             ELSE NULL::text
         END AS current_content_hash
-   FROM (((public.admin_users a
-     LEFT JOIN public.scoring_v7_subjects s ON ((s.owner_handle = a.handle)))
+   FROM (((public.users u
+     LEFT JOIN public.scoring_v7_subjects s ON ((s.owner_handle = u.handle)))
      LEFT JOIN public.scoring_observed_current c ON ((c.owner_handle = s.owner_handle)))
-     LEFT JOIN public.scoring_v7_receipts r ON (((r.id = c.receipt_id) AND (r.owner_handle = a.handle) AND (r.policy_version = 'v7.2'::text) AND ((r.public_receipt ->> 'action'::text) <> 'retract'::text))));`;
+     LEFT JOIN public.scoring_v7_receipts r ON (((r.id = c.receipt_id) AND (r.owner_handle = u.handle) AND (r.policy_version = 'v7.2'::text) AND ((r.public_receipt ->> 'action'::text) <> 'retract'::text))));`;
 
 /** Collapse all whitespace runs so formatting differences never decide safety. */
 function normalizeSql(sql: string): string {
@@ -228,8 +157,8 @@ export function evaluateDiffOutput(stdout: string): DiffResult {
     return {
       hasPendingChanges: false,
       reason:
-        "Diff contains only the known-benign admin_users view-chain migra artifact (#1064) — " +
-        "production's view definitions are identical; nothing to apply.",
+        "Diff contains only the known-benign admin_users_observed migra artifact (#1064) — " +
+        "production's view definition is identical; nothing to apply.",
     };
   }
 
