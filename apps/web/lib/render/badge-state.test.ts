@@ -101,6 +101,19 @@ describe("renderBadgeStatusSvg", () => {
       expect(svg).toContain("Puntuación en curso, 42%");
       expect(svg).not.toContain("Scoring in progress");
     });
+
+    // #1342 -- while a job can still add operations, no percentage is shown.
+    it("shows a discovering heading and no percentage or progress bar when percent is null", () => {
+      const svg = renderBadgeStatusSvg("collecting", { handle: "octocat", percent: null });
+      expect(svg).toContain("Scoring in progress, discovering activity");
+      expect(svg).not.toMatch(/Scoring in progress, \d+%/);
+      expect(svg).not.toContain('rx="5"'); // the progress bar's rounded rects
+    });
+
+    it("shows the same discovering heading when percent is omitted entirely", () => {
+      const svg = renderBadgeStatusSvg("collecting", { handle: "octocat" });
+      expect(svg).toContain("Scoring in progress, discovering activity");
+    });
   });
 
   describe("action_needed", () => {
@@ -186,6 +199,11 @@ describe("buildBadgeStatusStrings", () => {
       return interpolate(literal, values);
     });
     expect(strings.collectingHeading).toBe("Scoring in progress, 99%");
+  });
+
+  it("resolves the discovering heading when percent is null (#1342)", () => {
+    const strings = buildBadgeStatusStrings(t, { kind: "collecting", percent: null, sources: [], hasPriorReceipt: false }, interpolate);
+    expect(strings.collectingHeading).toBe("[scoring.status.badgeDiscovering]");
   });
 
   it("resolves the action_needed heading", () => {

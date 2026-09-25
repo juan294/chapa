@@ -68,9 +68,11 @@ interface ScoringStatusPanelProps {
 }
 
 /**
- * Per-provider scoring status: state, percent, resume time, reason and an
- * action (Reconnect or Retry). Shared by `/settings` and the share page's
- * owner section (#1335 phase 4) — one panel, not two copies of this markup.
+ * Per-provider scoring status: state, resume time, reason and an action
+ * (Reconnect or Retry). Shared by `/settings` and the share page's owner
+ * section (#1335 phase 4) — one panel, not two copies of this markup. The
+ * aggregate percent (or "discovering" while any job's operation count is
+ * still growing, #1342) is shown once above the list, not per source row.
  */
 export function ScoringStatusPanel({ initialStatus }: ScoringStatusPanelProps) {
   const { t, locale } = useTranslation();
@@ -147,12 +149,11 @@ export function ScoringStatusPanel({ initialStatus }: ScoringStatusPanelProps) {
         <>
           <p className="text-sm text-text-secondary">
             {status.kind === "collecting"
-              ? interpolate(t("scoring.status.panelCollecting") as string, { percent: String(status.percent) })
+              ? status.percent === null
+                ? (t("scoring.status.panelDiscovering") as string)
+                : interpolate(t("scoring.status.panelCollecting") as string, { percent: String(status.percent) })
               : (t("scoring.status.panelActionNeeded") as string)}
           </p>
-          {status.kind === "collecting" && (
-            <p className="text-xs text-text-secondary">{t("scoring.status.panelPercentEstimate") as string}</p>
-          )}
           <ul className="space-y-2">
             {status.sources.map((source) => {
               const reconnectKey = source.reason === "reconnect" ? RECONNECT_KEYS[source.provider] : undefined;

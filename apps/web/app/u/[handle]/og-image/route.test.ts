@@ -592,6 +592,18 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
       expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
     });
 
+    // #1342 -- a still-discovering job reports percent: null; the OG image
+    // must draw the discovering heading, not a percentage.
+    it("rasterizes the collecting state with a discovering heading when percent is null", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: null, sources: [], hasPriorReceipt: false });
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      const body = new TextDecoder().decode(await res.arrayBuffer());
+      expect(body).toContain('data-chapa-state="collecting"');
+      expect(body).toContain("Scoring in progress, discovering activity");
+      expect(body).not.toMatch(/Scoring in progress, \d+%/);
+    });
+
     it("rasterizes the action_needed state", async () => {
       mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: false });
       const [req, ctx] = makeRequest("testuser");

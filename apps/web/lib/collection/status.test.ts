@@ -71,6 +71,7 @@ describe("deriveScoringStatus", () => {
     const failed = job({
       provider: "bitbucket",
       state: "failed",
+      progress: { operationsDone: 0, operationsKnown: 0, events: 0, requests: 0, discovering: false },
       lastStop: { provider: "bitbucket", operation: "profile", stopKind: "not_accessible", httpStatus: 401, retryAfterSeconds: null },
     });
     expect(deriveScoringStatus([failed], null, true)).toEqual({
@@ -110,7 +111,7 @@ describe("deriveScoringStatus", () => {
     const running = job({
       provider: "github",
       state: "running",
-      progress: { operationsDone: 30, operationsKnown: 120, events: 10, requests: 30 },
+      progress: { operationsDone: 30, operationsKnown: 120, events: 10, requests: 30, discovering: false },
     });
     expect(deriveScoringStatus([running], null, true)).toEqual({
       kind: "collecting",
@@ -129,7 +130,7 @@ describe("deriveScoringStatus", () => {
     const running = job({
       provider: "github",
       state: "running",
-      progress: { operationsDone: 999, operationsKnown: 1000, events: 0, requests: 0 },
+      progress: { operationsDone: 999, operationsKnown: 1000, events: 0, requests: 0, discovering: false },
     });
     const status = deriveScoringStatus([running], null, true);
     expect(status).toMatchObject({ kind: "collecting", percent: 99 });
@@ -169,6 +170,104 @@ describe("deriveScoringStatus", () => {
     expect(status).toMatchObject({
       kind: "collecting",
       sources: [{ provider: "github", state: "retrying", resumesAt: "2026-09-23T11:00:00.000Z", attempt: 2, reason: "temporary" }],
+    });
+  });
+
+  // #1342 -- discovery-aware progress: while a job's operation count can
+  // still grow, no percentage is shown at all (never a number that could
+  // move backwards).
+  describe("discovering (#1342)", () => {
+    it("a job still discovering has percent null", () => {
+      const running = job({
+        provider: "github",
+        state: "running",
+        progress: { operationsDone: 5, operationsKnown: 10, events: 0, requests: 5, discovering: true },
+      });
+      const status = deriveScoringStatus([running], null, true);
+      expect(status).toMatchObject({ kind: "collecting", percent: null, sources: [{ provider: "github", percent: null }] });
+    });
+
+    it("collecting percent is null while any in-progress job is discovering, even when another job has a real percent", () => {
+      const discoveringJob = job({
+        id: "job-github", provider: "github", state: "running",
+        progress: { operationsDone: 5, operationsKnown: 10, events: 0, requests: 5, discovering: true },
+      });
+      const doneDiscovering = job({
+        id: "job-bitbucket", provider: "bitbucket", state: "running",
+        progress: { operationsDone: 50, operationsKnown: 100, events: 0, requests: 50, discovering: false },
+      });
+      const status = deriveScoringStatus([discoveringJob, doneDiscovering], null, true);
+      expect(status).toMatchObject({
+        kind: "collecting",
+        percent: null,
+        sources: [
+          { provider: "github", percent: null },
+          { provider: "bitbucket", percent: 50 },
+        ],
+      });
+    });
+
+    it("shows percent once every job has discovered", () => {
+      const a = job({
+        id: "job-a", provider: "github", state: "running",
+        progress: { operationsDone: 10, operationsKnown: 20, events: 0, requests: 10, discovering: false },
+      });
+      const b = job({
+        id: "job-b", provider: "bitbucket", state: "running",
+        progress: { operationsDone: 30, operationsKnown: 30, events: 0, requests: 30, discovering: false },
+      });
+      const status = deriveScoringStatus([a, b], null, true);
+      // (10 + 30) / (20 + 30) = 80%
+      expect(status).toMatchObject({ kind: "collecting", percent: 80 });
+    });
+
+    it("a complete job counts as discovered, regardless of its stored progress.discovering", () => {
+      const done = job({
+        state: "complete",
+        progress: { operationsDone: 40, operationsKnown: 40, events: 5, requests: 40, discovering: true },
+      });
+      const status = deriveScoringStatus([done], null, true);
+      expect(status).toMatchObject({ kind: "collecting", percent: 99, sources: [{ provider: "github", percent: 100 }] });
+    });
+
+    it("legacy progress without the discovering key is treated as discovering, unless the job is complete", () => {
+      const legacyRunning = job({
+        provider: "github",
+        state: "running",
+        progress: { operationsDone: 5, operationsKnown: 10, events: 0, requests: 5 },
+      });
+      const legacyComplete = job({
+        provider: "bitbucket",
+        state: "complete",
+        progress: { operationsDone: 10, operationsKnown: 10, events: 0, requests: 10 },
+      });
+      expect(deriveScoringStatus([legacyRunning], null, true)).toMatchObject({ kind: "collecting", percent: null, sources: [{ percent: null }] });
+      expect(deriveScoringStatus([legacyComplete], null, true)).toMatchObject({ kind: "collecting", sources: [{ percent: 100 }] });
+    });
+
+    it("percent never decreases across a discovery-to-completion sequence", () => {
+      // A representative sequence a real job's progress rows could take:
+      // discovering while operationsKnown still grows, then a fixed known
+      // count once discovery finishes, then done.
+      const sequence = [
+        { operationsDone: 0, operationsKnown: 0, events: 0, requests: 0, discovering: true },
+        { operationsDone: 2, operationsKnown: 8, events: 0, requests: 2, discovering: true },
+        { operationsDone: 5, operationsKnown: 20, events: 0, requests: 5, discovering: true },
+        { operationsDone: 8, operationsKnown: 20, events: 0, requests: 8, discovering: false },
+        { operationsDone: 15, operationsKnown: 20, events: 0, requests: 15, discovering: false },
+        { operationsDone: 20, operationsKnown: 20, events: 0, requests: 20, discovering: false },
+      ];
+      let lastPercent: number | null = null;
+      for (const progress of sequence) {
+        const running = job({ provider: "github", state: "running", progress });
+        const status = deriveScoringStatus([running], null, true);
+        if (status.kind !== "collecting") throw new Error("unreachable");
+        if (status.percent !== null) {
+          if (lastPercent !== null) expect(status.percent).toBeGreaterThanOrEqual(lastPercent);
+          lastPercent = status.percent;
+        }
+      }
+      expect(lastPercent).toBe(99);
     });
   });
 });

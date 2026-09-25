@@ -24,6 +24,13 @@ const COLLECTING: ScoringStatus = {
   ],
 };
 
+const DISCOVERING: ScoringStatus = {
+  kind: "collecting",
+  percent: null,
+  hasPriorReceipt: false,
+  sources: [{ provider: "github", state: "running", percent: null }],
+};
+
 const ACTION_NEEDED: ScoringStatus = {
   kind: "action_needed",
   hasPriorReceipt: false,
@@ -54,6 +61,13 @@ describe("ScoringStatusPanel", () => {
       const localTime = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
         .format(new Date("2026-09-23T14:30:00.000Z"));
       expect(screen.getByTestId("scoring-status-source-bitbucket").textContent).toContain(localTime);
+    });
+
+    // #1342 -- while any job can still add operations, no percentage shows.
+    it("shows the discovering copy and no percentage when percent is null", () => {
+      render(<ScoringStatusPanel initialStatus={DISCOVERING} />);
+      expect(screen.getByText("Discovering your activity. A percentage appears once the total is known.")).toBeDefined();
+      expect(screen.queryByText(/\d+% complete/)).toBeNull();
     });
 
     it("renders resume times in UTC on the server so hydration matches", () => {

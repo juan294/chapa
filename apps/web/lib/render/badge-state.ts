@@ -95,8 +95,10 @@ export interface BadgeStatusStrings {
 export interface BadgeStatusOptions {
   readonly handle: string;
   readonly displayName?: string | null;
-  /** 0-99, required only for `collecting` (used to build the English default heading). */
-  readonly percent?: number;
+  /** 0-99, used only for `collecting` (builds the English default heading).
+   * Null or omitted means still discovering (#1342): no progress bar, and
+   * the default heading names the state instead of a percentage. */
+  readonly percent?: number | null;
   readonly config?: BadgeConfig;
   readonly disableAnimation?: boolean;
   readonly strings?: BadgeStatusStrings;
@@ -148,10 +150,10 @@ function progressBar(percent: number, t: ReturnType<typeof badgeTheme>): string 
  * protects.
  */
 export function renderBadgeStatusSvg(state: BadgeStatusState, options: BadgeStatusOptions): string {
-  const { handle, displayName = null, percent = 0, config = DEFAULT_BADGE_CONFIG, disableAnimation = false, strings = {} } = options;
+  const { handle, displayName = null, percent = null, config = DEFAULT_BADGE_CONFIG, disableAnimation = false, strings = {} } = options;
   const t = badgeTheme(config.colorPalette);
   const safeHandle = escapeXml(handle);
-  const clampedPercent = Math.max(0, Math.min(99, Math.round(percent)));
+  const clampedPercent = percent == null ? null : Math.max(0, Math.min(99, Math.round(percent)));
 
   const headingY = 380;
   const bodyY = 412;
@@ -159,7 +161,7 @@ export function renderBadgeStatusSvg(state: BadgeStatusState, options: BadgeStat
   let body = "";
   switch (state) {
     case "collecting":
-      heading = strings.collectingHeading ?? `Scoring in progress, ${clampedPercent}%`;
+      heading = strings.collectingHeading ?? (clampedPercent === null ? "Scoring in progress, discovering activity" : `Scoring in progress, ${clampedPercent}%`);
       break;
     case "action_needed":
       heading = strings.actionNeededHeading ?? "Scoring paused: action needed";
@@ -183,7 +185,7 @@ export function renderBadgeStatusSvg(state: BadgeStatusState, options: BadgeStat
   ${wordmark(t)}
   ${identityHeader(handle, displayName, t)}
   <text x="${PAD}" y="${headingY}" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}">${escapeXml(heading)}</text>
-  ${state === "collecting" ? progressBar(clampedPercent, t) : ""}
+  ${state === "collecting" && clampedPercent !== null ? progressBar(clampedPercent, t) : ""}
   ${body ? `<text x="${PAD}" y="${bodyY}" font-family="'JetBrains Mono', monospace" font-size="18" fill="${t.accent}">${escapeXml(body)}</text>` : ""}
 </svg>`;
 }
@@ -197,7 +199,9 @@ export function renderBadgeStatusSvg(state: BadgeStatusState, options: BadgeStat
 export function buildBadgeStatusStrings(t: (key: string) => string, status: NonReadyScoringStatus, interpolate: (template: string, values: Record<string, string>) => string): BadgeStatusStrings {
   switch (status.kind) {
     case "collecting":
-      return { collectingHeading: interpolate(t("scoring.status.badgeCollecting"), { percent: String(Math.max(0, Math.min(99, Math.round(status.percent)))) }) };
+      return status.percent === null
+        ? { collectingHeading: t("scoring.status.badgeDiscovering") }
+        : { collectingHeading: interpolate(t("scoring.status.badgeCollecting"), { percent: String(Math.max(0, Math.min(99, Math.round(status.percent)))) }) };
     case "action_needed":
       return { actionNeededHeading: t("scoring.status.badgeActionNeeded") };
     case "unregistered":

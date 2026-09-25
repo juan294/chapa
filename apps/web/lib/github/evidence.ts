@@ -5,8 +5,8 @@ import {
 } from "@chapa/shared";
 import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
-  validateSliceWindow, type MutableSliceOperation,
+  assembleSliceCoverage, buildSliceCheckpoint, computeDiscoveryComplete, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory,
+  newSliceEvents, validateSliceWindow, type MutableSliceOperation,
 } from "@/lib/collection/slice-helpers";
 import {
   budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder,
@@ -136,6 +136,17 @@ const COMMIT_HISTORY_SINCE_MARGIN_MS = 30 * 86_400_000;
 // counts, before absorbing that repository's history as partial coverage.
 const COMMIT_PAGE_LADDER = [50, 20, 10] as const;
 const COMMIT_LADDER_ABSORB_AFTER = 3;
+
+/** Operation keys/prefixes whose processing can call `registerRepo`/`ensureOp`
+ * -- i.e. can still grow the checkpoint's operation count (#1342). Derived
+ * from this file's own call sites: `repositories`/`contributed` register
+ * discovered repositories; `merged:*` registers a PR's repository, queues a
+ * `files:` operation, and can split into two more `merged:*` ranges;
+ * `reviewDiscovery` registers a reviewed PR's repository and queues a
+ * `reviews:` operation. `profile`, `files:*`, `reviews:*` and `commits:*`
+ * never call either function once processed, however their data turns out --
+ * see the contract test for the same claim proven against the live engine. */
+export const GITHUB_EXPANDING_OPERATIONS = ["repositories", "contributed", "reviewDiscovery", "merged:"] as const;
 
 export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
@@ -523,9 +534,10 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
 
   function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
   function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
+  const discoveryComplete = computeDiscoveryComplete(operations, GITHUB_EXPANDING_OPERATIONS);
 
   if (pendingStop) {
-    return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
+    return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount, discoveryComplete };
   }
 
   // Every operation is done: assemble coverage from operations/reasons.
@@ -547,5 +559,5 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   const coverage = assembleSliceCoverage({
     provider: "github", host: "github.com", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
   });
-  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
+  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount, discoveryComplete };
 };

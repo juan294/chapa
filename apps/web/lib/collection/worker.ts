@@ -311,6 +311,11 @@ export async function runCollectionSlice(
         operationsKnown: seed.checkpoint.operations.length,
         events: seed.seededEvents.length,
         requests: 0,
+        // A seed pre-write never runs the collector, so discovery has not
+        // started yet -- always true here (#1342). Without this, a seeded
+        // job's inflated N/N ratio would read as a false 99% before the
+        // first real slice appends any operations.
+        discovering: true,
       };
       const outcome = await deps.checkpoint(lease, seed.checkpoint, seed.seededEvents, seedProgress, false);
       if (outcome.status !== "lease_mismatch") {
@@ -343,6 +348,10 @@ export async function runCollectionSlice(
     operationsKnown: result.checkpoint.operations.length,
     events: stagedKeys.size + result.events.length,
     requests: result.requests,
+    // Carries the collector's own discoveryComplete for this checkpoint
+    // (#1342): while false, a not-done operation could still add more
+    // operations, so operationsKnown is not yet final.
+    discovering: !result.discoveryComplete,
   };
 
   scheduleServerEvent("scoring_collection_slice", {

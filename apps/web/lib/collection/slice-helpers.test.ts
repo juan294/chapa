@@ -3,8 +3,8 @@ import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEve
 import { createDiagnosticRecorder } from "@/lib/platform/evidence-diagnostics";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import {
-  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
-  validateSliceWindow, type MutableSliceOperation,
+  assembleSliceCoverage, buildSliceCheckpoint, computeDiscoveryComplete, emptySliceMeasurements, ensureSliceOperation, isExpandingOperation,
+  makeSliceStopFactory, newSliceEvents, validateSliceWindow, type MutableSliceOperation,
 } from "./slice-helpers";
 
 const window = createScoringWindow("2026-09-05T12:00:00Z");
@@ -117,6 +117,47 @@ describe("buildSliceCheckpoint", () => {
   it("merges extraState on top of the common envelope (GitLab's verifiedEmails, e.g.)", () => {
     const checkpoint = buildSliceCheckpoint([], new Set(), {}, new Set(), { verifiedEmails: ["a@example.com"] });
     expect(checkpoint.state).toEqual({ reasons: [], verifiedEmails: ["a@example.com"] });
+  });
+});
+
+describe("isExpandingOperation", () => {
+  const expanding = ["repositories", "contributed", "reviewDiscovery", "merged:"];
+
+  it("matches an exact key", () => {
+    expect(isExpandingOperation(expanding, "repositories")).toBe(true);
+    expect(isExpandingOperation(expanding, "commits:R1")).toBe(false);
+  });
+
+  it("matches a trailing-colon entry as a prefix", () => {
+    expect(isExpandingOperation(expanding, "merged:2026-01-01..2026-01-31")).toBe(true);
+    expect(isExpandingOperation(expanding, "merge")).toBe(false);
+  });
+});
+
+describe("computeDiscoveryComplete", () => {
+  const expanding = ["repositories", "merged:"];
+
+  it("is false while any not-done operation is in the expanding list", () => {
+    const operations: MutableSliceOperation[] = [
+      { key: "profile", cursor: null, done: true },
+      { key: "repositories", cursor: null, done: false },
+    ];
+    expect(computeDiscoveryComplete(operations, expanding)).toBe(false);
+  });
+
+  it("is true once every expanding operation is done, even if non-expanding ones remain", () => {
+    const operations: MutableSliceOperation[] = [
+      { key: "profile", cursor: null, done: true },
+      { key: "repositories", cursor: null, done: true },
+      { key: "merged:2026-01-01..2026-01-31", cursor: null, done: true },
+      { key: "commits:R1", cursor: null, done: false },
+      { key: "files:PR1", cursor: null, done: false },
+    ];
+    expect(computeDiscoveryComplete(operations, expanding)).toBe(true);
+  });
+
+  it("is true for an empty operations list", () => {
+    expect(computeDiscoveryComplete([], expanding)).toBe(true);
   });
 });
 

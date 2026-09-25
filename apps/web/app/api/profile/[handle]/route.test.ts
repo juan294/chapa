@@ -114,6 +114,17 @@ describe("GET /api/profile/:handle", () => {
     expect(body).toEqual({ handle: "juan294", scoringStatus: MOCK_SCORING_STATUS });
   });
 
+  // #1342 -- a still-discovering job reports percent: null, not a number.
+  it("passes through a null percent when collection is still discovering", async () => {
+    mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
+    mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: null, sources: [], hasPriorReceipt: false });
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    const body = await resp.json();
+    expect(body).toEqual({ handle: "juan294", scoringStatus: { kind: "collecting", percent: null, sources: [], hasPriorReceipt: false } });
+  });
+
   it("returns 503 when the current-receipt authority is unavailable, without falling back", async () => {
     mockReadPublicObservedScore.mockResolvedValue({ status: "unavailable" });
 
