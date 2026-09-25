@@ -74,7 +74,6 @@ it("reconciles the GitHub and Bitbucket slice engines through verified project/w
     V7Files: { node: { files: connection([{ path: "docs/a.md" }]) } },
     V7ReviewDiscovery: { user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: connection([]) } } },
     V7Commits: { node: { defaultBranchRef: { target: { history: connection([{ id: "C1", oid: "dddddddddddd", authoredDate: date, author: { user: githubActor }, additions: 2, deletions: 1 }]) } } } },
-    V7Issues: { node: { issues: connection([]) } },
   };
   vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init?: RequestInit) => {
     const operation = /query (\w+)/.exec(JSON.parse(String((init as RequestInit).body)).query)?.[1] ?? "";
@@ -118,8 +117,10 @@ it("reconciles the GitHub and Bitbucket slice engines through verified project/w
   expect(ghCommit.measurements.additions.status).toBe("observed");
   expect(ghAccepted.subjectId).not.toBe(bbAccepted.subjectId);
   expect(ghAccepted.provider).not.toBe(bbAccepted.provider);
+  // Symmetric since #1351: neither engine collects a scoring-admissible
+  // issue_work event (GitHub dropped its issue-closure scan entirely).
   expect(bb.coverage.eventKinds.issue_work).toBe("unavailable");
-  expect(gh.coverage.eventKinds.issue_work).not.toBe("unavailable");
+  expect(gh.coverage.eventKinds.issue_work).toBe("unavailable");
   const combined = aggregateEngineeringEvidence(input([...gh.events, ...bb.events], [gh.coverage, bb.coverage], ghAccepted));
   expect(acceptedSummary(combined)).toEqual(acceptedSummary(github));
   expect(combined.diagnostics.authoredCommits).toBe(1);

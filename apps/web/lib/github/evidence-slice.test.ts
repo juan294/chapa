@@ -25,7 +25,6 @@ function mockApi(overrides: Record<string, Handler> = {}) {
     V7Repositories: () => ({ user: { repositories: page([]) } }),
     V7ContributedRepositories: () => ({ user: { repositoriesContributedTo: page([]) } }),
     V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } }),
-    V7Issues: () => ({ node: { issues: page([]) } }),
     ...overrides,
   };
   const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
@@ -163,6 +162,65 @@ describe("collectGitHubSlice", () => {
     const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("budget");
+  });
+
+  // #1351: the GitHub issue-closure scan (V7Issues/V7Closures) is gone --
+  // every issue_work event it produced was inadmissible for scoring anyway
+  // (v7-evidence.github-issue-work.test.ts proves the equivalence).
+  it("never requests V7Issues or V7Closures", async () => {
+    const prs = [{ id: "PR1", repositoryId: "R1", mergedAt: "2026-08-01T12:00:00.000Z" }];
+    const mergedHandler: Handler = ({ query, after }) => {
+      const match = /merged:(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})/.exec(String(query));
+      const [, start, end] = match!;
+      const matches = prs.filter((pr) => { const d = pr.mergedAt.slice(0, 10); return d >= start! && d <= end!; });
+      const offset = after ? Number(after) : 0;
+      const slice = matches.slice(offset, offset + 100);
+      const nextOffset = offset + 100;
+      const hasNextPage = nextOffset < matches.length;
+      return { search: { issueCount: matches.length, pageInfo: { hasNextPage, endCursor: hasNextPage ? String(nextOffset) : null }, nodes: slice.map((pr) => ({
+        __typename: "PullRequest", id: pr.id, repository: { id: pr.repositoryId, nameWithOwner: pr.repositoryId }, author: actor,
+        merged: true, mergedAt: pr.mergedAt, createdAt: "2020-01-01T00:00:00.000Z", headRefOid: `sha-${pr.id}`, body: "desc",
+        headRefName: "feature", baseRefName: "main", additions: 1, deletions: 0, changedFiles: 1, closingIssuesReferences: { totalCount: 0 },
+      })) } };
+    };
+    const filesHandler: Handler = ({ id }) => ({ node: { files: page([{ path: `file-${id as string}.md` }]) } });
+    const commitsHandler: Handler = () => ({ node: { isEmpty: true, defaultBranchRef: null } });
+    const fetcher = mockApi({ V7MergedChanges: mergedHandler, V7Files: filesHandler, V7Commits: commitsHandler });
+
+    const result = await runToCompletion(50);
+    expect(result.events.filter((e) => e.kind === "accepted_change")).toHaveLength(1);
+    const queries = fetcher.mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { query: string }).query);
+    expect(queries.some((q) => q.includes("V7Issues"))).toBe(false);
+    expect(queries.some((q) => q.includes("V7Closures"))).toBe(false);
+  });
+
+  it("drops legacy issue-closure operations from a resumed checkpoint and never re-requests them", async () => {
+    const commitsHandler: Handler = () => ({ node: { isEmpty: true, defaultBranchRef: null } });
+    const closuresHandler: Handler = () => ({ node: { timelineItems: page([]) } });
+    const fetcher = mockApi({ V7Commits: commitsHandler, V7Closures: closuresHandler });
+    const checkpoint: CollectorCheckpoint = {
+      version: 1,
+      operations: [
+        { key: "profile", cursor: null, done: true },
+        { key: "issues:R1", cursor: null, done: true },
+        { key: "closures:I1", cursor: null, done: false },
+        { key: "commits:R1", cursor: null, done: false },
+      ],
+      discovered: { repositoryIds: ["R1"] },
+      state: { subjectId: "U1", login: "alice", pr: {}, issueRepo: { I1: "R1" }, reasons: [] },
+    };
+
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.checkpoint.operations.some((op) => op.key.startsWith("issues:") || op.key.startsWith("closures:"))).toBe(false);
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.done).toBe(true);
+    const queries = fetcher.mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { query: string }).query);
+    expect(queries.some((q) => q.includes("V7Closures"))).toBe(false);
+  });
+
+  it("reports issue_work unavailable", async () => {
+    mockApi({ V7MergedChanges: () => ({ search: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } }) });
+    const result = await runToCompletion(50);
+    expect(result.coverage?.eventKinds.issue_work).toBe("unavailable");
   });
 });
 

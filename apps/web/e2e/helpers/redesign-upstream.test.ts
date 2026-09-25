@@ -146,7 +146,7 @@ describe('collection-queue GraphQL replay', () => {
     const replay = createRedesignFetch({ cache: {}, github: {}, githubCollectionResponses: responses });
     for (const [key, query] of Object.entries(GITHUB_EVIDENCE_QUERIES)) {
       const sent = withRateLimit(query);
-      if (!Object.hasOwn(responses, sent)) continue; // files/reviews/commits/issues/closures: no fixture needed
+      if (!Object.hasOwn(responses, sent)) continue; // files/reviews/commits: no fixture needed
       const response = await replay('https://api.github.com/graphql', { method: 'POST', body: JSON.stringify({ query: sent, variables: { login: 'chapa-collectq-chromium', after: null } }) });
       expect(await response.json(), key).toEqual(responses[sent]);
     }
