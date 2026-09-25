@@ -27,6 +27,99 @@ A job's `state` is one of:
 | `complete` | This provider's day is fully collected (allowing partial coverage from absorbed per-item 401/403/404s). |
 | `failed` | Terminal: either the identity check itself failed (401/403 on the credential, fixed by reconnecting) or retries were exhausted. |
 
+## GitHub operation kinds
+
+A GitHub job's checkpoint tracks these operation keys (#1351): `profile`,
+`repositories`, `contributed`, `merged:<start>..<end>` (one per month of the
+window, and split further on a search page over 1,000 matches), `files:<id>`,
+`reviewDiscovery`, `reviews:<id>` and `commits:<repositoryId>`. GitHub issue
+closures are not collected: the `issues:`/`closures:` operations, and the
+`V7Issues`/`V7Closures` queries, were removed. Every `issue_work` event they
+produced was inadmissible for scoring (`acceptedKind` in
+`lib/impact/v7-evidence.ts` never accepts one without a `linked_issue_result`
+GitHub never supplies), so this did not change the displayed score, and it
+removed the largest single cost from the shared GraphQL allowance: on
+2026-09-24, `closures:` operations were 203,544 of about 206,000 known
+operations across unfinished jobs. A job resumed from a checkpoint written
+before this change drops any remaining `issues:`/`closures:` operations the
+first time it loads that checkpoint; nothing needs to be done by hand.
+
+## Incremental daily reuse
+
+A fresh job seeds its checkpoint from yesterday's complete observation of the
+same source, staging in-window events immediately and marking their
+`files:`/`reviews:` operations done when they cannot change further (#1335
+phase 3). Seeding never pre-registers the seeded events' repositories (#1352):
+every engine's `registerRepo` returns early for an already-known repository
+id, so pre-registering one would suppress the per-repository operations
+(`commits:`, `pullrequests:`, `merge_requests:`, `issues:`, `pulls:`, ...)
+that discovery creates for it, and new activity there since the prior
+observation would never be collected. Discovery always re-finds every
+repository, because the worker always runs `owned_and_contributed` scope, and
+every retained merge or review event already registers its own repository as
+a side effect of processing it. If you suspect a stale seed effect
+(new activity missing in an already-known repository) on a production job
+enqueued before 2026-09-25, no operator action is needed: the next daily job
+after that release date seeds without pre-registered repositories.
+
+## Retry and attempt policy
+
+Migration `058_collection_attempt_policy.sql` redefines `attempt` as
+"failures since the last progress", not "failures ever" (#1351):
+
+| Event | `attempt` |
+|---|---|
+| `fail` with `stopKind = rate_limited` | unchanged |
+| `fail` with any other retryable stop | +1 |
+| `checkpoint` whose `progress.operationsDone` is greater than the stored value | reset to 0 |
+| `enqueue` `retry` on a `failed` job whose `last_stop.stopKind` is `http`, `network`, `deadline` or `budget` | reset to 0, keep checkpoint, staged events and progress |
+| `enqueue` `retry` after any other stop kind, or `reconnect`/`refresh` | reset to 0 and clear, as before |
+
+A job that only ever waits for the shared allowance can never spend its
+retry budget on that alone, and a long job that makes steady progress with
+an occasional 5xx in between never runs out of retries. A Retry after a
+transient stop (`http`, `network`, `deadline`, `budget`) resumes from the
+saved checkpoint instead of restarting the day's collection; a Retry after a
+structural stop (`graphql`, `protocol`, `parse`) clears the checkpoint, since
+a bad cursor should not repeat.
+
+## Commit-history 5xx retry ladder
+
+One repository's commit history can answer HTTP 5xx even at a page of 50,
+when GitHub cannot compute line counts for one or more commits in the page
+within its own gateway timeout (measured 2026-09-25,
+`docs/plans/2026-09-25-v4-collection-stabilization-phases/evidence/phase-4-commits-502.md`:
+juan294/paisaxe answered 502 at pages of 50 with line counts, and 200 at 20,
+10, and without line counts). The GitHub engine retries a failing commits
+page at 50, then 20, then 10, then at 10 without line counts, before giving
+up that page as an ordinary `http` stop. After 3 separate failed ladders for
+the same repository (tracked in `checkpoint.state.commitLadderFailures`),
+that repository's `commits:` operation is marked done with a `source_error`
+reason instead of blocking the job forever; `authored_commit` coverage for
+that source reads `partial`. A success at any ladder size resets the failure
+counter for that repository. To see this happening for a job, read its
+checkpoint's `state.commitPageSize` and `state.commitLadderFailures` maps.
+
+## Progress: discovering vs. percent
+
+A job's checkpoint operation count is not fixed until discovery finishes: an
+owner's `repositories`/`contributed` lists, GitHub's `merged:*` search ranges
+and `reviewDiscovery`, and the equivalent per-provider discovery operations,
+can still add more operations (a new `commits:`/`files:`/`reviews:` op per
+item they find) while they are not yet done. `progress.discovering` (written
+by the worker from the collector's own `discoveryComplete` flag) is `true`
+while any such operation remains. While `discovering` is true for any
+in-progress job, every owner-facing surface (`/settings`, the share page, the
+badge and OG image, `/generating`) shows "discovering" with no percentage,
+never a number that could later move backwards. A seeded job's very first
+progress write is always `discovering: true`, since seeding never runs the
+collector. A legacy progress row with no `discovering` key (written before
+this field existed) reads as still discovering unless the job is `complete`.
+Once every in-progress job has finished discovery, the aggregate percent
+(operations done over operations known, capped at 99 until the job is
+complete) can only go up, because each job's known count is fixed from that
+point on.
+
 ## Reading `/api/health`'s `scoringQueue` block
 
 ```json
