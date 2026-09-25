@@ -453,7 +453,7 @@ platform, authenticates with the server `GITHUB_TOKEN`
 own OAuth session token. That token belongs to the owner's own personal
 GitHub account (user ID 3944118, confirmed in the `gh` rate-limit error).
 Collection therefore shares one 5,000-point-per-hour GraphQL allowance with
-that account's own everyday `gh` CLI use — a large collection run can starve
+that account's own everyday `gh` CLI use. A large collection run can starve
 the owner's own terminal, and vice versa.
 
 **Why accepted:** phase 1 of #1351 removes the GitHub issue-closure scan
@@ -464,9 +464,9 @@ effect (`acceptedKind` in `lib/impact/v7-evidence.ts` never accepts an
 observed jobs (w-winter, bbezerra82, awizemann) from 30,000-74,000 operations
 to under about 3,000, which is close to the whole hourly allowance rather than
 several multiples of it. A dedicated token pool, a GitHub App or a bot account
-(#1346) would remove the shared-allowance risk entirely, but is out of scope
-for this phase — the reduction alone is expected to keep jobs finishing within
-one day.
+(#1346) would remove the shared-allowance risk entirely. The owner chose on
+2026-09-25 to keep the shared token, because the reduction alone is expected
+to keep jobs finishing within one day.
 
 **Mitigation:** `/api/health`'s `scoringQueue` block and the
 `scoring_queue_stuck` alert (`docs/runbooks/scoring-collection-queue.md`)
@@ -478,7 +478,7 @@ the GraphQL points this token actually spends); read the live
 
 **Revisit if:** a job cannot finish collection within one day, or the shared
 allowance is observed exhausted routinely rather than only under simultaneous
-heavy `gh` use — that would mean phase 1's reduction was not enough and #1346
+heavy `gh` use. That would mean phase 1's reduction was not enough and #1346
 (a token pool, GitHub App, or bot account) needs to be taken up.
 
 **Refs:** #1351, #1346

@@ -70,6 +70,18 @@ Phases 4 and 5 both edit `lib/github/evidence.ts`, and phase 5 also edits
 `worker.ts`, `collection-queue.ts` and every engine, so they run in order after
 the batch.
 
+## Status (2026-09-25)
+
+- [x] Phase 1: remove the GitHub issue-closure scan
+- [x] Phase 2: seeded jobs keep per-repository operations
+- [x] Phase 3: retry and attempt policy (migration 058); held migration renumbered to 059
+- [x] Phase 4: commit-history 5xx retry ladder (measured first)
+- [x] Phase 5: discovery-aware progress, plus shared docs
+- [x] Phase 6: deterministic e2e checks
+- [ ] Release (separate authorization, `docs/release/release-playbook.md`)
+
+Deviations: `2026-09-25-v4-collection-stabilization-notes.md`.
+
 ## Pseudocode notation
 
 `+` adds a line, `-` removes a line, `~` changes a line. `...` is unchanged code.
