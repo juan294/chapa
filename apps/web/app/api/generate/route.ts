@@ -72,8 +72,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // `repo`-scoped and private-inclusive — the same fetch the warm-cache cron
   // would make for this handle within the hour. Its result is classified
   // `authenticated`, so the cache-boundary rule already prevents a later
-  // session-token fetch from downgrading it. If this attempt fails too, the
-  // 502 below stands.
+  // session-token fetch from downgrading it.
   if (!stats) {
     fireAndForget(
       () =>
@@ -99,10 +98,25 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
         { status: 409 },
       );
     }
-    return NextResponse.json(
-      { error: "Failed to fetch stats. Try again later." },
-      { status: 502 },
+    // #1353 — both live attempts failed for a transient reason, usually
+    // GitHub's ~10s GraphQL limit on the 365-day contribution query. The
+    // durable queue collects evidence with its own retries and backoff, so
+    // this warm is an optimization, not a gate: enqueue and let the
+    // generating page follow the real scoring status.
+    fireAndForget(
+      () =>
+        captureServerEvent("generate_stats_fetch_failed", {
+          handle: handle.toLowerCase(),
+        }),
+      () => undefined,
     );
+    const scoringStatus = await enqueueAndReportScoringStatus(handle, "signup");
+    return NextResponse.json({
+      success: true,
+      handle,
+      statsWarmed: false,
+      ...(scoringStatus ? { scoringStatus } : {}),
+    });
   }
 
   // #1335 phase 4 — first badge generation is called moments after the OAuth
