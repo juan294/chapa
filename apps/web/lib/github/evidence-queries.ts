@@ -14,9 +14,9 @@ const change = `id ${repository} author { ... on User { id } } merged mergedAt c
   closingIssuesReferences(first: 1) { totalCount }`;
 
 function commitHistoryQuery(name: string, lineFields: string): string {
-  return `query ${name}($id: ID!, $subjectId: ID!, $since: GitTimestamp!, $after: String) {
+  return `query ${name}($id: ID!, $subjectId: ID!, $since: GitTimestamp!, $after: String, $first: Int!) {
     node(id: $id) { ... on Repository { isEmpty defaultBranchRef { target { ... on Commit {
-      history(first: 50, after: $after, since: $since, author: {id: $subjectId}) {
+      history(first: $first, after: $after, since: $since, author: {id: $subjectId}) {
         ${pageInfo} nodes { id oid author { user { id } } authoredDate${lineFields ? ` ${lineFields}` : ""} }
       }
     } } } } }
@@ -58,7 +58,9 @@ export const GITHUB_EVIDENCE_QUERIES = {
   // `since` filters by committed date, not authored date, so the caller sets
   // it a margin before the window and still filters each node by authoredDate.
   // Unbounded history walked a repository's whole past and answered 502 on
-  // large histories; smaller pages keep each request well inside GitHub's timeout.
+  // large histories; smaller pages keep each request well inside GitHub's
+  // timeout. `first` is a variable so a failing page can retry smaller
+  // (evidence.ts's commit-history 5xx retry ladder, #1351).
   commits: commitHistoryQuery("V7Commits", "additions deletions"),
   // The same page without line counts. GitHub nulls a commit whose lines it
   // cannot count; this variant recovers that commit with unknown lines.

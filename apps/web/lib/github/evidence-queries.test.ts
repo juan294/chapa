@@ -13,9 +13,11 @@ describe("GITHUB_EVIDENCE_QUERIES", () => {
   });
 
   // Unbounded author-filtered history walks a repository's whole past and
-  // answered 502 on large histories (production, 2026-09-24).
-  it("bounds commit history by a since timestamp and pages of at most 50", () => {
-    expect(GITHUB_EVIDENCE_QUERIES.commits).toMatch(/history\(first: 50, after: \$after, since: \$since, author: \{id: \$subjectId\}\)/);
+  // answered 502 on large histories (production, 2026-09-24). `first` is a
+  // variable, not a literal 50, so a failing page can retry smaller (#1351).
+  it("bounds commit history by a since timestamp and a variable page size", () => {
+    expect(GITHUB_EVIDENCE_QUERIES.commits).toMatch(/history\(first: \$first, after: \$after, since: \$since, author: \{id: \$subjectId\}\)/);
     expect(GITHUB_EVIDENCE_QUERIES.commits).toMatch(/\$since: GitTimestamp!/);
+    expect(GITHUB_EVIDENCE_QUERIES.commits).toMatch(/\$first: Int!/);
   });
 });
