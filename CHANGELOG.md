@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.7] - 2026-09-25
+
+### Fixed
+
+- **Login no longer fails when GitHub cannot answer in time.** After sign-in,
+  the generating page waited for one live GitHub fetch and showed "Something
+  went wrong" if it failed. It fails when the 365-day contribution query hits
+  GitHub's time limit, or when the shared GraphQL allowance is used up. That
+  fetch only warms a cache, and sign-in already queues durable collection,
+  so the page now continues to the scoring status instead (#1353).
+- GitHub GraphQL error logs now include the error type codes, so a timeout or
+  rate limit can be told apart. Error messages are still never logged.
+
 ## [4.0.6] - 2026-09-24
 
 ### Fixed
