@@ -150,3 +150,8 @@ It is kept out of the first release because the release PR's pending-migrations
 gate requires the repository to match the production schema. Applying it is a
 production action that needs its own explicit authorization; it has not been run
 as of this document.
+
+Update 2026-09-25: production had run v4 code (v4.0.0 to v4.0.6) that reads none
+of these objects, so the owner chose to merge the file into `develop` (#1351). It
+ships with the next release together with `058_collection_attempt_policy.sql`.
+After it is applied, a rollback to v3 code is no longer possible.

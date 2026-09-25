@@ -37,11 +37,9 @@ const TABLES = [
   "campaign_sends",
   "feature_flags",
   "merge_operations",
-  "metrics_snapshots",
   "studio_configs",
   "supplemental_stats",
   "tool_insights",
-  "verification_records",
   "scoring_v7_subjects",
   "scoring_v7_sources",
   "scoring_v7_source_observations",
@@ -63,7 +61,7 @@ const TABLES = [
  * is a uuid and is copied verbatim, which is what keeps foreign keys pointing
  * at the same rows.
  */
-const IDENTITY_ID_TABLES = new Set(["merge_operations", "metrics_snapshots", "users", "verification_records"]);
+const IDENTITY_ID_TABLES = new Set(["merge_operations", "users"]);
 
 const PAGE_SIZE = 1000;
 
