@@ -33,11 +33,14 @@ describe("seedFromPrior", () => {
     expect(result.seededEvents).toEqual([inWindow]);
   });
 
-  it("seeds discovered repository ids from the retained events", () => {
-    const a = event({ eventId: "a", occurredAt: "2026-09-01T00:00:00.000Z", repositoryId: "R1" });
-    const b = event({ eventId: "b", occurredAt: "2026-09-02T00:00:00.000Z", repositoryId: "R2" });
+  it("does not pre-register repositories", () => {
+    const a = event({ eventId: "a", occurredAt: "2026-09-01T00:00:00.000Z", repositoryId: "R1", kind: "accepted_change" });
+    const b = event({ eventId: "b", occurredAt: "2026-09-02T00:00:00.000Z", repositoryId: "R2", kind: "accepted_change" });
     const result = seedFromPrior({ dataThrough: null, events: [a, b] }, window);
-    expect(result.checkpoint.discovered.repositoryIds).toEqual(["R1", "R2"]);
+    expect(result.checkpoint.discovered.repositoryIds).toEqual([]);
+    expect(result.seededEvents).toEqual([a, b]);
+    expect(result.checkpoint.operations).toContainEqual({ key: "files:github:a", cursor: null, done: true });
+    expect(result.checkpoint.operations).toContainEqual({ key: "files:github:b", cursor: null, done: true });
   });
 
   it("marks files of an already-merged accepted_change as a done, skippable operation", () => {
@@ -59,11 +62,6 @@ describe("seedFromPrior", () => {
     const review = event({ eventId: "REV1", occurredAt: "2026-09-01T00:00:00.000Z", kind: "review" });
     const result = seedFromPrior({ dataThrough: null, events: [review] }, window);
     expect(result.checkpoint.operations).toEqual([]);
-  });
-
-  it("carries the prior dataThrough into state for time-filterable operations", () => {
-    const result = seedFromPrior({ dataThrough: "2026-09-22T12:00:00.000Z", events: [] }, window);
-    expect(result.checkpoint.state?.seededDataThrough).toBe("2026-09-22T12:00:00.000Z");
   });
 
   it("is pure: repeated calls with the same input produce the same result", () => {

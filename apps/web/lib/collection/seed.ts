@@ -31,16 +31,18 @@ const THIRTY_DAYS_MS = 30 * 86_400_000;
  *   `files:<workItemId>` for an already-merged accepted_change, and
  *   `reviews:<workItemId>` for one merged more than 30 days before the new
  *   window's reference time (no further review can attach to it).
- * - `discovered.repositoryIds` seeds from the retained events' repositories,
- *   so a slice engine does not need to re-discover them from scratch.
- * - The prior `dataThrough` is carried in `state.seededDataThrough` so a
- *   time-filterable operation (one with a native `since`/`updated_after`
- *   parameter) can narrow its first request to only what changed since then,
- *   instead of the whole window.
+ * - `discovered.repositoryIds` stays empty (#1352): every engine's
+ *   `registerRepo` returns early for an already-known repository id, so
+ *   pre-registering a repository here would suppress the per-repository
+ *   operations (`commits:`, `issues:`, `pullrequests:`, ...) discovery
+ *   creates for it, and new activity there since the prior observation would
+ *   never be collected. Discovery always re-finds every repository, because
+ *   the worker always runs `owned_and_contributed` scope, and every retained
+ *   merge or review event already registers its own repository as a side
+ *   effect of the engine processing it.
  */
 export function seedFromPrior(prior: PriorObservation, window: ScoringWindow): SeedResult {
   const seededEvents = prior.events.filter((event) => isWithinScoringWindow(event.occurredAt, window));
-  const repositoryIds = [...new Set(seededEvents.map((event) => event.repositoryId))].sort();
   const acceptedChanges = seededEvents.filter((event) => event.kind === "accepted_change");
   const referenceMs = scoringInstant(window.referenceTime).getTime();
 
@@ -60,8 +62,7 @@ export function seedFromPrior(prior: PriorObservation, window: ScoringWindow): S
     checkpoint: {
       version: 1,
       operations,
-      discovered: { repositoryIds, itemIds: { seededWorkItemIds: [...immutableFiles].sort() } },
-      state: { seededDataThrough: prior.dataThrough },
+      discovered: { repositoryIds: [], itemIds: { seededWorkItemIds: [...immutableFiles].sort() } },
     },
     seededEvents,
   };
