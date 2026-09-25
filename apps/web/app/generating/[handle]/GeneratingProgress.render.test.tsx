@@ -233,6 +233,28 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  // #1353 — /api/generate succeeds with statsWarmed:false when both live
+  // fetches timed out. Nothing was warmed, so the share page must still warm.
+  it("does not mark the owner cache warm when the server reports it was not warmed", async () => {
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, handle: "testuser", statsWarmed: false }),
+      }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(sessionStorage.getItem("chapa:refreshed:testuser")).toBeNull();
+    expect(screen.queryByText("Something went wrong generating your badge.")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it("does not mark the owner cache warm when generation fails", async () => {
     sessionStorage.clear();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502 }));

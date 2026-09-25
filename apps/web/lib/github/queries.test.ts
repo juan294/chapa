@@ -168,9 +168,35 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("nonexistent");
 
     expect(result).toBeNull();
-    // The provider's error body is never echoed into logs (S08).
+    // The provider's error body is never echoed into logs (S08); only the
+    // bounded type code is, so a timeout is distinguishable (#1353).
     expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
-      "[github] GraphQL errors for nonexistent",
+      "[github] GraphQL errors for nonexistent types=untyped",
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("logs only bounded GraphQL type codes, never messages or free-form types", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            errors: [
+              { message: "secret detail", type: "TIMEOUT" },
+              { message: "x", extensions: { type: "not a code; token=abc" } },
+            ],
+            data: { user: null },
+          }),
+      }),
+    );
+
+    await fetchContributionData("someone");
+
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      "[github] GraphQL errors for someone types=TIMEOUT,other",
     );
     consoleSpy.mockRestore();
   });
@@ -693,7 +719,7 @@ describe("fetchContributionData", () => {
 
       expect(result).toBeNull();
       expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
-        "[github] GraphQL errors for testuser",
+        "[github] GraphQL errors for testuser types=RATE_LIMITED",
       );
       consoleSpy.mockRestore();
     });

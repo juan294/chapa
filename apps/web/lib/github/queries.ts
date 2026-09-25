@@ -30,6 +30,20 @@ function isUserNotFound(json: { data?: { user?: unknown }; errors?: GraphqlError
   return errors.some((e) => e.type === "NOT_FOUND" || e.extensions?.type === "NOT_FOUND");
 }
 
+/**
+ * #1353 — the distinct GraphQL error type codes, for logs. S08 forbids echoing
+ * the provider's error body, so messages are never read and any type that is
+ * not a bare upper-case code is reported as `other`.
+ */
+function graphqlErrorTypes(errors: GraphqlError[]): string {
+  const types = errors.map((e) => {
+    const type = e.extensions?.type ?? e.type ?? e.code;
+    if (type === undefined) return "untyped";
+    return /^[A-Z_]{1,40}$/.test(type) ? type : "other";
+  });
+  return [...new Set(types)].join(",");
+}
+
 // ---------------------------------------------------------------------------
 // Fetch function
 // ---------------------------------------------------------------------------
@@ -132,7 +146,7 @@ export async function fetchContributionData(
     ] as GraphqlError[];
 
     if (errors.length > 0) {
-      console.error(`[github] GraphQL errors for ${login}`);
+      console.error(`[github] GraphQL errors for ${login} types=${graphqlErrorTypes(errors)}`);
 
       // Treat RATE_LIMITED or FORBIDDEN errors as a complete fetch failure.
       // GitHub returns partial data alongside these errors, but that partial data

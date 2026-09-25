@@ -161,18 +161,40 @@ describe("POST /api/generate", () => {
     expect(mockGetStats).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when both the session-token and server-token fetches fail", async () => {
+  // #1353 — GitHub's contribution query runs close to its ~10s GraphQL
+  // limit, so both live attempts can time out. The OAuth callback already
+  // queued durable collection, which retries on its own, so a failed warm
+  // must not block login: enqueue, report status, and say the warm failed.
+  it("still enqueues and succeeds when both the session-token and server-token fetches fail", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue(null);
     mockFindUnusableSourceLinks.mockResolvedValue([]);
+    mockEnqueueAndReportScoringStatus.mockResolvedValue({ kind: "collecting", percent: 0, sources: [], hasPriorReceipt: false });
 
     const res = await POST(makeRequest("chapa_session=abc"));
-    expect(res.status).toBe(502);
-    const body = await res.json();
-    expect(body.error).toContain("Failed to fetch");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      handle: "juan294",
+      statsWarmed: false,
+      scoringStatus: { kind: "collecting", percent: 0, sources: [], hasPriorReceipt: false },
+    });
     expect(mockGetStats).toHaveBeenCalledTimes(2);
     expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
     expect(mockGetStats).toHaveBeenNthCalledWith(2, "juan294");
+    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith("juan294", "signup");
+  });
+
+  it("does not enqueue when a stale connection blocked the fetch", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockGetStats.mockResolvedValue(null);
+    mockFindUnusableSourceLinks.mockResolvedValue(["gitlab"]);
+
+    const res = await POST(makeRequest("chapa_session=abc"));
+
+    expect(res.status).toBe(409);
+    expect(mockEnqueueAndReportScoringStatus).not.toHaveBeenCalled();
   });
 
   // A connected platform whose token cannot be refreshed makes getStats null.
@@ -299,13 +321,13 @@ describe("POST /api/generate", () => {
       );
     });
 
-    it("schedules no warm when generation fails", async () => {
+    it("schedules no warm when both live fetches fail", async () => {
       mockRequireSession.mockReturnValue({ session: SESSION });
       mockGetStats.mockResolvedValue(null);
 
       const res = await POST(makeRequest("chapa_session=abc"));
 
-      expect(res.status).toBe(502);
+      expect(res.status).toBe(200);
       expect(afterCallbacks).toHaveLength(0);
     });
 

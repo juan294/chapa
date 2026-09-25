@@ -125,7 +125,7 @@ tables (`docs/decisions/2026-09-23-universal-v72-no-consent.md`).
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
 - GET|PUT `/api/studio/config` Load/save Studio preview configuration
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
-- POST `/api/generate` Generate badge for authenticated user (#1282/#1283 — fetches with the session token first, then retries once tokenless, i.e. as the `repo`-scoped server `GITHUB_TOKEN`, when that returns null; a first-time handle has no baseline, so a scope-blinded rejection or a GraphQL timeout otherwise became a 502 that "Try again" could never recover from. `/studio` applies the same fallback)
+- POST `/api/generate` Generate badge for authenticated user (#1282/#1283 — fetches with the session token first, then retries once tokenless, i.e. as the `repo`-scoped server `GITHUB_TOKEN`, when that returns null; a first-time handle has no baseline, so a scope-blinded rejection or a GraphQL timeout otherwise became a 502 that "Try again" could never recover from. `/studio` applies the same fallback. #1353 — if both live fetches still fail and no connection is stale, the route does not 502: the fetch is only a cache warm, so it enqueues durable collection and answers 200 with `statsWarmed: false`, and the generating page continues to the scoring status)
 - POST `/api/recalculate` Recalculate impact scores
 - POST `/api/insights` Submit tool insights data
 - GET `/api/cli/auth/poll` CLI device auth polling (RFC 8628-style: first poll issues + returns a `device_code`; subsequent polls from the CLI should echo it to bind the session to the initiating device; legacy CLIs that omit it still work)
