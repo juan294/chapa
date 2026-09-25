@@ -193,7 +193,13 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         // LE-5-2 — the share page this redirects to warms the owner's cache
         // with the same session-token fetch that just succeeded here. Record
         // it as done so that visit does not spend a refresh on a repeat.
-        markCacheWarmed(handle);
+        // #1353 — unless the server says both live fetches failed and only
+        // the durable queue was started; then the share page still warms.
+        const body: unknown = await res.json?.().catch(() => null);
+        if (cancelled) return;
+        if ((body as { statsWarmed?: unknown } | null)?.statsWarmed !== false) {
+          markCacheWarmed(handle);
+        }
         setStepStatuses(['done', 'active', 'pending', 'pending']);
         setAnnouncedStepIndex(1);
         completeRemainingSteps(registerStepTimer);
