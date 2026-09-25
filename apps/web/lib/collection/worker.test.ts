@@ -322,8 +322,7 @@ describe("runCollectionSlice", () => {
       const seededCheckpoint: CollectorCheckpoint = {
         version: 1,
         operations: [{ key: "files:github:PR1", cursor: null, done: true }],
-        discovered: { repositoryIds: ["R1"], itemIds: { seededWorkItemIds: ["github:PR1"] } },
-        state: { seededDataThrough: "2026-09-04T12:00:00.000Z" },
+        discovered: { repositoryIds: [], itemIds: { seededWorkItemIds: ["github:PR1"] } },
       };
       expect(deps.checkpoint).toHaveBeenNthCalledWith(1, { id: "job-1", leaseToken: "lease-1" }, seededCheckpoint, [merged], expect.any(Object), false);
       expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), new Set([engineeringEventKey(merged)]));
