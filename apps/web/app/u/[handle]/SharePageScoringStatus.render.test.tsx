@@ -24,6 +24,7 @@ beforeEach(() => {
 });
 
 const COLLECTING: NonReadyScoringStatus = { kind: "collecting", percent: 55, sources: [], hasPriorReceipt: false };
+const DISCOVERING: NonReadyScoringStatus = { kind: "collecting", percent: null, sources: [], hasPriorReceipt: false };
 const ACTION_NEEDED: NonReadyScoringStatus = {
   kind: "action_needed",
   hasPriorReceipt: false,
@@ -58,6 +59,18 @@ describe("SharePageScoringStatus", () => {
     );
     // The visitor never sees the owner's per-provider panel.
     expect(screen.queryByRole("button", { name: /retry/i })).toBeNull();
+  });
+
+  // #1342 -- a collecting status with a null percent (still discovering)
+  // must still render the collecting badge, with no crash and no percent.
+  it("renders the collecting badge for a null percent (still discovering)", async () => {
+    render(
+      await SharePageScoringStatus({ handle: "octocat", locale: "en", status: DISCOVERING, badgeState: "collecting", isOwner: false }),
+    );
+    expect(document.querySelector('[data-chapa-state="collecting"]')).not.toBeNull();
+    expect(screen.getByTestId("share-status-visitor-sentence").textContent).toBe(
+      "This profile's score is still being calculated.",
+    );
   });
 
   it("renders the action_needed visitor sentence", async () => {

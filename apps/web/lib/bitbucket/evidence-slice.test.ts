@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
+import { isExpandingOperation } from "@/lib/collection/slice-helpers";
 import type { SourceContextInput } from "@/lib/platform/source-context";
-import { collectBitbucketSlice } from "./evidence";
+import { collectBitbucketSlice, BITBUCKET_EXPANDING_OPERATIONS } from "./evidence";
 
 const window = createScoringWindow("2026-09-05T12:00:00Z");
 const credential = { token: "tok" };
@@ -206,5 +207,72 @@ describe("collectBitbucketSlice", () => {
     const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 10, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.stop?.stopKind).toBe("rate_limited");
     expect(result.stop?.retryAfterSeconds).toBe(30);
+  });
+});
+
+describe("discoveryComplete (#1342)", () => {
+  it("is false on the first slice", async () => {
+    setupFetch({ repos: [REPO_A] });
+    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.discoveryComplete).toBe(false);
+  });
+
+  it("BITBUCKET_EXPANDING_OPERATIONS matches exactly the keys/prefixes whose processing calls registerRepo/ensureOp", () => {
+    // Documents the call-site audit backing the constant: every key below is
+    // either the profile/commits/diff ops (never expand) or in the list.
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, "workspaces")).toBe(true);
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, `workspace-repos:${WORKSPACE}`)).toBe(true);
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, `pullrequests:${REPO_A}`)).toBe(true);
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, "activity:some-key")).toBe(true);
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, "diffstat:some-key")).toBe(true);
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, "profile")).toBe(false);
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, `commits:${REPO_A}`)).toBe(false);
+    expect(isExpandingOperation(BITBUCKET_EXPANDING_OPERATIONS, "diff:some-key")).toBe(false);
+  });
+
+  it("operationsKnown never grows once discoveryComplete is true, and it stays true", async () => {
+    // setupFetch()'s default handler exercises every operation kind: a
+    // workspace, a repository, subject-authored commits, a MERGED PR whose
+    // author is the subject, an activity feed with a MERGED update and a
+    // subject comment, and a diffstat redirect resolving to a diff page.
+    setupFetch({ repos: [REPO_A] });
+    let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
+    const stagedKeys = new Set<string>();
+    let sawDiscoveryComplete = false;
+    let knownAtDiscoveryComplete = -1;
+    for (let i = 0; i < 500; i++) {
+      const result = await collectBitbucketSlice(ownedInput(), credential, checkpoint, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+      for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
+      checkpoint = result.checkpoint;
+      if (sawDiscoveryComplete) {
+        expect(result.discoveryComplete).toBe(true);
+        expect(checkpoint.operations.length).toBe(knownAtDiscoveryComplete);
+      } else if (result.discoveryComplete) {
+        sawDiscoveryComplete = true;
+        knownAtDiscoveryComplete = checkpoint.operations.length;
+      }
+      if (result.done) break;
+      if (result.stop && result.stop.stopKind !== "budget" && result.stop.stopKind !== "deadline") {
+        throw new Error(`Unexpected stop: ${JSON.stringify(result.stop)}`);
+      }
+    }
+    expect(sawDiscoveryComplete).toBe(true);
+  });
+
+  it("a legacy checkpoint with no flag starts as not discovered while an expanding op remains undone", async () => {
+    const checkpoint: CollectorCheckpoint = {
+      version: 1,
+      operations: [
+        { key: "profile", cursor: null, done: true },
+        { key: "workspaces", cursor: null, done: false },
+      ],
+      discovered: { repositoryIds: [] },
+      state: { subjectId: PROFILE.uuid, profileUuid: PROFILE.uuid, accountId: PROFILE.account_id, reasons: [] },
+    };
+    setupFetch();
+    const result = await collectBitbucketSlice(ownedInput(), credential, checkpoint, { maxRequests: 0, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.checkpoint.operations.find((op) => op.key === "workspaces")?.done).toBe(false);
+    expect(result.discoveryComplete).toBe(false);
   });
 });

@@ -5,8 +5,8 @@ import {
 } from "@chapa/shared";
 import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
-  validateSliceWindow, type MutableSliceOperation,
+  assembleSliceCoverage, buildSliceCheckpoint, computeDiscoveryComplete, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory,
+  newSliceEvents, validateSliceWindow, type MutableSliceOperation,
 } from "@/lib/collection/slice-helpers";
 import {
   budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
@@ -42,6 +42,18 @@ interface CodebergPrMeta {
 }
 type MutableCodebergOperation = MutableSliceOperation;
 interface CodebergListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
+
+/** Operation keys/prefixes whose processing can call `registerRepo`/`ensureOp`
+ * -- i.e. can still grow the checkpoint's operation count (#1342). Derived
+ * from this file's own call sites: `repos:own`/`repos:user` and `feeds`
+ * register discovered repositories; `pulls:*` always queues a `reviews:`
+ * operation and, for a subject-authored merge, a `refs:` operation; `refs:*`
+ * queues a `files:` operation on both its success path and its
+ * `not_accessible` absorb path; `issues:*` queues a `timeline:` operation per
+ * issue. `profile`, `commits:*`, `files:*`, `reviews:*` and `timeline:*`
+ * never call either function once processed, however their data turns out --
+ * see the contract test for the same claim proven against the live engine. */
+export const CODEBERG_EXPANDING_OPERATIONS = ["repos:own", "repos:user", "feeds", "pulls:", "refs:", "issues:"] as const;
 
 export const collectCodebergSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
@@ -386,8 +398,9 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
 
   function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
   function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
+  const discoveryComplete = computeDiscoveryComplete(operations, CODEBERG_EXPANDING_OPERATIONS);
 
-  if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
+  if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount, discoveryComplete };
 
   reasons.add("discovery_incomplete"); reasons.add("acceptance_time_unknown"); reasons.add("not_supported");
   const commitsComplete = operations.filter((op) => op.key.startsWith("commits:")).every((op) => op.done);
@@ -401,7 +414,7 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
   const coverage = assembleSliceCoverage({
     provider: "codeberg", host: "codeberg.org", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
   });
-  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
+  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount, discoveryComplete };
 };
 
 /** `meta.mergedAt` is a raw provider timestamp string that has not yet been

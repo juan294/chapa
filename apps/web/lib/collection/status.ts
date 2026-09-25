@@ -22,10 +22,23 @@ const IN_PROGRESS_STATES: ReadonlySet<CollectionJobState> = new Set([
   "retrying",
 ]);
 
-function clampPercent(done: number, known: number, complete: boolean): number {
-  if (complete) return 100;
-  if (known <= 0) return 0;
-  return Math.min(99, Math.floor((done / known) * 100));
+/** True while `job` can still add operations (#1342): a complete job has
+ * finished discovery by definition, regardless of what its progress row
+ * says; any other job is still discovering unless its progress explicitly
+ * says otherwise. A legacy row written before this field existed (no
+ * `discovering` key at all) reads as `undefined`, which is not `=== false`,
+ * so it is treated as still discovering -- the safe default, since a legacy
+ * in-flight checkpoint may still be mid-scaffold. */
+function discovering(job: CollectionJob): boolean {
+  return job.state !== "complete" && job.progress.discovering !== false;
+}
+
+function clampPercent(job: CollectionJob): number | null {
+  if (job.state === "complete") return 100;
+  if (discovering(job)) return null;
+  const { operationsDone, operationsKnown } = job.progress;
+  if (operationsKnown <= 0) return 0;
+  return Math.min(99, Math.floor((operationsDone / operationsKnown) * 100));
 }
 
 function reasonForFailedJob(job: CollectionJob): ProviderStatusReason {
@@ -33,7 +46,7 @@ function reasonForFailedJob(job: CollectionJob): ProviderStatusReason {
 }
 
 function toProviderStatus(job: CollectionJob): ProviderStatus {
-  const percent = clampPercent(job.progress.operationsDone, job.progress.operationsKnown, job.state === "complete");
+  const percent = clampPercent(job);
   const base = { provider: job.provider, state: job.state, percent };
 
   if (job.state === "waiting_rate_limit") {
@@ -52,9 +65,14 @@ function toProviderStatus(job: CollectionJob): ProviderStatus {
  * over total operations known, capped at 99 -- this is only ever shown while
  * `kind` is `collecting`, never `ready`, so the cap always applies (phase-4.md:
  * "percent = operationsDone / max(operationsKnown, 1), capped at 99 until done").
+ * Null while any job is still discovering (#1342): while true, the sum of
+ * `operationsKnown` is not yet final, so the fraction it would produce could
+ * only move backwards as discovery finds more work. A complete job always
+ * counts as discovered, regardless of its stored progress.
  */
-function overallPercent(jobs: readonly CollectionJob[]): number {
+function overallPercent(jobs: readonly CollectionJob[]): number | null {
   if (jobs.length === 0) return 0;
+  if (jobs.some((job) => discovering(job))) return null;
   const done = jobs.reduce((sum, j) => sum + j.progress.operationsDone, 0);
   const known = jobs.reduce((sum, j) => sum + j.progress.operationsKnown, 0);
   if (known <= 0) return 0;

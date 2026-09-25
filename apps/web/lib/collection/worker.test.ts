@@ -58,7 +58,7 @@ function makeJob(overrides: Partial<CollectionJob> = {}): CollectionJob {
 }
 
 function sliceResult(overrides: Partial<SliceResult> = {}): SliceResult {
-  return { events: [], checkpoint: EMPTY_CHECKPOINT, done: false, coverage: null, stop: null, requests: 1, ...overrides };
+  return { events: [], checkpoint: EMPTY_CHECKPOINT, done: false, coverage: null, stop: null, requests: 1, discoveryComplete: false, ...overrides };
 }
 
 /** Mirrors `seed.test.ts`'s helper -- a minimal but schema-shaped
@@ -181,6 +181,30 @@ describe("runCollectionSlice", () => {
     );
     expect(deps.onJobComplete).toHaveBeenCalledWith(expect.objectContaining({ state: "complete", observationId: "obs-1" }));
     expect(deps.fail).not.toHaveBeenCalled();
+  });
+
+  // #1342 -- the worker never recomputes discovery on its own; it only
+  // carries whatever the collector reported for this checkpoint.
+  it("slice progress carries the collector's discoveryComplete", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ discoveryComplete: true }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.checkpoint).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ discovering: false }),
+      expect.anything(),
+    );
+  });
+
+  it("slice progress reports discovering true when the collector's discoveryComplete is false", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ discoveryComplete: false, stop: { provider: "github", operation: "repositories", stopKind: "budget", httpStatus: null, retryAfterSeconds: null } }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.checkpoint).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ discovering: true }),
+      expect.anything(),
+    );
   });
 
   it("still reaches complete when an absorbed not_accessible fan-out item left coverage partial, not just on full complete coverage", async () => {
@@ -357,6 +381,27 @@ describe("runCollectionSlice", () => {
       };
       expect(deps.checkpoint).toHaveBeenNthCalledWith(1, { id: "job-1", leaseToken: "lease-1" }, seededCheckpoint, [merged], expect.any(Object), false);
       expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), new Set([engineeringEventKey(merged)]));
+    });
+
+    // #1342 -- a seed pre-write never runs the collector, so its progress
+    // must read as still discovering, not a false N/N=99%.
+    it("seed writes discovering true", async () => {
+      const deps = harness();
+      const merged = event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" });
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [merged] }));
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      expect(deps.checkpoint).toHaveBeenNthCalledWith(
+        1,
+        expect.anything(),
+        expect.anything(),
+        [merged],
+        expect.objectContaining({ discovering: true }),
+        false,
+      );
     });
 
     it("does not seed when the checkpoint already has progress or events are already staged (not the job's first slice)", async () => {

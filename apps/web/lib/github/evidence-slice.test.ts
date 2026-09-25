@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
-import { collectGitHubSlice, githubMergedSearchRanges } from "./evidence";
+import { collectGitHubSlice, githubMergedSearchRanges, GITHUB_EXPANDING_OPERATIONS } from "./evidence";
+import { isExpandingOperation } from "@/lib/collection/slice-helpers";
 
 vi.mock("@/lib/env", () => ({ getGithubToken: () => undefined }));
 
@@ -321,6 +322,98 @@ describe("commit-history 5xx retry ladder", () => {
     expect(result.stop?.stopKind).toBe("budget");
     expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.cursor).toBeNull();
     expect((result.checkpoint.state?.commitLadderFailures as Record<string, number> | undefined)?.["commits:R1"]).toBeUndefined();
+  });
+});
+
+describe("discoveryComplete (#1342)", () => {
+  it("is false on the first slice", async () => {
+    mockApi({ V7Repositories: () => ({ user: { repositories: page([{ id: "R1", nameWithOwner: "a/b" }]) } }) });
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.discoveryComplete).toBe(false);
+  });
+
+  it("GITHUB_EXPANDING_OPERATIONS matches exactly the keys/prefixes whose processing calls registerRepo/ensureOp", () => {
+    // Documents the call-site audit backing the constant: every key below is
+    // either the profile op (never expands) or in the list.
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "repositories")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "contributed")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "reviewDiscovery")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "merged:2026-01-01..2026-01-31")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "profile")).toBe(false);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "files:github:PR1")).toBe(false);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "reviews:github:PR1")).toBe(false);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "commits:R1")).toBe(false);
+  });
+
+  it("operationsKnown never grows once discoveryComplete is true, and it stays true", async () => {
+    const prs = [{ id: "PR1", repositoryId: "R1", mergedAt: "2026-08-01T12:00:00.000Z" }];
+    const mergedHandler: Handler = ({ query, after }) => {
+      const match = /merged:(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})/.exec(String(query));
+      const [, start, end] = match!;
+      const matches = prs.filter((pr) => { const d = pr.mergedAt.slice(0, 10); return d >= start! && d <= end!; });
+      const offset = after ? Number(after) : 0;
+      const slice = matches.slice(offset, offset + 100);
+      const nextOffset = offset + 100;
+      const hasNextPage = nextOffset < matches.length;
+      return { search: { issueCount: matches.length, pageInfo: { hasNextPage, endCursor: hasNextPage ? String(nextOffset) : null }, nodes: slice.map((pr) => ({
+        __typename: "PullRequest", id: pr.id, repository: { id: pr.repositoryId, nameWithOwner: pr.repositoryId }, author: actor,
+        merged: true, mergedAt: pr.mergedAt, createdAt: "2020-01-01T00:00:00.000Z", headRefOid: `sha-${pr.id}`, body: "desc",
+        headRefName: "feature", baseRefName: "main", additions: 1, deletions: 0, changedFiles: 1, closingIssuesReferences: { totalCount: 0 },
+      })) } };
+    };
+    const filesHandler: Handler = ({ id }) => ({ node: { files: page([{ path: `file-${id as string}.md` }]) } });
+    const commitsHandler: Handler = () => ({ node: { isEmpty: false, defaultBranchRef: { target: { history: page([
+      { id: "R1-C1", oid: "R1-C1", author: { user: actor }, authoredDate: "2026-08-02T00:00:00.000Z", additions: 1, deletions: 0 },
+    ]) } } } });
+    const reviewDiscoveryHandler: Handler = () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([
+      { isRestricted: false, pullRequest: { id: "PR2", repository: { id: "R1" } } },
+    ]) } } });
+    const reviewsHandler: Handler = () => ({ node: { reviews: page([{ id: "REV1", author: actor, state: "APPROVED", submittedAt: "2026-08-03T00:00:00.000Z" }]) } });
+    mockApi({
+      V7MergedChanges: mergedHandler, V7Files: filesHandler, V7Commits: commitsHandler,
+      V7ReviewDiscovery: reviewDiscoveryHandler, V7Reviews: reviewsHandler,
+    });
+
+    let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
+    const stagedKeys = new Set<string>();
+    let sawDiscoveryComplete = false;
+    let knownAtDiscoveryComplete = -1;
+    for (let i = 0; i < 200; i++) {
+      const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 1, deadlineAt: Date.now() + 120_000 }, stagedKeys);
+      for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
+      checkpoint = result.checkpoint;
+      if (sawDiscoveryComplete) {
+        expect(result.discoveryComplete).toBe(true);
+        expect(checkpoint.operations.length).toBe(knownAtDiscoveryComplete);
+      } else if (result.discoveryComplete) {
+        sawDiscoveryComplete = true;
+        knownAtDiscoveryComplete = checkpoint.operations.length;
+      }
+      if (result.done) break;
+      if (result.stop && result.stop.stopKind !== "budget" && result.stop.stopKind !== "deadline") {
+        throw new Error(`Unexpected stop: ${JSON.stringify(result.stop)}`);
+      }
+    }
+    expect(sawDiscoveryComplete).toBe(true);
+  });
+
+  it("a legacy checkpoint with no flag starts as not discovered while an expanding op remains undone", async () => {
+    const checkpoint: CollectorCheckpoint = {
+      version: 1,
+      operations: [
+        { key: "profile", cursor: null, done: true },
+        { key: "repositories", cursor: null, done: false },
+        { key: "contributed", cursor: null, done: true },
+        { key: "reviewDiscovery", cursor: null, done: true },
+      ],
+      discovered: { repositoryIds: [] },
+      state: { subjectId: "U1", login: "alice", pr: {}, reasons: [] },
+    };
+    mockApi({ V7Repositories: () => ({ user: { repositories: page([]) } }) });
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 0, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.checkpoint.operations.find((op) => op.key === "repositories")?.done).toBe(false);
+    expect(result.discoveryComplete).toBe(false);
   });
 });
 
