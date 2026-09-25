@@ -1,7 +1,11 @@
 /**
  * v7 only. Legacy CONTRIBUTION_QUERY remains a v6 reader.
  * Semantics checked against https://docs.github.com/en/graphql/reference/users,
- * /commits, /pulls and /issues. Review contributions discover PRs, not all reviews.
+ * /commits and /pulls. Review contributions discover PRs, not all reviews.
+ * GitHub issue closures are not collected (#1351): every `issue_work` event
+ * the collector produced was inadmissible for scoring (see v7-evidence.ts's
+ * `acceptedKind`), so a linked-issue scan spent GraphQL points with no
+ * effect on the displayed score.
  */
 const pageInfo = "pageInfo { hasNextPage endCursor } totalCount";
 const repository = "repository { id nameWithOwner }";
@@ -59,21 +63,4 @@ export const GITHUB_EVIDENCE_QUERIES = {
   // The same page without line counts. GitHub nulls a commit whose lines it
   // cannot count; this variant recovers that commit with unknown lines.
   commitsWithoutLines: commitHistoryQuery("V7CommitsWithoutLines", ""),
-  issues: `query V7Issues($id: ID!, $since: DateTime!, $after: String) {
-    node(id: $id) { ... on Repository {
-      issues(first: 100, after: $after, filterBy: {since: $since}, orderBy: {field: UPDATED_AT, direction: DESC}) {
-        ${pageInfo} nodes { id ${repository} }
-      }
-    } }
-  }`,
-  closures: `query V7Closures($id: ID!, $after: String) {
-    node(id: $id) { ... on Issue { timelineItems(first: 100, after: $after, itemTypes: [CLOSED_EVENT]) {
-      ${pageInfo} nodes { ... on ClosedEvent { id createdAt actor { ... on User { id } }
-        closer { __typename
-          ... on PullRequest { id author { ... on User { id } } merged mergedAt headRefOid repository { id nameWithOwner } }
-          ... on Commit { id }
-        }
-      } }
-    } } }
-  }`,
 } as const;

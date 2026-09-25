@@ -443,6 +443,46 @@ zero" from "defect" some other way) rather than a blanket refusal.
 
 **Refs:** #1335
 
+---
+
+## GitHub collection shares one server token with the owner's account (2026-09-25)
+
+**Risk / trade-off:** every GitHub collection job, for every owner on the
+platform, authenticates with the server `GITHUB_TOKEN`
+(`apps/web/lib/platform/source-context.ts:49`), never the requesting owner's
+own OAuth session token. That token belongs to the owner's own personal
+GitHub account (user ID 3944118, confirmed in the `gh` rate-limit error).
+Collection therefore shares one 5,000-point-per-hour GraphQL allowance with
+that account's own everyday `gh` CLI use — a large collection run can starve
+the owner's own terminal, and vice versa.
+
+**Why accepted:** phase 1 of #1351 removes the GitHub issue-closure scan
+(`issues:`/`closures:` operations), which was 203,544 of about 206,000 known
+GitHub operations in unfinished jobs on 2026-09-24 and produced no scoring
+effect (`acceptedKind` in `lib/impact/v7-evidence.ts` never accepts an
+`issue_work` event this scan could produce). That reduces the largest
+observed jobs (w-winter, bbezerra82, awizemann) from 30,000-74,000 operations
+to under about 3,000, which is close to the whole hourly allowance rather than
+several multiples of it. A dedicated token pool, a GitHub App or a bot account
+(#1346) would remove the shared-allowance risk entirely, but is out of scope
+for this phase — the reduction alone is expected to keep jobs finishing within
+one day.
+
+**Mitigation:** `/api/health`'s `scoringQueue` block and the
+`scoring_queue_stuck` alert (`docs/runbooks/scoring-collection-queue.md`)
+surface a job that cannot make progress, including one starved by allowance
+exhaustion. `gh api rate_limit` misreports this allowance (it does not reflect
+the GraphQL points this token actually spends); read the live
+`X-Ratelimit-Remaining` and `X-Ratelimit-Reset` headers from
+`gh api graphql -i` instead.
+
+**Revisit if:** a job cannot finish collection within one day, or the shared
+allowance is observed exhausted routinely rather than only under simultaneous
+heavy `gh` use — that would mean phase 1's reduction was not enough and #1346
+(a token pool, GitHub App, or bot account) needs to be taken up.
+
+**Refs:** #1351, #1346
+
 ## Review schedule
 
 These accepted risks should be re-evaluated:

@@ -144,15 +144,18 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   const effectiveToken = credential.token?.trim() || undefined;
   let requestCount = 0;
 
-  const operations: MutableCollectorOperation[] = checkpoint.operations.map((op) => ({ key: op.key, cursor: op.cursor, done: op.done }));
+  // Legacy in-flight checkpoints (#1351) may still carry `issues:`/`closures:`
+  // operations from before this scan was dropped -- drop them on load so a
+  // resumed job never re-requests them.
+  const operations: MutableCollectorOperation[] = checkpoint.operations
+    .filter((op) => !op.key.startsWith("issues:") && !op.key.startsWith("closures:"))
+    .map((op) => ({ key: op.key, cursor: op.cursor, done: op.done }));
   const repositoryIds = new Set(checkpoint.discovered.repositoryIds);
   const state: Record<string, unknown> = { ...(checkpoint.state ?? {}) };
   const prMeta: Record<string, GitHubPrMeta> = { ...((state.pr as Record<string, GitHubPrMeta> | undefined) ?? {}) };
   state.pr = prMeta;
-  const issueRepo: Record<string, string> = { ...((state.issueRepo as Record<string, string> | undefined) ?? {}) };
-  state.issueRepo = issueRepo;
+  delete state.issueRepo; // drop the legacy map from resumed checkpoints
   const reasons = new Set<EvidenceReasonCode>((state.reasons as EvidenceReasonCode[] | undefined) ?? []);
-  const seededDataThrough = state.seededDataThrough as string | null | undefined;
   const newEvents = new Map<string, NormalizedEngineeringEvent>();
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
@@ -162,7 +165,6 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     if (repositoryIds.has(repositoryId)) return;
     repositoryIds.add(repositoryId);
     ensureOp(`commits:${repositoryId}`);
-    ensureOp(`issues:${repositoryId}`);
   }
   function addEvent(event: NormalizedEngineeringEvent): void { newEvents.set(engineeringEventKey(event), event); }
   function inWindow(date: unknown, operation: keyof typeof queries): boolean {
@@ -426,56 +428,6 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
       if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
       return "done";
     }
-    if (op.key.startsWith("issues:")) {
-      const repositoryId = op.key.slice("issues:".length);
-      const since = seededDataThrough && seededDataThrough > window.startInclusive ? seededDataThrough : window.startInclusive;
-      const outcome = await runPagedList(op, "issues", { id: repositoryId, since }, ["node", "issues"], (node) => {
-        const issueId = string(node.id); if (!issueId) { reasons.add("not_accessible"); return; }
-        issueRepo[issueId] = repositoryId;
-        ensureOp(`closures:${issueId}`);
-      });
-      if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
-      return "done";
-    }
-    if (op.key.startsWith("closures:")) {
-      const issueId = op.key.slice("closures:".length);
-      const repositoryId = issueRepo[issueId];
-      const outcome = await runPagedList(op, "closures", { id: issueId }, ["node", "timelineItems"], (node) => {
-        const actorId = string(at(node, "actor", "id"));
-        if (!actorId) { reasons.add("attribution_unknown"); return; }
-        if (actorId !== subjectId()) return;
-        const closureId = string(node.id); if (!closureId) { reasons.add("not_accessible"); return; }
-        if (!inWindow(node.createdAt, "closures")) return;
-        if (!repositoryId) { reasons.add("not_accessible"); return; }
-        const closer = object(node.closer);
-        const closerId = string(closer.id);
-        const linkedId = closer.__typename === "PullRequest" && closer.merged === true ? closerId : null;
-        const authoredResult = linkedId !== null && string(at(closer, "author", "id")) === subjectId();
-        const occurredAt = scoringInstant(String(node.createdAt)).toISOString();
-        const workItemId = linkedId ? `github:${linkedId}` : `github:${issueId}`;
-        addEvent({
-          schemaVersion: "v7", provider: "github", host: "github.com", subjectId: subjectId()!, actorId: subjectId()!,
-          repositoryId, eventId: closureId, kind: "issue_work", occurredAt, dataThrough: window.referenceTime,
-          canonicalProjectId: `github:${repositoryId}`, workItemId, artifactRevision: closureId,
-          artifactReferenceIds: [`github:${closureId}`, ...(closerId ? [`github:${closerId}`] : [])],
-          attribution: "individual", provenance: "source_observed", coverage: "complete",
-          measurements: emptyMeasurements(), categories: [], acceptance: unknown("partial", "attribution_unknown"),
-        });
-        if (!authoredResult) reasons.add("attribution_unknown");
-        if (closer.__typename && closer.__typename !== "PullRequest") reasons.add("not_supported");
-        if (authoredResult && linkedId) {
-          const linkedWorkItemId = `github:${linkedId}`;
-          const linkedRepo = string(at(closer, "repository", "id"));
-          if (linkedRepo && (!explicit || repositoryIds.has(linkedRepo)) && !prMeta[linkedWorkItemId]) {
-            prMeta[linkedWorkItemId] = { repositoryId: linkedRepo, mergedAt: string(closer.mergedAt), revision: string(closer.headRefOid) ?? linkedId };
-            registerRepo(linkedRepo);
-            ensureOp(`files:${linkedWorkItemId}`);
-          }
-        }
-      });
-      if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
-      return "done";
-    }
     op.done = true;
     return "done";
   }
@@ -510,13 +462,15 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   if (!explicit) reasons.add("discovery_incomplete");
   reasons.add("acceptance_time_unknown");
   const commitsComplete = operations.filter((op) => op.key.startsWith("commits:")).every((op) => op.done);
-  const issuesComplete = operations.filter((op) => op.key.startsWith("issues:") || op.key.startsWith("closures:")).every((op) => op.done);
   const unidentified = ["not_accessible", "source_error", "attribution_unknown", "pagination_incomplete"].some((reason) => reasons.has(reason as EvidenceReasonCode));
   const eventKinds: SourceCoverage["eventKinds"] = {
     accepted_change: "partial",
     authored_commit: explicit && !unidentified && commitsComplete ? "complete" : "partial",
     review: "partial",
-    issue_work: explicit && !unidentified && issuesComplete ? "complete" : "partial",
+    // GitHub issue closures are not collected (#1351): every issue_work event
+    // this scan could produce was inadmissible for scoring (v7-evidence.ts's
+    // acceptedKind never accepts one), so there is nothing to report here.
+    issue_work: "unavailable",
     practice_evidence: "unavailable", documentation_design: "unavailable", maintenance: "unavailable",
   };
   reasons.add("not_supported");
