@@ -128,7 +128,7 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
   const cleanup = async () => {
     const errors: unknown[] = [];
     for (const owner of receiptOwners) await check(db.rpc('scoring_v7_withdraw', { p_owner: owner })).catch(error => errors.push(error));
-    const tables = ['verification_records', 'user_platforms', 'studio_configs', 'metrics_snapshots', 'users'];
+    const tables = ['user_platforms', 'studio_configs', 'users'];
     for (const table of tables) {
       await check(db.from(table).delete().in('handle', [...REDESIGN_HANDLES])).catch(error => errors.push(error));
     }

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- The retired v6 database objects: `metrics_snapshots`, `verification_records`,
+  the `admin_users` and `latest_snapshots` views, the publication-consent
+  columns and the `scoring_v7_rendering` flag row (migration 059, #1335).
+  After this migration, a rollback to v3 is no longer possible.
+
 ### Changed
 
 - GitHub collection no longer scans issue closures, which never affected the

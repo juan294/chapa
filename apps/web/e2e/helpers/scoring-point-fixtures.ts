@@ -75,13 +75,10 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
   const check = async <T extends { error: unknown }>(operation: PromiseLike<T>): Promise<T> => { const result = await operation; if (result.error) throw result.error; return result; };
   const existing = await check(db.from("users").select("handle").in("handle", [...SCORING_POINT_HANDLES]));
   if (existing.data?.length) throw new Error("Refusing to overwrite scoring fixture owners");
-  const flag = await check(db.from("feature_flags").select("*").eq("key", "scoring_v7_rendering"));
   const cleanup = async () => {
     const errors: unknown[] = [];
     for (const owner of SCORING_POINT_HANDLES) await check(db.rpc("scoring_v7_withdraw", { p_owner: owner })).catch(error => errors.push(error));
-    for (const table of ["verification_records", "studio_configs", "tool_insights", "metrics_snapshots", "users"]) await check(db.from(table).delete().in("handle", [...SCORING_POINT_HANDLES])).catch(error => errors.push(error));
-    await check(db.from("feature_flags").delete().eq("key", "scoring_v7_rendering")).catch(error => errors.push(error));
-    if (flag.data?.length) await check(db.from("feature_flags").upsert(flag.data, { onConflict: "key" })).catch(error => errors.push(error));
+    for (const table of ["studio_configs", "tool_insights", "users"]) await check(db.from(table).delete().in("handle", [...SCORING_POINT_HANDLES])).catch(error => errors.push(error));
     for (const table of ["scoring_v7_subjects", "scoring_v7_sources", "scoring_v7_evidence", "scoring_v7_raw_artifacts", "scoring_v7_receipts", "scoring_observed_current", "report_craft_reports", "report_craft_selection"]) {
       const residue = await check(db.from(table).select("owner_handle").in("owner_handle", [...SCORING_POINT_HANDLES])).catch(error => { errors.push(error); return null; });
       if (residue?.data?.length) errors.push(new Error(`Scoring fixture residue in ${table}`));
@@ -92,7 +89,6 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
     if (errors.length) throw new AggregateError(errors, "Scoring fixture cleanup failed");
   };
   try {
-    await check(db.from("feature_flags").upsert({ key: "scoring_v7_rendering", enabled: true, config: {}, description: "Disposable scoring qualification" }, { onConflict: "key" }));
     const seeds = await buildScoringPointSeeds(options.referenceTime);
     const cache: Record<string, string> = {};
     const owners: Record<string, { revisionId: string; receiptId: string; contentHash: string; verificationToken: string }> = {};
@@ -191,7 +187,7 @@ export async function bootstrapCollectionQueueFixtures(db: SupabaseClient, optio
   const cleanup = async () => {
     const errors: unknown[] = [];
     for (const owner of COLLECTION_QUEUE_HANDLES) await check(db.rpc("scoring_v7_withdraw", { p_owner: owner })).catch(error => errors.push(error));
-    for (const table of ["verification_records", "studio_configs", "tool_insights", "metrics_snapshots", "users"]) await check(db.from(table).delete().in("handle", [...COLLECTION_QUEUE_HANDLES])).catch(error => errors.push(error));
+    for (const table of ["studio_configs", "tool_insights", "users"]) await check(db.from(table).delete().in("handle", [...COLLECTION_QUEUE_HANDLES])).catch(error => errors.push(error));
     for (const table of ["scoring_v7_subjects", "scoring_v7_sources", "scoring_v7_evidence", "scoring_v7_raw_artifacts", "scoring_v7_receipts", "scoring_observed_current", "scoring_collection_jobs", "scoring_issuance_attempts", "report_craft_reports", "report_craft_selection"]) {
       const residue = await check(db.from(table).select("owner_handle").in("owner_handle", [...COLLECTION_QUEUE_HANDLES])).catch(error => { errors.push(error); return null; });
       if (residue?.data?.length) errors.push(new Error(`Collection queue fixture residue in ${table}`));
