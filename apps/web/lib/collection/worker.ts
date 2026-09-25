@@ -412,6 +412,10 @@ export async function runCollectionSlice(
   }
 
   if (stop.stopKind === "http" || stop.stopKind === "network") {
+    // job.attempt is "failures since last progress" (migration 058, #1351
+    // phase 3): a rate_limited stop never bumped it, and a checkpoint that
+    // advanced operationsDone reset it, so this budget is spent only by
+    // http/network failures with no progress between them.
     const retryAt = job.attempt < MAX_COLLECTION_ATTEMPTS - 1 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
     await failJob(lease, stop, retryAt);
     return;
@@ -425,7 +429,8 @@ export async function runCollectionSlice(
   await failJob(lease, stop, structuralRetryAt(job, deps));
 }
 
-/** The structural (graphql/protocol/parse/thrown) retry rule: 3 tries, then terminal. */
+/** The structural (graphql/protocol/parse/thrown) retry rule: 3 tries since
+ * last progress, then terminal (see the http/network comment above). */
 function structuralRetryAt(job: CollectionJob, deps: CollectionWorkerDeps): string | null {
   return job.attempt < 2 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
 }
