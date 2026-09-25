@@ -129,6 +129,9 @@ function fillNullNodes(primary: ObjectData, fallback: ObjectData, path: readonly
   return rebuilt;
 }
 
+/** A gateway or server failure (HTTP 5xx), the only stop the commits ladder retries. */
+function isServerError(stop: SourceDiagnostic): boolean { return stop.stopKind === "http" && (stop.httpStatus ?? 0) >= 500; }
+
 const COMMIT_HISTORY_SINCE_MARGIN_MS = 30 * 86_400_000;
 // A commit page whose line counts GitHub cannot compute inside its gateway
 // timeout answers 502, even at first:50 (measured 2026-09-25, evidence file
@@ -137,15 +140,13 @@ const COMMIT_HISTORY_SINCE_MARGIN_MS = 30 * 86_400_000;
 const COMMIT_PAGE_LADDER = [50, 20, 10] as const;
 const COMMIT_LADDER_ABSORB_AFTER = 3;
 
-/** Operation keys/prefixes whose processing can call `registerRepo`/`ensureOp`
- * -- i.e. can still grow the checkpoint's operation count (#1342). Derived
- * from this file's own call sites: `repositories`/`contributed` register
+/** Operations that can still add operations (contract: `computeDiscoveryComplete`,
+ * #1342). From this file's call sites: `repositories`/`contributed` register
  * discovered repositories; `merged:*` registers a PR's repository, queues a
  * `files:` operation, and can split into two more `merged:*` ranges;
  * `reviewDiscovery` registers a reviewed PR's repository and queues a
  * `reviews:` operation. `profile`, `files:*`, `reviews:*` and `commits:*`
- * never call either function once processed, however their data turns out --
- * see the contract test for the same claim proven against the live engine. */
+ * never add operations. */
 export const GITHUB_EXPANDING_OPERATIONS = ["repositories", "contributed", "reviewDiscovery", "merged:"] as const;
 
 export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
@@ -169,9 +170,9 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   const effectiveToken = credential.token?.trim() || undefined;
   let requestCount = 0;
 
-  // Legacy in-flight checkpoints (#1351) may still carry `issues:`/`closures:`
-  // operations from before this scan was dropped -- drop them on load so a
-  // resumed job never re-requests them.
+  // Checkpoints written before the issue-closure scan was dropped (2026-09-25,
+  // #1351) can still hold `issues:`/`closures:` operations. Drop them on load.
+  // Safe to delete once no job from before that release can still be running.
   const operations: MutableCollectorOperation[] = checkpoint.operations
     .filter((op) => !op.key.startsWith("issues:") && !op.key.startsWith("closures:"))
     .map((op) => ({ key: op.key, cursor: op.cursor, done: op.done }));
@@ -265,7 +266,7 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
         const fallback = await request(options.withoutLineCounts, { ...pageVariables, after: cursor });
         r = fallback.stop ? fallback : { data: fillNullNodes(r.data, fallback.data, path), stop: null };
       }
-      if (r.stop && r.stop.stopKind === "http" && (r.stop.httpStatus ?? 0) >= 500 && options.onServerError) {
+      if (r.stop && isServerError(r.stop) && options.onServerError) {
         const ladder = await options.onServerError(cursor);
         if (ladder.kind === "recovered") r = { data: ladder.data, stop: null };
         else if (ladder.kind === "absorbed") { op.done = true; op.cursor = null; return { kind: "done", totalCount: null }; }
@@ -466,12 +467,12 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
         for (const size of COMMIT_PAGE_LADDER.filter((candidate) => candidate < currentSize)) {
           const r = await request("commits", { ...commitQueryVariables(size), after: cursor });
           if (!r.stop) { commitPageSizes[op.key] = size; return { kind: "recovered", data: r.data }; }
-          if (r.stop.stopKind !== "http" || (r.stop.httpStatus ?? 0) < 500) return { kind: "stop", stop: r.stop };
+          if (!isServerError(r.stop)) return { kind: "stop", stop: r.stop };
         }
         const smallest = COMMIT_PAGE_LADDER.at(-1)!;
         const fallback = await request("commitsWithoutLines", { ...commitQueryVariables(smallest), after: cursor });
         if (!fallback.stop) { commitPageSizes[op.key] = smallest; return { kind: "recovered", data: fallback.data }; }
-        if (fallback.stop.stopKind !== "http" || (fallback.stop.httpStatus ?? 0) < 500) return { kind: "stop", stop: fallback.stop };
+        if (!isServerError(fallback.stop)) return { kind: "stop", stop: fallback.stop };
         const failures = (commitLadderFailures[op.key] ?? 0) + 1;
         if (failures >= COMMIT_LADDER_ABSORB_AFTER) {
           reasons.add("source_error");
@@ -480,6 +481,8 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
           return { kind: "absorbed" };
         }
         commitLadderFailures[op.key] = failures;
+        // Every size failed: the next slice starts at the smallest one.
+        commitPageSizes[op.key] = smallest;
         return { kind: "stop", stop: fallback.stop };
       }
       const outcome = await runPagedList(op, "commits", () => commitQueryVariables(commitPageSizes[op.key] ?? COMMIT_PAGE_LADDER[0]), ["node", "defaultBranchRef", "target", "history"], (node) => {

@@ -61,9 +61,8 @@ interface GitlabMrMeta {
 type MutableGitlabOperation = MutableSliceOperation;
 interface GitlabListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
 
-/** Operation keys/prefixes whose processing can call `registerRepo`/`ensureOp`
- * -- i.e. can still grow the checkpoint's operation count (#1342). Derived
- * from this file's own call sites: `projects:owned`/`projects:contributed`
+/** Operations that can still add operations (contract: `computeDiscoveryComplete`,
+ * #1342). From this file's call sites: `projects:owned`/`projects:contributed`
  * register each discovered project; `authored_merged` and `merge_requests:*`
  * both route every node through `registerMr`, which registers the MR's
  * project, always queues a `notes:` operation, and -- when the MR is merged
@@ -72,9 +71,7 @@ interface GitlabListOutcome { readonly kind: "done" | "stop"; readonly stop?: So
  * `not_accessible` absorb path emits the event directly, with no new
  * operation); `issues:*` queues a `resource_state_events:` operation per
  * issue. `profile`, `emails`, `diffs:*`, `notes:*`, `commits:*` and
- * `resource_state_events:*` never call either function once processed,
- * however their data turns out -- see the contract test for the same claim
- * proven against the live engine. */
+ * `resource_state_events:*` never add operations. */
 export const GITLAB_EXPANDING_OPERATIONS = ["projects:owned", "projects:contributed", "authored_merged", "merge_requests:", "details:", "issues:"] as const;
 
 /** Bounds an otherwise-unbounded commit history to the scoring window via

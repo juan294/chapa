@@ -43,16 +43,14 @@ interface CodebergPrMeta {
 type MutableCodebergOperation = MutableSliceOperation;
 interface CodebergListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
 
-/** Operation keys/prefixes whose processing can call `registerRepo`/`ensureOp`
- * -- i.e. can still grow the checkpoint's operation count (#1342). Derived
- * from this file's own call sites: `repos:own`/`repos:user` and `feeds`
+/** Operations that can still add operations (contract: `computeDiscoveryComplete`,
+ * #1342). From this file's call sites: `repos:own`/`repos:user` and `feeds`
  * register discovered repositories; `pulls:*` always queues a `reviews:`
  * operation and, for a subject-authored merge, a `refs:` operation; `refs:*`
  * queues a `files:` operation on both its success path and its
  * `not_accessible` absorb path; `issues:*` queues a `timeline:` operation per
  * issue. `profile`, `commits:*`, `files:*`, `reviews:*` and `timeline:*`
- * never call either function once processed, however their data turns out --
- * see the contract test for the same claim proven against the live engine. */
+ * never add operations. */
 export const CODEBERG_EXPANDING_OPERATIONS = ["repos:own", "repos:user", "feeds", "pulls:", "refs:", "issues:"] as const;
 
 export const collectCodebergSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {

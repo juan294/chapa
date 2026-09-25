@@ -29,14 +29,14 @@ describe("seedFromPrior", () => {
   it("keeps in-window prior events and drops out-of-window ones", () => {
     const inWindow = event({ eventId: "in", occurredAt: "2026-09-01T00:00:00.000Z" });
     const outOfWindow = event({ eventId: "out", occurredAt: "2024-01-01T00:00:00.000Z" });
-    const result = seedFromPrior({ dataThrough: "2026-09-22T12:00:00.000Z", events: [inWindow, outOfWindow] }, window);
+    const result = seedFromPrior({ events: [inWindow, outOfWindow] }, window);
     expect(result.seededEvents).toEqual([inWindow]);
   });
 
   it("does not pre-register repositories", () => {
     const a = event({ eventId: "a", occurredAt: "2026-09-01T00:00:00.000Z", repositoryId: "R1", kind: "accepted_change" });
     const b = event({ eventId: "b", occurredAt: "2026-09-02T00:00:00.000Z", repositoryId: "R2", kind: "accepted_change" });
-    const result = seedFromPrior({ dataThrough: null, events: [a, b] }, window);
+    const result = seedFromPrior({ events: [a, b] }, window);
     expect(result.checkpoint.discovered.repositoryIds).toEqual([]);
     expect(result.seededEvents).toEqual([a, b]);
     expect(result.checkpoint.operations).toContainEqual({ key: "files:github:a", cursor: null, done: true });
@@ -45,14 +45,14 @@ describe("seedFromPrior", () => {
 
   it("marks files of an already-merged accepted_change as a done, skippable operation", () => {
     const merged = event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z", kind: "accepted_change" });
-    const result = seedFromPrior({ dataThrough: null, events: [merged] }, window);
+    const result = seedFromPrior({ events: [merged] }, window);
     expect(result.checkpoint.operations).toContainEqual({ key: "files:github:PR1", cursor: null, done: true });
   });
 
   it("marks reviews as skippable only once the merge is more than 30 days before the reference time", () => {
     const recent = event({ eventId: "PR-recent", occurredAt: "2026-09-20T00:00:00.000Z" });
     const stale = event({ eventId: "PR-stale", occurredAt: "2026-06-01T00:00:00.000Z" });
-    const result = seedFromPrior({ dataThrough: null, events: [recent, stale] }, window);
+    const result = seedFromPrior({ events: [recent, stale] }, window);
     const keys = result.checkpoint.operations.map((op) => op.key);
     expect(keys).not.toContain("reviews:github:PR-recent");
     expect(keys).toContain("reviews:github:PR-stale");
@@ -60,14 +60,14 @@ describe("seedFromPrior", () => {
 
   it("does not mark files/reviews skippable for a non-accepted_change event", () => {
     const review = event({ eventId: "REV1", occurredAt: "2026-09-01T00:00:00.000Z", kind: "review" });
-    const result = seedFromPrior({ dataThrough: null, events: [review] }, window);
+    const result = seedFromPrior({ events: [review] }, window);
     expect(result.checkpoint.operations).toEqual([]);
   });
 
   it("is pure: repeated calls with the same input produce the same result", () => {
     const events = [event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" })];
-    const a = seedFromPrior({ dataThrough: "2026-09-20T00:00:00.000Z", events }, window);
-    const b = seedFromPrior({ dataThrough: "2026-09-20T00:00:00.000Z", events }, window);
+    const a = seedFromPrior({ events }, window);
+    const b = seedFromPrior({ events }, window);
     expect(a).toEqual(b);
   });
 });

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
 import type { CollectorCheckpoint } from "@/lib/collection/plan";
 import { seedFromPrior, type PriorObservation } from "@/lib/collection/seed";
+import { emptySliceMeasurements } from "@/lib/collection/slice-helpers";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectGitlabSlice } from "./evidence";
 
@@ -44,15 +45,7 @@ function priorEvent(): NormalizedEngineeringEvent {
     canonicalProjectId: `gitlab.com:project:${PROJECT_A}`, workItemId, artifactRevision: workItemId,
     artifactReferenceIds: [workItemId], attribution: "individual", provenance: "source_observed",
     coverage: "complete", categories: [],
-    measurements: {
-      changedFiles: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
-      additions: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
-      deletions: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
-      leadTimeHours: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
-      hasDescription: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
-      hasIssueLink: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
-      usesFeatureBranch: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
-    },
+    measurements: emptySliceMeasurements(),
     acceptance: { status: "unknown", coverage: "unavailable", reasonCode: "not_assessed" },
   };
 }
@@ -60,7 +53,7 @@ function priorEvent(): NormalizedEngineeringEvent {
 describe("collectGitlabSlice from a seeded checkpoint", () => {
   it("registers per-repository operations for a project seeded from the prior observation", async () => {
     setupFetch();
-    const prior: PriorObservation = { dataThrough: "2026-09-04T00:00:00.000Z", events: [priorEvent()] };
+    const prior: PriorObservation = { events: [priorEvent()] };
     const seed = seedFromPrior(prior, window);
 
     let checkpoint: CollectorCheckpoint = seed.checkpoint;

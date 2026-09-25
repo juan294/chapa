@@ -240,7 +240,7 @@ async function trySeedFromPrior(
     // window, never today's own (there isn't one yet on a job's first slice).
     const prior = await deps.readPriorObservation(storageContext, true);
     if (!prior || prior.coverage.status !== "complete") return null;
-    const { checkpoint, seededEvents } = seedFromPrior({ dataThrough: prior.coverage.dataThrough, events: prior.events }, resolved.context.window);
+    const { checkpoint, seededEvents } = seedFromPrior({ events: prior.events }, resolved.context.window);
     return { checkpoint, seededEvents };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

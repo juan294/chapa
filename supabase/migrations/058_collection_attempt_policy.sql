@@ -1,21 +1,6 @@
--- Refs #1335, #1351 (phase 3). Retry and attempt policy for the durable
--- collection queue (055/056/057). `attempt` on `scoring_collection_jobs` is
--- redefined from "failures so far" to "failures since the last progress":
---
---   * A `rate_limited` stop never increments `attempt` -- waiting for the
---     shared GitHub allowance is not a failure, and the http/structural
---     retry budgets must never be spent by rate limiting alone. On
---     2026-09-24 jobs that only waited for the allowance were already at
---     attempt 1 to 4.
---   * A checkpoint whose `progress.operationsDone` is greater than the
---     stored value resets `attempt` to 0 -- a job that keeps making
---     progress must not fail just because it also saw one transient error
---     per hour.
---   * Re-enqueuing a `failed` job with reason `retry`, when its last stop
---     was a transient one (`http`, `network`, `deadline`, `budget`), keeps
---     the checkpoint, staged events and progress instead of clearing them,
---     so a retry after a transient failure resumes rather than restarts.
---     Every other retry/reconnect/refresh case still clears, as before.
+-- Refs #1335, #1351. Retry and attempt policy for the durable collection
+-- queue (055/056/057). `attempt` now means "failures since the last
+-- progress". Each rule is described at the function that enforces it.
 --
 -- `scoring_collection_valid_progress` also gains an optional boolean
 -- `discovering` key, which phase 5 starts writing.

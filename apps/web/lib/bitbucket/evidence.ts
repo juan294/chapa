@@ -59,9 +59,8 @@ function commitsPath(repositoryId: string, sinceIso: string): string {
   return url.toString();
 }
 
-/** Operation keys/prefixes whose processing can call `registerRepo`/`ensureOp`
- * -- i.e. can still grow the checkpoint's operation count (#1342). Derived
- * from this file's own call sites: `workspaces` queues a `workspace-repos:`
+/** Operations that can still add operations (contract: `computeDiscoveryComplete`,
+ * #1342). From this file's call sites: `workspaces` queues a `workspace-repos:`
  * operation per workspace; `workspace-repos:*` registers each discovered
  * repository (which itself queues `commits:`/`pullrequests:`); `pullrequests:*`
  * queues an `activity:` operation per PR; `activity:*` conditionally queues a
@@ -69,9 +68,7 @@ function commitsPath(repositoryId: string, sinceIso: string): string {
  * subject with a resolvable merge date; `diffstat:*` conditionally queues a
  * `diff:` operation on its clean-redirect success path (its `not_accessible`
  * and malformed-redirect paths emit the event directly instead). `profile`,
- * `commits:*` and `diff:*` never call either function once processed,
- * however their data turns out -- see the contract test for the same claim
- * proven against the live engine. */
+ * `commits:*` and `diff:*` never add operations. */
 export const BITBUCKET_EXPANDING_OPERATIONS = ["workspaces", "workspace-repos:", "pullrequests:", "activity:", "diffstat:"] as const;
 
 export const collectBitbucketSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {

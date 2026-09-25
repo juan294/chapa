@@ -292,6 +292,22 @@ describe("commit-history 5xx retry ladder", () => {
     expect(result.stop?.httpStatus).toBe(502);
     expect(result.checkpoint.state?.commitLadderFailures).toMatchObject({ "commits:R1": 1 });
     expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.done).toBe(false);
+      // The next slice starts at the smallest size instead of repeating a known 502.
+    expect(result.checkpoint.state?.commitPageSize).toMatchObject({ "commits:R1": 10 });
+  });
+
+  it("starts the next slice's ladder at the stored smallest size", async () => {
+    const fetcher = mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: () => new Response("Bad Gateway", { status: 502 }),
+    });
+    const checkpoint = { ...commitsCheckpoint(), state: { ...commitsCheckpoint().state, commitPageSize: { "commits:R1": 10 }, commitLadderFailures: { "commits:R1": 1 } } };
+    await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    const sizes = fetcher.mock.calls
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as { query: string; variables: Record<string, unknown> })
+      .filter((c) => c.query.includes("query V7Commits"))
+      .map((c) => c.variables.first);
+    expect(sizes).toEqual([10, 10]);
   });
 
   it("absorbs a commits op after 3 failed ladders", async () => {

@@ -2,13 +2,8 @@ import "server-only";
 import { isWithinScoringWindow, scoringInstant, type NormalizedEngineeringEvent, type ScoringWindow } from "@chapa/shared";
 import type { CollectorCheckpoint, CollectorOperation } from "./plan";
 
-/**
- * The prior day's completed observation for one source, as read from storage.
- * `dataThrough` is the prior collection's own window end -- never a caller-
- * supplied date -- and seeds the "only fetch since" optimization below.
- */
+/** The prior day's completed observation for one source, as read from storage. */
 export interface PriorObservation {
-  readonly dataThrough: string | null;
   readonly events: readonly NormalizedEngineeringEvent[];
 }
 
