@@ -262,6 +262,8 @@ describe("commit-history 5xx retry ladder", () => {
       .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as { query: string; variables: Record<string, unknown> })
       .filter((c) => c.query.includes("query V7Commits("));
     expect(commitCalls.some((c) => c.variables.first === 20 && c.variables.after === "c1")).toBe(true);
+      // A finished operation leaves no per-operation ladder state behind.
+    expect(result.checkpoint.state?.commitPageSize).toEqual({});
   });
 
   it("falls back to no line counts at the smallest page", async () => {

@@ -313,6 +313,39 @@ describe("runCollectionSlice", () => {
     expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), null);
   });
 
+  // The slice's own checkpoint resets `attempt` in the database when it
+  // advances operationsDone (migration 058), so the in-memory claim-time
+  // attempt must not end a job that made progress before this stop.
+  describe("a stop after progress in the same slice", () => {
+    const advanced: CollectorCheckpoint = {
+      version: 1,
+      operations: [{ key: "profile", cursor: null, done: true }, { key: "merged:a", cursor: null, done: true }, { key: "merged:b", cursor: null, done: false }],
+      discovered: { repositoryIds: [] },
+    };
+    const priorProgress = { operationsDone: 1, operationsKnown: 3, events: 0, requests: 0 };
+
+    it("still retries an http stop at the claim-time budget edge", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ checkpoint: advanced, stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 502, retryAfterSeconds: null } }));
+      await runCollectionSlice(makeJob({ attempt: 7, progress: priorProgress }), Date.now() + 60_000, deps);
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), new Date(Date.parse("2026-09-05T12:00:00.000Z") + 60_000).toISOString());
+    });
+
+    it("still retries a structural stop at the claim-time budget edge", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ checkpoint: advanced, stop: { provider: "github", operation: "merged", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null } }));
+      await runCollectionSlice(makeJob({ attempt: 2, progress: priorProgress }), Date.now() + 60_000, deps);
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.any(String));
+    });
+
+    it("ends the job when the slice made no progress", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ checkpoint: advanced, stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 502, retryAfterSeconds: null } }));
+      await runCollectionSlice(makeJob({ attempt: 7, progress: { ...priorProgress, operationsDone: 2 } }), Date.now() + 60_000, deps);
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), null);
+    });
+  });
+
   it("gives a protocol/parse stop only a 3-try budget, stricter than http/network", async () => {
     const deps = harness();
     deps.collect = vi.fn().mockResolvedValue(sliceResult({ stop: { provider: "github", operation: "merged", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null } }));

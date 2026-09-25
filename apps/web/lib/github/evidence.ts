@@ -507,6 +507,7 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
         onPage: (data) => { if (Array.isArray(object(at(data, "node", "defaultBranchRef", "target", "history")).nodes)) delete commitLadderFailures[op.key]; },
       });
       if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+      delete commitPageSizes[op.key];
       return "done";
     }
     op.done = true;
