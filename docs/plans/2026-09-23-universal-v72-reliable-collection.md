@@ -72,7 +72,7 @@ render surfaces ◄── receipt (ready) | scoring status (collecting / failed 
 | `055_scoring_collection_queue.sql` | 3 | expand |
 | `056_scoring_status_and_fan_in.sql` | 4 | expand |
 | `057_retire_v6_selector.sql` | 5 | expand |
-| `058_contract_v6_and_consent.sql` | 5 | contract, applied only after the release |
+| `059_contract_v6_and_consent.sql` | 5 | contract, applied only after the release |
 
 The split follows `docs/runbooks/migrations.md:122` and `:203-215`: migrations are applied before the code that depends on them, and destructive drops wait until no running code reads the objects.
 

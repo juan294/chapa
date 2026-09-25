@@ -111,7 +111,7 @@ This is expand-migrate-contract (`docs/runbooks/migrations.md:203-215`). The run
 - `057_retire_v6_selector.sql`: `UPDATE feature_flags SET enabled = true WHERE key = 'scoring_v7_rendering';`
   - This keeps the old code on v7.2 during the window between migration and deploy.
   - The new code never reads the row.
-- `058_contract_v6_and_consent.sql`, applied only after production runs the new code (phase 7 step 7.5):
+- `059_contract_v6_and_consent.sql`, applied only after production runs the new code (phase 7 step 7.5):
 ```sql
 DELETE FROM feature_flags WHERE key = 'scoring_v7_rendering';
 ALTER TABLE scoring_v7_subjects DROP CONSTRAINT <consent check name from 039>;
