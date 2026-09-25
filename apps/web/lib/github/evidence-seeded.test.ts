@@ -29,7 +29,6 @@ function mockApi(overrides: Record<string, Handler> = {}) {
     V7MergedChanges: () => ({ search: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } }),
     V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } }),
     V7Commits: () => ({ node: { isEmpty: true, defaultBranchRef: null } }),
-    V7Issues: () => ({ node: { issues: page([]) } }),
     ...overrides,
   };
   const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {

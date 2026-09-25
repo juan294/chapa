@@ -31,6 +31,7 @@ function mockApi(overrides: Record<string, Handler> = {}) {
     const { query, variables } = JSON.parse(String(init?.body)) as { query: string; variables: Record<string, unknown> };
     const operation = /query (\w+)/.exec(query)?.[1] ?? "unknown";
     const result = handlers[operation]?.(variables);
+    if (result instanceof Response) return result;
     if (!result) throw new Error(`Unexpected operation ${operation} (${JSON.stringify(variables)})`);
     return new Response(JSON.stringify({ data: result }), { status: 200 });
   });
@@ -221,6 +222,105 @@ describe("collectGitHubSlice", () => {
     mockApi({ V7MergedChanges: () => ({ search: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } }) });
     const result = await runToCompletion(50);
     expect(result.coverage?.eventKinds.issue_work).toBe("unavailable");
+  });
+});
+
+// #1351: one repository whose commit history times out at every page size
+// (measured docs/plans/2026-09-25-v4-collection-stabilization-phases/evidence/phase-4-commits-502.md)
+// must not block the whole receipt forever.
+function commitsCheckpoint(state: Record<string, unknown> = {}): CollectorCheckpoint {
+  return {
+    version: 1,
+    operations: [
+      { key: "profile", cursor: null, done: true },
+      { key: "commits:R1", cursor: null, done: false },
+    ],
+    discovered: { repositoryIds: ["R1"] },
+    state: { subjectId: "U1", login: "alice", pr: {}, reasons: [], ...state },
+  };
+}
+function commitNode(id: string, withLines: boolean): Record<string, unknown> {
+  const base = { id, oid: id, author: { user: actor }, authoredDate: "2026-08-01T00:00:00.000Z" };
+  return withLines ? { ...base, additions: 3, deletions: 1 } : base;
+}
+
+describe("commit-history 5xx retry ladder", () => {
+  it("retries a 502 commits page at 20, then 10", async () => {
+    const fetcher = mockApi({
+      V7Commits: ({ first, after }) => {
+        if (first === 50) return new Response("Bad Gateway", { status: 502 });
+        if (after === null) return { node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C1", true), commitNode("C2", true)], "c1") } } } };
+        return { node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C3", true)]) } } } };
+      },
+    });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    const commitIds = result.events.filter((e) => e.kind === "authored_commit").map((e) => e.eventId).sort();
+    expect(commitIds).toEqual(["C1", "C2", "C3"]);
+    const commitCalls = fetcher.mock.calls
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as { query: string; variables: Record<string, unknown> })
+      .filter((c) => c.query.includes("query V7Commits("));
+    expect(commitCalls.some((c) => c.variables.first === 20 && c.variables.after === "c1")).toBe(true);
+  });
+
+  it("falls back to no line counts at the smallest page", async () => {
+    mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: ({ first }) => {
+        if (first !== 10) return new Response("Bad Gateway", { status: 502 });
+        return { node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C1", false)]) } } } };
+      },
+    });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    const commitEvent = result.events.find((e) => e.kind === "authored_commit" && e.eventId === "C1");
+    expect(commitEvent?.measurements.additions.status).toBe("unknown");
+    expect(commitEvent?.measurements.deletions.status).toBe("unknown");
+  });
+
+  it("returns an http stop when the whole ladder fails, and counts it", async () => {
+    mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: () => new Response("Bad Gateway", { status: 502 }),
+    });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.stop?.stopKind).toBe("http");
+    expect(result.stop?.httpStatus).toBe(502);
+    expect(result.checkpoint.state?.commitLadderFailures).toMatchObject({ "commits:R1": 1 });
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.done).toBe(false);
+  });
+
+  it("absorbs a commits op after 3 failed ladders", async () => {
+    mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: () => new Response("Bad Gateway", { status: 502 }),
+    });
+    const checkpoint = commitsCheckpoint({ commitLadderFailures: { "commits:R1": 2 } });
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.done).toBe(true);
+    expect(result.coverage?.reasonCodes).toContain("source_error");
+    expect((result.checkpoint.state?.commitLadderFailures as Record<string, number> | undefined)?.["commits:R1"]).toBeUndefined();
+  });
+
+  it("a success resets the ladder counter", async () => {
+    mockApi({
+      V7Commits: () => ({ node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C1", true)]) } } } }),
+    });
+    const checkpoint = commitsCheckpoint({ commitLadderFailures: { "commits:R1": 2 } });
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    expect((result.checkpoint.state?.commitLadderFailures as Record<string, number> | undefined)?.["commits:R1"]).toBeUndefined();
+  });
+
+  it("ladder requests count against maxRequests", async () => {
+    mockApi({ V7Commits: () => new Response("Bad Gateway", { status: 502 }) });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 2, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.stop?.stopKind).toBe("budget");
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.cursor).toBeNull();
+    expect((result.checkpoint.state?.commitLadderFailures as Record<string, number> | undefined)?.["commits:R1"]).toBeUndefined();
   });
 });
 
