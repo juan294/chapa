@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-09-25
+
+### Removed
+
+- The retired v6 database objects: `metrics_snapshots`, `verification_records`,
+  the `admin_users` and `latest_snapshots` views, the publication-consent
+  columns and the `scoring_v7_rendering` flag row (migration 059, #1335).
+  After this migration, a rollback to v3 is no longer possible.
+
+### Changed
+
+- GitHub collection no longer scans issue closures, which never affected the
+  displayed score and used most of the shared request allowance (#1351).
+- Daily collection again collects new activity in repositories that were
+  already known from the previous day (#1352).
+- Rate-limit waits no longer use up a collection's retry budget, progress
+  resets it, and Retry after a temporary error resumes instead of starting
+  over (#1351).
+- A repository whose commit history keeps failing at GitHub no longer blocks
+  the score: Chapa retries with smaller pages, then records that history as
+  incomplete (#1351).
+- Scoring progress shows "discovering" until the total is known, then a
+  percentage that only goes up (#1342).
+
 ## [4.0.7] - 2026-09-25
 
 ### Fixed

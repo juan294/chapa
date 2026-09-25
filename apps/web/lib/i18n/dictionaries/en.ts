@@ -455,6 +455,7 @@ export const en: Translations = {
   scoring: {
     status: {
       badgeCollecting: 'Scoring in progress, {percent}%',
+      badgeDiscovering: 'Scoring in progress, discovering activity',
       badgeActionNeeded: 'Scoring paused: action needed',
       badgeUnregistered: 'Not on Chapa yet',
       badgeUnregisteredDomain: 'chapa.thecreativetoken.com',
@@ -470,8 +471,8 @@ export const en: Translations = {
       panelReady: 'Your score is up to date.',
       panelUpdating: 'Updating with today’s activity…',
       panelCollecting: 'Collecting evidence — {percent}% complete',
+      panelDiscovering: 'Discovering your activity. A percentage appears once the total is known.',
       panelActionNeeded: 'Scoring paused: action needed',
-      panelPercentEstimate: 'Estimated — the total can grow as more activity is discovered.',
       stateQueued: 'Queued',
       stateRunning: 'Collecting',
       stateWaitingRateLimit: 'Rate limit reached, resuming at {time}',

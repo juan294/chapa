@@ -242,7 +242,11 @@ export function GeneratingProgress({ handle }: { handle: string }) {
       try {
         const res = await fetch("/api/scoring/status");
         if (cancelled || !res.ok) return;
-        const body = (await res.json()) as { scoringStatus?: { kind?: string; percent?: number } } | null;
+        // `percent` is `number | null` (#1342) -- null while the job can
+        // still add operations. The `typeof ... !== "number"` guard already
+        // treats null the same as "nothing to show yet": step 1 keeps its
+        // plain label with no `— N%` suffix until a real percent arrives.
+        const body = (await res.json()) as { scoringStatus?: { kind?: string; percent?: number | null } } | null;
         if (cancelled) return;
         const status = body?.scoringStatus;
         if (status?.kind !== "collecting" || typeof status.percent !== "number") return;

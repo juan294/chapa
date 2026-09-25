@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
-import { collectGitHubSlice, githubMergedSearchRanges } from "./evidence";
+import { collectGitHubSlice, githubMergedSearchRanges, GITHUB_EXPANDING_OPERATIONS } from "./evidence";
+import { isExpandingOperation } from "@/lib/collection/slice-helpers";
 
 vi.mock("@/lib/env", () => ({ getGithubToken: () => undefined }));
 
@@ -25,13 +26,13 @@ function mockApi(overrides: Record<string, Handler> = {}) {
     V7Repositories: () => ({ user: { repositories: page([]) } }),
     V7ContributedRepositories: () => ({ user: { repositoriesContributedTo: page([]) } }),
     V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } }),
-    V7Issues: () => ({ node: { issues: page([]) } }),
     ...overrides,
   };
   const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
     const { query, variables } = JSON.parse(String(init?.body)) as { query: string; variables: Record<string, unknown> };
     const operation = /query (\w+)/.exec(query)?.[1] ?? "unknown";
     const result = handlers[operation]?.(variables);
+    if (result instanceof Response) return result;
     if (!result) throw new Error(`Unexpected operation ${operation} (${JSON.stringify(variables)})`);
     return new Response(JSON.stringify({ data: result }), { status: 200 });
   });
@@ -163,6 +164,274 @@ describe("collectGitHubSlice", () => {
     const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("budget");
+  });
+
+  // #1351: the GitHub issue-closure scan (V7Issues/V7Closures) is gone --
+  // every issue_work event it produced was inadmissible for scoring anyway
+  // (v7-evidence.github-issue-work.test.ts proves the equivalence).
+  it("never requests V7Issues or V7Closures", async () => {
+    const prs = [{ id: "PR1", repositoryId: "R1", mergedAt: "2026-08-01T12:00:00.000Z" }];
+    const mergedHandler: Handler = ({ query, after }) => {
+      const match = /merged:(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})/.exec(String(query));
+      const [, start, end] = match!;
+      const matches = prs.filter((pr) => { const d = pr.mergedAt.slice(0, 10); return d >= start! && d <= end!; });
+      const offset = after ? Number(after) : 0;
+      const slice = matches.slice(offset, offset + 100);
+      const nextOffset = offset + 100;
+      const hasNextPage = nextOffset < matches.length;
+      return { search: { issueCount: matches.length, pageInfo: { hasNextPage, endCursor: hasNextPage ? String(nextOffset) : null }, nodes: slice.map((pr) => ({
+        __typename: "PullRequest", id: pr.id, repository: { id: pr.repositoryId, nameWithOwner: pr.repositoryId }, author: actor,
+        merged: true, mergedAt: pr.mergedAt, createdAt: "2020-01-01T00:00:00.000Z", headRefOid: `sha-${pr.id}`, body: "desc",
+        headRefName: "feature", baseRefName: "main", additions: 1, deletions: 0, changedFiles: 1, closingIssuesReferences: { totalCount: 0 },
+      })) } };
+    };
+    const filesHandler: Handler = ({ id }) => ({ node: { files: page([{ path: `file-${id as string}.md` }]) } });
+    const commitsHandler: Handler = () => ({ node: { isEmpty: true, defaultBranchRef: null } });
+    const fetcher = mockApi({ V7MergedChanges: mergedHandler, V7Files: filesHandler, V7Commits: commitsHandler });
+
+    const result = await runToCompletion(50);
+    expect(result.events.filter((e) => e.kind === "accepted_change")).toHaveLength(1);
+    const queries = fetcher.mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { query: string }).query);
+    expect(queries.some((q) => q.includes("V7Issues"))).toBe(false);
+    expect(queries.some((q) => q.includes("V7Closures"))).toBe(false);
+  });
+
+  it("drops legacy issue-closure operations from a resumed checkpoint and never re-requests them", async () => {
+    const commitsHandler: Handler = () => ({ node: { isEmpty: true, defaultBranchRef: null } });
+    const closuresHandler: Handler = () => ({ node: { timelineItems: page([]) } });
+    const fetcher = mockApi({ V7Commits: commitsHandler, V7Closures: closuresHandler });
+    const checkpoint: CollectorCheckpoint = {
+      version: 1,
+      operations: [
+        { key: "profile", cursor: null, done: true },
+        { key: "issues:R1", cursor: null, done: true },
+        { key: "closures:I1", cursor: null, done: false },
+        { key: "commits:R1", cursor: null, done: false },
+      ],
+      discovered: { repositoryIds: ["R1"] },
+      state: { subjectId: "U1", login: "alice", pr: {}, issueRepo: { I1: "R1" }, reasons: [] },
+    };
+
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.checkpoint.operations.some((op) => op.key.startsWith("issues:") || op.key.startsWith("closures:"))).toBe(false);
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.done).toBe(true);
+    const queries = fetcher.mock.calls.map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { query: string }).query);
+    expect(queries.some((q) => q.includes("V7Closures"))).toBe(false);
+  });
+
+  it("reports issue_work unavailable", async () => {
+    mockApi({ V7MergedChanges: () => ({ search: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } }) });
+    const result = await runToCompletion(50);
+    expect(result.coverage?.eventKinds.issue_work).toBe("unavailable");
+  });
+});
+
+// #1351: one repository whose commit history times out at every page size
+// (measured docs/plans/2026-09-25-v4-collection-stabilization-phases/evidence/phase-4-commits-502.md)
+// must not block the whole receipt forever.
+function commitsCheckpoint(state: Record<string, unknown> = {}): CollectorCheckpoint {
+  return {
+    version: 1,
+    operations: [
+      { key: "profile", cursor: null, done: true },
+      { key: "commits:R1", cursor: null, done: false },
+    ],
+    discovered: { repositoryIds: ["R1"] },
+    state: { subjectId: "U1", login: "alice", pr: {}, reasons: [], ...state },
+  };
+}
+function commitNode(id: string, withLines: boolean): Record<string, unknown> {
+  const base = { id, oid: id, author: { user: actor }, authoredDate: "2026-08-01T00:00:00.000Z" };
+  return withLines ? { ...base, additions: 3, deletions: 1 } : base;
+}
+
+describe("commit-history 5xx retry ladder", () => {
+  it("retries a 502 commits page at 20, then 10", async () => {
+    const fetcher = mockApi({
+      V7Commits: ({ first, after }) => {
+        if (first === 50) return new Response("Bad Gateway", { status: 502 });
+        if (after === null) return { node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C1", true), commitNode("C2", true)], "c1") } } } };
+        return { node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C3", true)]) } } } };
+      },
+    });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    const commitIds = result.events.filter((e) => e.kind === "authored_commit").map((e) => e.eventId).sort();
+    expect(commitIds).toEqual(["C1", "C2", "C3"]);
+    const commitCalls = fetcher.mock.calls
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as { query: string; variables: Record<string, unknown> })
+      .filter((c) => c.query.includes("query V7Commits("));
+    expect(commitCalls.some((c) => c.variables.first === 20 && c.variables.after === "c1")).toBe(true);
+      // A finished operation leaves no per-operation ladder state behind.
+    expect(result.checkpoint.state?.commitPageSize).toEqual({});
+  });
+
+  it("falls back to no line counts at the smallest page", async () => {
+    mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: ({ first }) => {
+        if (first !== 10) return new Response("Bad Gateway", { status: 502 });
+        return { node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C1", false)]) } } } };
+      },
+    });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    const commitEvent = result.events.find((e) => e.kind === "authored_commit" && e.eventId === "C1");
+    expect(commitEvent?.measurements.additions.status).toBe("unknown");
+    expect(commitEvent?.measurements.deletions.status).toBe("unknown");
+  });
+
+  it("returns an http stop when the whole ladder fails, and counts it", async () => {
+    mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: () => new Response("Bad Gateway", { status: 502 }),
+    });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.stop?.stopKind).toBe("http");
+    expect(result.stop?.httpStatus).toBe(502);
+    expect(result.checkpoint.state?.commitLadderFailures).toMatchObject({ "commits:R1": 1 });
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.done).toBe(false);
+      // The next slice starts at the smallest size instead of repeating a known 502.
+    expect(result.checkpoint.state?.commitPageSize).toMatchObject({ "commits:R1": 10 });
+  });
+
+  it("starts the next slice's ladder at the stored smallest size", async () => {
+    const fetcher = mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: () => new Response("Bad Gateway", { status: 502 }),
+    });
+    const checkpoint = { ...commitsCheckpoint(), state: { ...commitsCheckpoint().state, commitPageSize: { "commits:R1": 10 }, commitLadderFailures: { "commits:R1": 1 } } };
+    await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    const sizes = fetcher.mock.calls
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as { query: string; variables: Record<string, unknown> })
+      .filter((c) => c.query.includes("query V7Commits"))
+      .map((c) => c.variables.first);
+    expect(sizes).toEqual([10, 10]);
+  });
+
+  it("absorbs a commits op after 3 failed ladders", async () => {
+    mockApi({
+      V7Commits: () => new Response("Bad Gateway", { status: 502 }),
+      V7CommitsWithoutLines: () => new Response("Bad Gateway", { status: 502 }),
+    });
+    const checkpoint = commitsCheckpoint({ commitLadderFailures: { "commits:R1": 2 } });
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.done).toBe(true);
+    expect(result.coverage?.reasonCodes).toContain("source_error");
+    expect((result.checkpoint.state?.commitLadderFailures as Record<string, number> | undefined)?.["commits:R1"]).toBeUndefined();
+  });
+
+  it("a success resets the ladder counter", async () => {
+    mockApi({
+      V7Commits: () => ({ node: { isEmpty: false, defaultBranchRef: { target: { history: page([commitNode("C1", true)]) } } } }),
+    });
+    const checkpoint = commitsCheckpoint({ commitLadderFailures: { "commits:R1": 2 } });
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(true);
+    expect((result.checkpoint.state?.commitLadderFailures as Record<string, number> | undefined)?.["commits:R1"]).toBeUndefined();
+  });
+
+  it("ladder requests count against maxRequests", async () => {
+    mockApi({ V7Commits: () => new Response("Bad Gateway", { status: 502 }) });
+    const result = await collectGitHubSlice(input, credential, commitsCheckpoint(), { maxRequests: 2, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.stop?.stopKind).toBe("budget");
+    expect(result.checkpoint.operations.find((op) => op.key === "commits:R1")?.cursor).toBeNull();
+    expect((result.checkpoint.state?.commitLadderFailures as Record<string, number> | undefined)?.["commits:R1"]).toBeUndefined();
+  });
+});
+
+describe("discoveryComplete (#1342)", () => {
+  it("is false on the first slice", async () => {
+    mockApi({ V7Repositories: () => ({ user: { repositories: page([{ id: "R1", nameWithOwner: "a/b" }]) } }) });
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.discoveryComplete).toBe(false);
+  });
+
+  it("GITHUB_EXPANDING_OPERATIONS matches exactly the keys/prefixes whose processing calls registerRepo/ensureOp", () => {
+    // Documents the call-site audit backing the constant: every key below is
+    // either the profile op (never expands) or in the list.
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "repositories")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "contributed")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "reviewDiscovery")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "merged:2026-01-01..2026-01-31")).toBe(true);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "profile")).toBe(false);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "files:github:PR1")).toBe(false);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "reviews:github:PR1")).toBe(false);
+    expect(isExpandingOperation(GITHUB_EXPANDING_OPERATIONS, "commits:R1")).toBe(false);
+  });
+
+  it("operationsKnown never grows once discoveryComplete is true, and it stays true", async () => {
+    const prs = [{ id: "PR1", repositoryId: "R1", mergedAt: "2026-08-01T12:00:00.000Z" }];
+    const mergedHandler: Handler = ({ query, after }) => {
+      const match = /merged:(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})/.exec(String(query));
+      const [, start, end] = match!;
+      const matches = prs.filter((pr) => { const d = pr.mergedAt.slice(0, 10); return d >= start! && d <= end!; });
+      const offset = after ? Number(after) : 0;
+      const slice = matches.slice(offset, offset + 100);
+      const nextOffset = offset + 100;
+      const hasNextPage = nextOffset < matches.length;
+      return { search: { issueCount: matches.length, pageInfo: { hasNextPage, endCursor: hasNextPage ? String(nextOffset) : null }, nodes: slice.map((pr) => ({
+        __typename: "PullRequest", id: pr.id, repository: { id: pr.repositoryId, nameWithOwner: pr.repositoryId }, author: actor,
+        merged: true, mergedAt: pr.mergedAt, createdAt: "2020-01-01T00:00:00.000Z", headRefOid: `sha-${pr.id}`, body: "desc",
+        headRefName: "feature", baseRefName: "main", additions: 1, deletions: 0, changedFiles: 1, closingIssuesReferences: { totalCount: 0 },
+      })) } };
+    };
+    const filesHandler: Handler = ({ id }) => ({ node: { files: page([{ path: `file-${id as string}.md` }]) } });
+    const commitsHandler: Handler = () => ({ node: { isEmpty: false, defaultBranchRef: { target: { history: page([
+      { id: "R1-C1", oid: "R1-C1", author: { user: actor }, authoredDate: "2026-08-02T00:00:00.000Z", additions: 1, deletions: 0 },
+    ]) } } } });
+    const reviewDiscoveryHandler: Handler = () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([
+      { isRestricted: false, pullRequest: { id: "PR2", repository: { id: "R1" } } },
+    ]) } } });
+    const reviewsHandler: Handler = () => ({ node: { reviews: page([{ id: "REV1", author: actor, state: "APPROVED", submittedAt: "2026-08-03T00:00:00.000Z" }]) } });
+    mockApi({
+      V7MergedChanges: mergedHandler, V7Files: filesHandler, V7Commits: commitsHandler,
+      V7ReviewDiscovery: reviewDiscoveryHandler, V7Reviews: reviewsHandler,
+    });
+
+    let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
+    const stagedKeys = new Set<string>();
+    let sawDiscoveryComplete = false;
+    let knownAtDiscoveryComplete = -1;
+    for (let i = 0; i < 200; i++) {
+      const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 1, deadlineAt: Date.now() + 120_000 }, stagedKeys);
+      for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
+      checkpoint = result.checkpoint;
+      if (sawDiscoveryComplete) {
+        expect(result.discoveryComplete).toBe(true);
+        expect(checkpoint.operations.length).toBe(knownAtDiscoveryComplete);
+      } else if (result.discoveryComplete) {
+        sawDiscoveryComplete = true;
+        knownAtDiscoveryComplete = checkpoint.operations.length;
+      }
+      if (result.done) break;
+      if (result.stop && result.stop.stopKind !== "budget" && result.stop.stopKind !== "deadline") {
+        throw new Error(`Unexpected stop: ${JSON.stringify(result.stop)}`);
+      }
+    }
+    expect(sawDiscoveryComplete).toBe(true);
+  });
+
+  it("a legacy checkpoint with no flag starts as not discovered while an expanding op remains undone", async () => {
+    const checkpoint: CollectorCheckpoint = {
+      version: 1,
+      operations: [
+        { key: "profile", cursor: null, done: true },
+        { key: "repositories", cursor: null, done: false },
+        { key: "contributed", cursor: null, done: true },
+        { key: "reviewDiscovery", cursor: null, done: true },
+      ],
+      discovered: { repositoryIds: [] },
+      state: { subjectId: "U1", login: "alice", pr: {}, reasons: [] },
+    };
+    mockApi({ V7Repositories: () => ({ user: { repositories: page([]) } }) });
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 0, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.checkpoint.operations.find((op) => op.key === "repositories")?.done).toBe(false);
+    expect(result.discoveryComplete).toBe(false);
   });
 });
 

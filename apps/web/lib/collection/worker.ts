@@ -240,7 +240,7 @@ async function trySeedFromPrior(
     // window, never today's own (there isn't one yet on a job's first slice).
     const prior = await deps.readPriorObservation(storageContext, true);
     if (!prior || prior.coverage.status !== "complete") return null;
-    const { checkpoint, seededEvents } = seedFromPrior({ dataThrough: prior.coverage.dataThrough, events: prior.events }, resolved.context.window);
+    const { checkpoint, seededEvents } = seedFromPrior({ events: prior.events }, resolved.context.window);
     return { checkpoint, seededEvents };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -311,6 +311,11 @@ export async function runCollectionSlice(
         operationsKnown: seed.checkpoint.operations.length,
         events: seed.seededEvents.length,
         requests: 0,
+        // A seed pre-write never runs the collector, so discovery has not
+        // started yet -- always true here (#1342). Without this, a seeded
+        // job's inflated N/N ratio would read as a false 99% before the
+        // first real slice appends any operations.
+        discovering: true,
       };
       const outcome = await deps.checkpoint(lease, seed.checkpoint, seed.seededEvents, seedProgress, false);
       if (outcome.status !== "lease_mismatch") {
@@ -334,7 +339,7 @@ export async function runCollectionSlice(
     // the job: left running, its lease expires and every tick re-claims it
     // (2026-09-24, an EMU login the GitHub collector rejected). Treat it as a
     // structural failure, then rethrow so the tick still captures the cause.
-    await failJob(lease, { provider: job.provider, operation: "collect", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null }, structuralRetryAt(job, deps));
+    await failJob(lease, { provider: job.provider, operation: "collect", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null }, structuralRetryAt(job.attempt, deps));
     throw error;
   }
 
@@ -343,6 +348,10 @@ export async function runCollectionSlice(
     operationsKnown: result.checkpoint.operations.length,
     events: stagedKeys.size + result.events.length,
     requests: result.requests,
+    // Carries the collector's own discoveryComplete for this checkpoint
+    // (#1342): while false, a not-done operation could still add more
+    // operations, so operationsKnown is not yet final.
+    discovering: !result.discoveryComplete,
   };
 
   scheduleServerEvent("scoring_collection_slice", {
@@ -411,8 +420,14 @@ export async function runCollectionSlice(
     return;
   }
 
+  // `attempt` is "failures since last progress" (migration 058, #1351): a
+  // rate_limited stop never bumps it, and a checkpoint that advances
+  // operationsDone resets it. This slice's own checkpoint above may have just
+  // reset it in the database, so the claim-time job.attempt would be stale.
+  const attempt = progress.operationsDone > job.progress.operationsDone ? 0 : job.attempt;
+
   if (stop.stopKind === "http" || stop.stopKind === "network") {
-    const retryAt = job.attempt < MAX_COLLECTION_ATTEMPTS - 1 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
+    const retryAt = attempt < MAX_COLLECTION_ATTEMPTS - 1 ? new Date(deps.now() + nextBackoff(attempt) * 1000).toISOString() : null;
     await failJob(lease, stop, retryAt);
     return;
   }
@@ -422,12 +437,13 @@ export async function runCollectionSlice(
   // terminal. (evidence-diagnostics.ts's reasonFor() already groups
   // "graphql" with "protocol"/"parse" as source_error, distinct from the
   // honest-incompleteness budget/deadline/rate_limited group.)
-  await failJob(lease, stop, structuralRetryAt(job, deps));
+  await failJob(lease, stop, structuralRetryAt(attempt, deps));
 }
 
-/** The structural (graphql/protocol/parse/thrown) retry rule: 3 tries, then terminal. */
-function structuralRetryAt(job: CollectionJob, deps: CollectionWorkerDeps): string | null {
-  return job.attempt < 2 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
+/** The structural (graphql/protocol/parse/thrown) retry rule: 3 tries since
+ * last progress, then terminal (see the http/network comment above). */
+function structuralRetryAt(attempt: number, deps: CollectionWorkerDeps): string | null {
+  return attempt < 2 ? new Date(deps.now() + nextBackoff(attempt) * 1000).toISOString() : null;
 }
 
 /**

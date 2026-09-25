@@ -1720,6 +1720,18 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
     });
 
+    // #1342 -- a still-discovering job reports percent: null; the badge
+    // must draw the discovering heading, not a percentage or a progress bar.
+    it("renders the collecting state with a discovering heading when percent is null", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: null, sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="collecting"');
+      expect(body).toContain("Scoring in progress, discovering activity");
+      expect(body).not.toMatch(/Scoring in progress, \d+%/);
+    });
+
     it("renders the action_needed state with no-store", async () => {
       mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: false });
       const [request, ctx] = makeRequest("testuser");

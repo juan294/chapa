@@ -43,6 +43,11 @@ Every discovered applicable test must execute, with zero skips or failures; a fa
 applicable browser selection fails `localProbes`, not only a named release probe.
 Do not count deployment-only pending checks as local passes.
 
+`link-crawl.spec.ts` measures each warm render as the best of 3 samples, not
+one; the JSON attachment keeps every sample (`warmSamples`) and the machine's
+`loadAverage` at capture time, so a slow machine stays visible without
+failing the budget on its own.
+
 ## Later authorized production proof
 
 After promotion, actual `/api/version` must report `mainCommit` and environment

@@ -181,7 +181,7 @@ describe("run", () => {
     );
 
     // Tables before the failure completed (HEAD + DELETE both fired)...
-    const completed = ["users", "metrics_snapshots", "verification_records"];
+    const completed = ["users"];
     for (const table of completed) {
       const tableCalls = calls.filter((c) => c.url.includes(`/${table}?`));
       expect(tableCalls.map((c) => c.method)).toEqual(["HEAD", "DELETE"]);
@@ -420,6 +420,12 @@ function scanMigrations(): { tables: Map<string, Set<string>>; views: Set<string
       }
       if (columns.size > 0) tables.set(table, columns);
     }
+
+    // A later migration can drop a table (059 dropped metrics_snapshots and
+    // verification_records); it is no longer part of the schema.
+    for (const m of sql.matchAll(/drop\s+table\s+(?:if\s+exists\s+)?(?:public\.)?([a-z0-9_]+)/gi)) {
+      tables.delete(m[1].toLowerCase());
+    }
   }
 
   return { tables, views };
@@ -446,7 +452,6 @@ describe("SUPABASE_TABLES", () => {
       "campaign_sends.handle",
       "merge_operations.source_handle",
       "merge_operations.target_handle",
-      "metrics_snapshots.handle",
       "report_craft_reports.owner_handle",
       "report_craft_selection.owner_handle",
       "scoring_collection_jobs.owner_handle",
@@ -470,7 +475,6 @@ describe("SUPABASE_TABLES", () => {
       "tool_insights.handle",
       "user_platforms.handle",
       "users.handle",
-      "verification_records.handle",
     ]);
   });
 

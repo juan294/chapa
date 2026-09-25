@@ -5,8 +5,8 @@ import {
 } from "@chapa/shared";
 import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
-  validateSliceWindow, type MutableSliceOperation,
+  assembleSliceCoverage, buildSliceCheckpoint, computeDiscoveryComplete, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory,
+  newSliceEvents, validateSliceWindow, type MutableSliceOperation,
 } from "@/lib/collection/slice-helpers";
 import {
   budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder,
@@ -95,6 +95,14 @@ interface GitHubPrMeta {
 }
 type MutableCollectorOperation = MutableSliceOperation;
 interface ListOutcome { readonly kind: "done" | "stop" | "split"; readonly stop?: SourceDiagnostic; readonly totalCount?: number | null }
+/** Outcome of a commit-history page-size ladder retry (#1351). `recovered`
+ * carries the page data the smaller/no-line-count query returned, so the
+ * caller processes it exactly like a normal successful page.
+ */
+type LadderOutcome =
+  | { readonly kind: "recovered"; readonly data: ObjectData }
+  | { readonly kind: "absorbed" }
+  | { readonly kind: "stop"; readonly stop: SourceDiagnostic };
 
 const RATE_LIMIT_FLOOR = 200;
 
@@ -121,7 +129,25 @@ function fillNullNodes(primary: ObjectData, fallback: ObjectData, path: readonly
   return rebuilt;
 }
 
+/** A gateway or server failure (HTTP 5xx), the only stop the commits ladder retries. */
+function isServerError(stop: SourceDiagnostic): boolean { return stop.stopKind === "http" && (stop.httpStatus ?? 0) >= 500; }
+
 const COMMIT_HISTORY_SINCE_MARGIN_MS = 30 * 86_400_000;
+// A commit page whose line counts GitHub cannot compute inside its gateway
+// timeout answers 502, even at first:50 (measured 2026-09-25, evidence file
+// phase-4-commits-502.md). Retry the same page smaller, then without line
+// counts, before absorbing that repository's history as partial coverage.
+const COMMIT_PAGE_LADDER = [50, 20, 10] as const;
+const COMMIT_LADDER_ABSORB_AFTER = 3;
+
+/** Operations that can still add operations (contract: `computeDiscoveryComplete`,
+ * #1342). From this file's call sites: `repositories`/`contributed` register
+ * discovered repositories; `merged:*` registers a PR's repository, queues a
+ * `files:` operation, and can split into two more `merged:*` ranges;
+ * `reviewDiscovery` registers a reviewed PR's repository and queues a
+ * `reviews:` operation. `profile`, `files:*`, `reviews:*` and `commits:*`
+ * never add operations. */
+export const GITHUB_EXPANDING_OPERATIONS = ["repositories", "contributed", "reviewDiscovery", "merged:"] as const;
 
 export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
@@ -144,15 +170,18 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   const effectiveToken = credential.token?.trim() || undefined;
   let requestCount = 0;
 
-  const operations: MutableCollectorOperation[] = checkpoint.operations.map((op) => ({ key: op.key, cursor: op.cursor, done: op.done }));
+  // Checkpoints written before the issue-closure scan was dropped (2026-09-25,
+  // #1351) can still hold `issues:`/`closures:` operations. Drop them on load.
+  // Safe to delete once no job from before that release can still be running.
+  const operations: MutableCollectorOperation[] = checkpoint.operations
+    .filter((op) => !op.key.startsWith("issues:") && !op.key.startsWith("closures:"))
+    .map((op) => ({ key: op.key, cursor: op.cursor, done: op.done }));
   const repositoryIds = new Set(checkpoint.discovered.repositoryIds);
   const state: Record<string, unknown> = { ...(checkpoint.state ?? {}) };
   const prMeta: Record<string, GitHubPrMeta> = { ...((state.pr as Record<string, GitHubPrMeta> | undefined) ?? {}) };
   state.pr = prMeta;
-  const issueRepo: Record<string, string> = { ...((state.issueRepo as Record<string, string> | undefined) ?? {}) };
-  state.issueRepo = issueRepo;
+  delete state.issueRepo; // drop the legacy map from resumed checkpoints
   const reasons = new Set<EvidenceReasonCode>((state.reasons as EvidenceReasonCode[] | undefined) ?? []);
-  const seededDataThrough = state.seededDataThrough as string | null | undefined;
   const newEvents = new Map<string, NormalizedEngineeringEvent>();
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
@@ -162,7 +191,6 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     if (repositoryIds.has(repositoryId)) return;
     repositoryIds.add(repositoryId);
     ensureOp(`commits:${repositoryId}`);
-    ensureOp(`issues:${repositoryId}`);
   }
   function addEvent(event: NormalizedEngineeringEvent): void { newEvents.set(engineeringEventKey(event), event); }
   function inWindow(date: unknown, operation: keyof typeof queries): boolean {
@@ -214,21 +242,35 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
    * half-range operations instead of hitting GitHub search's 1,000-node cap.
    */
   async function runPagedList(
-    op: MutableCollectorOperation, queryName: keyof typeof queries, variables: Record<string, unknown>, path: readonly string[],
+    op: MutableCollectorOperation, queryName: keyof typeof queries, variables: Record<string, unknown> | (() => Record<string, unknown>), path: readonly string[],
     onNode: (node: ObjectData) => void,
     options: {
       readonly search?: boolean; readonly onPage?: (data: ObjectData) => void; readonly emptyOk?: (data: ObjectData) => boolean;
       /** The same query without line counts, to recover nodes GitHub nulled because it could not count their lines. */
       readonly withoutLineCounts?: keyof typeof queries;
+      /** Runs when a page answers an HTTP 5xx, so the caller can retry it
+       * smaller or absorb the operation instead of stopping the whole slice
+       * (#1351, commit-history page-size ladder). */
+      readonly onServerError?: (cursor: string | null) => Promise<LadderOutcome>;
     } = {},
   ): Promise<ListOutcome> {
     let cursor = op.cursor;
     let isFirstFetch = cursor === null;
     for (;;) {
-      let r = await request(queryName, { ...variables, after: cursor });
+      // A thunk lets the commits ladder read its current (possibly reduced)
+      // page size fresh on every page, instead of the fixed object every
+      // other caller passes.
+      const pageVariables = typeof variables === "function" ? variables() : variables;
+      let r = await request(queryName, { ...pageVariables, after: cursor });
       if (r.lineCountsUnavailable && options.withoutLineCounts) {
-        const fallback = await request(options.withoutLineCounts, { ...variables, after: cursor });
+        const fallback = await request(options.withoutLineCounts, { ...pageVariables, after: cursor });
         r = fallback.stop ? fallback : { data: fillNullNodes(r.data, fallback.data, path), stop: null };
+      }
+      if (r.stop && isServerError(r.stop) && options.onServerError) {
+        const ladder = await options.onServerError(cursor);
+        if (ladder.kind === "recovered") r = { data: ladder.data, stop: null };
+        else if (ladder.kind === "absorbed") { op.done = true; op.cursor = null; return { kind: "done", totalCount: null }; }
+        else { op.cursor = cursor; return { kind: "stop", stop: ladder.stop }; }
       }
       options.onPage?.(r.data);
       if (!r.stop && options.emptyOk?.(r.data)) { op.done = true; op.cursor = null; return { kind: "done", totalCount: 0 }; }
@@ -407,7 +449,43 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     }
     if (op.key.startsWith("commits:")) {
       const repositoryId = op.key.slice("commits:".length);
-      const outcome = await runPagedList(op, "commits", { id: repositoryId, subjectId: subjectId(), since: commitHistorySince }, ["node", "defaultBranchRef", "target", "history"], (node) => {
+      // Per-op page size and ladder-failure bookkeeping, carried in checkpoint
+      // state across slices (#1351). Reduced once a smaller size works;
+      // failures count separate ladder exhaustions, reset on any success.
+      const commitPageSizes: Record<string, number> = (state.commitPageSize as Record<string, number> | undefined) ?? {};
+      state.commitPageSize = commitPageSizes;
+      const commitLadderFailures: Record<string, number> = (state.commitLadderFailures as Record<string, number> | undefined) ?? {};
+      state.commitLadderFailures = commitLadderFailures;
+      const commitQueryVariables = (first: number) => ({ id: repositoryId, subjectId: subjectId(), since: commitHistorySince, first });
+      /** Retries the failing page at each smaller ladder size, then without
+       * line counts at the smallest size. Absorbs the whole operation as
+       * partial coverage after COMMIT_LADDER_ABSORB_AFTER separate failed
+       * ladders. Any other stop (budget, deadline, rate limit, ...) mid-ladder
+       * propagates immediately and is never counted as a ladder failure. */
+      async function retryCommitsLadder(cursor: string | null): Promise<LadderOutcome> {
+        const currentSize = commitPageSizes[op.key] ?? COMMIT_PAGE_LADDER[0];
+        for (const size of COMMIT_PAGE_LADDER.filter((candidate) => candidate < currentSize)) {
+          const r = await request("commits", { ...commitQueryVariables(size), after: cursor });
+          if (!r.stop) { commitPageSizes[op.key] = size; return { kind: "recovered", data: r.data }; }
+          if (!isServerError(r.stop)) return { kind: "stop", stop: r.stop };
+        }
+        const smallest = COMMIT_PAGE_LADDER.at(-1)!;
+        const fallback = await request("commitsWithoutLines", { ...commitQueryVariables(smallest), after: cursor });
+        if (!fallback.stop) { commitPageSizes[op.key] = smallest; return { kind: "recovered", data: fallback.data }; }
+        if (!isServerError(fallback.stop)) return { kind: "stop", stop: fallback.stop };
+        const failures = (commitLadderFailures[op.key] ?? 0) + 1;
+        if (failures >= COMMIT_LADDER_ABSORB_AFTER) {
+          reasons.add("source_error");
+          delete commitPageSizes[op.key];
+          delete commitLadderFailures[op.key];
+          return { kind: "absorbed" };
+        }
+        commitLadderFailures[op.key] = failures;
+        // Every size failed: the next slice starts at the smallest one.
+        commitPageSizes[op.key] = smallest;
+        return { kind: "stop", stop: fallback.stop };
+      }
+      const outcome = await runPagedList(op, "commits", () => commitQueryVariables(commitPageSizes[op.key] ?? COMMIT_PAGE_LADDER[0]), ["node", "defaultBranchRef", "target", "history"], (node) => {
         const authorId = string(at(node, "author", "user", "id"));
         if (!authorId) { reasons.add("attribution_unknown"); return; }
         if (authorId !== subjectId()) return;
@@ -422,58 +500,17 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
           measurements: { ...emptyMeasurements(), additions: observedNumber(node.additions), deletions: observedNumber(node.deletions) },
           categories: [], acceptance: unknown("unavailable", "acceptance_time_unknown"),
         });
-      }, { emptyOk: (data) => at(data, "node", "isEmpty") === true && at(data, "node", "defaultBranchRef") === null, withoutLineCounts: "commitsWithoutLines" });
-      if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
-      return "done";
-    }
-    if (op.key.startsWith("issues:")) {
-      const repositoryId = op.key.slice("issues:".length);
-      const since = seededDataThrough && seededDataThrough > window.startInclusive ? seededDataThrough : window.startInclusive;
-      const outcome = await runPagedList(op, "issues", { id: repositoryId, since }, ["node", "issues"], (node) => {
-        const issueId = string(node.id); if (!issueId) { reasons.add("not_accessible"); return; }
-        issueRepo[issueId] = repositoryId;
-        ensureOp(`closures:${issueId}`);
+      }, {
+        emptyOk: (data) => at(data, "node", "isEmpty") === true && at(data, "node", "defaultBranchRef") === null,
+        withoutLineCounts: "commitsWithoutLines",
+        onServerError: retryCommitsLadder,
+        // A page that returns real history data, from any source (the normal
+        // request, the line-counts-unavailable fallback, or the ladder),
+        // resets the failure counter -- a later slice made progress.
+        onPage: (data) => { if (Array.isArray(object(at(data, "node", "defaultBranchRef", "target", "history")).nodes)) delete commitLadderFailures[op.key]; },
       });
       if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
-      return "done";
-    }
-    if (op.key.startsWith("closures:")) {
-      const issueId = op.key.slice("closures:".length);
-      const repositoryId = issueRepo[issueId];
-      const outcome = await runPagedList(op, "closures", { id: issueId }, ["node", "timelineItems"], (node) => {
-        const actorId = string(at(node, "actor", "id"));
-        if (!actorId) { reasons.add("attribution_unknown"); return; }
-        if (actorId !== subjectId()) return;
-        const closureId = string(node.id); if (!closureId) { reasons.add("not_accessible"); return; }
-        if (!inWindow(node.createdAt, "closures")) return;
-        if (!repositoryId) { reasons.add("not_accessible"); return; }
-        const closer = object(node.closer);
-        const closerId = string(closer.id);
-        const linkedId = closer.__typename === "PullRequest" && closer.merged === true ? closerId : null;
-        const authoredResult = linkedId !== null && string(at(closer, "author", "id")) === subjectId();
-        const occurredAt = scoringInstant(String(node.createdAt)).toISOString();
-        const workItemId = linkedId ? `github:${linkedId}` : `github:${issueId}`;
-        addEvent({
-          schemaVersion: "v7", provider: "github", host: "github.com", subjectId: subjectId()!, actorId: subjectId()!,
-          repositoryId, eventId: closureId, kind: "issue_work", occurredAt, dataThrough: window.referenceTime,
-          canonicalProjectId: `github:${repositoryId}`, workItemId, artifactRevision: closureId,
-          artifactReferenceIds: [`github:${closureId}`, ...(closerId ? [`github:${closerId}`] : [])],
-          attribution: "individual", provenance: "source_observed", coverage: "complete",
-          measurements: emptyMeasurements(), categories: [], acceptance: unknown("partial", "attribution_unknown"),
-        });
-        if (!authoredResult) reasons.add("attribution_unknown");
-        if (closer.__typename && closer.__typename !== "PullRequest") reasons.add("not_supported");
-        if (authoredResult && linkedId) {
-          const linkedWorkItemId = `github:${linkedId}`;
-          const linkedRepo = string(at(closer, "repository", "id"));
-          if (linkedRepo && (!explicit || repositoryIds.has(linkedRepo)) && !prMeta[linkedWorkItemId]) {
-            prMeta[linkedWorkItemId] = { repositoryId: linkedRepo, mergedAt: string(closer.mergedAt), revision: string(closer.headRefOid) ?? linkedId };
-            registerRepo(linkedRepo);
-            ensureOp(`files:${linkedWorkItemId}`);
-          }
-        }
-      });
-      if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+      delete commitPageSizes[op.key];
       return "done";
     }
     op.done = true;
@@ -501,27 +538,30 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
 
   function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
   function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
+  const discoveryComplete = computeDiscoveryComplete(operations, GITHUB_EXPANDING_OPERATIONS);
 
   if (pendingStop) {
-    return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
+    return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount, discoveryComplete };
   }
 
   // Every operation is done: assemble coverage from operations/reasons.
   if (!explicit) reasons.add("discovery_incomplete");
   reasons.add("acceptance_time_unknown");
   const commitsComplete = operations.filter((op) => op.key.startsWith("commits:")).every((op) => op.done);
-  const issuesComplete = operations.filter((op) => op.key.startsWith("issues:") || op.key.startsWith("closures:")).every((op) => op.done);
   const unidentified = ["not_accessible", "source_error", "attribution_unknown", "pagination_incomplete"].some((reason) => reasons.has(reason as EvidenceReasonCode));
   const eventKinds: SourceCoverage["eventKinds"] = {
     accepted_change: "partial",
     authored_commit: explicit && !unidentified && commitsComplete ? "complete" : "partial",
     review: "partial",
-    issue_work: explicit && !unidentified && issuesComplete ? "complete" : "partial",
+    // GitHub issue closures are not collected (#1351): every issue_work event
+    // this scan could produce was inadmissible for scoring (v7-evidence.ts's
+    // acceptedKind never accepts one), so there is nothing to report here.
+    issue_work: "unavailable",
     practice_evidence: "unavailable", documentation_design: "unavailable", maintenance: "unavailable",
   };
   reasons.add("not_supported");
   const coverage = assembleSliceCoverage({
     provider: "github", host: "github.com", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
   });
-  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
+  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount, discoveryComplete };
 };

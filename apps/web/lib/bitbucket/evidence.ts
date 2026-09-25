@@ -5,8 +5,8 @@ import {
 } from "@chapa/shared";
 import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
-  validateSliceWindow, type MutableSliceOperation,
+  assembleSliceCoverage, buildSliceCheckpoint, computeDiscoveryComplete, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory,
+  newSliceEvents, validateSliceWindow, type MutableSliceOperation,
 } from "@/lib/collection/slice-helpers";
 import {
   budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
@@ -58,6 +58,18 @@ function commitsPath(repositoryId: string, sinceIso: string): string {
   url.searchParams.set("q", `date>=${sinceIso}`);
   return url.toString();
 }
+
+/** Operations that can still add operations (contract: `computeDiscoveryComplete`,
+ * #1342). From this file's call sites: `workspaces` queues a `workspace-repos:`
+ * operation per workspace; `workspace-repos:*` registers each discovered
+ * repository (which itself queues `commits:`/`pullrequests:`); `pullrequests:*`
+ * queues an `activity:` operation per PR; `activity:*` conditionally queues a
+ * `diffstat:` operation once a PR turns out merged and authored by the
+ * subject with a resolvable merge date; `diffstat:*` conditionally queues a
+ * `diff:` operation on its clean-redirect success path (its `not_accessible`
+ * and malformed-redirect paths emit the event directly instead). `profile`,
+ * `commits:*` and `diff:*` never add operations. */
+export const BITBUCKET_EXPANDING_OPERATIONS = ["workspaces", "workspace-repos:", "pullrequests:", "activity:", "diffstat:"] as const;
 
 export const collectBitbucketSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
@@ -425,8 +437,9 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
 
   function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
   function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
+  const discoveryComplete = computeDiscoveryComplete(operations, BITBUCKET_EXPANDING_OPERATIONS);
 
-  if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
+  if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount, discoveryComplete };
 
   if (!explicit) reasons.add("discovery_incomplete");
   reasons.add("acceptance_time_unknown"); reasons.add("not_supported");
@@ -440,5 +453,5 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
   const coverage = assembleSliceCoverage({
     provider: "bitbucket", host: "bitbucket.org", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
   });
-  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
+  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount, discoveryComplete };
 };

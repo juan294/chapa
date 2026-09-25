@@ -34,6 +34,12 @@ describe("postWriteScore (#1335 phase 5: v7.2 is the one rendered policy)", () =
     mockReadScoringStatus.mockResolvedValue(null);
     expect(await postWriteScore("alice")).toBeNull();
   });
+
+  // #1342 -- a still-discovering job reports percent: null, not a number.
+  it("passes through a null percent when collection is still discovering", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: null, sources: [], hasPriorReceipt: false });
+    expect(await postWriteScore("alice")).toMatchObject({ kind: "collecting", percent: null });
+  });
 });
 
 describe("enqueueAndReportScoringStatus (#1335 phase 4/5: the enqueue-then-report shape shared by refresh/recalculate/generate)", () => {
@@ -43,6 +49,13 @@ describe("enqueueAndReportScoringStatus (#1335 phase 4/5: the enqueue-then-repor
     expect(mockEnqueueCollection).toHaveBeenCalledWith("alice", "refresh");
     expect(mockScheduleCollectionAdvance).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ kind: "collecting", percent: 40 });
+  });
+
+  // #1342 -- a still-discovering job reports percent: null, not a number.
+  it("passes through a null percent when collection is still discovering", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: null, sources: [], hasPriorReceipt: false });
+    const result = await enqueueAndReportScoringStatus("alice", "refresh");
+    expect(result).toMatchObject({ kind: "collecting", percent: null });
   });
 
   it("passes the reason through unchanged (e.g. generate's signup vs refresh's refresh)", async () => {

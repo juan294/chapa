@@ -11,9 +11,14 @@
  */
 const CEILING_SECONDS = 64 * 60;
 
-/** Total attempts a transient (5xx/429/network) failure gets before the job
- * becomes terminally `failed`. A protocol/parse failure uses a stricter
- * budget of its own (3), enforced by the worker, not here.
+/** Total attempts a transient (5xx/network) failure gets, since the job's
+ * last progress, before it becomes terminally `failed`. Migration 058
+ * (#1351 phase 3) redefines `job.attempt` as "failures since the last
+ * progress": a `rate_limited` stop never counts against this budget, and a
+ * checkpoint that advances `operationsDone` resets it to 0, so this budget
+ * is spent only by repeated failures with no progress between them. A
+ * protocol/parse failure uses a stricter budget of its own (3), enforced by
+ * the worker, not here.
  */
 export const MAX_COLLECTION_ATTEMPTS = 8;
 

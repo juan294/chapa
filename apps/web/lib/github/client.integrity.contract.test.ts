@@ -26,7 +26,7 @@ function isGitHubApiRequest(input: unknown): boolean {
 async function cleanup() {
   const db = getServiceClient();
   for (const handle of handles) {
-    for (const [table, column] of [["metrics_snapshots", "handle"], ["supplemental_stats", "target_handle"]] as const) {
+    for (const [table, column] of [["supplemental_stats", "target_handle"]] as const) {
       expect((await db.from(table).delete().eq(column, handle)).error).toBeNull();
     }
   }

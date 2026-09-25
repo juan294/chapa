@@ -45,8 +45,6 @@ import { loadConfig, type Config } from "./lib/env";
 export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; deletion?: "scoring_v7_rpc" }> =
   [
     { table: "users", column: "handle" },
-    { table: "metrics_snapshots", column: "handle" },
-    { table: "verification_records", column: "handle" },
     // Also removes platform_token_refresh_attempts through its mandatory
     // link_id -> user_platforms.id ON DELETE CASCADE (migration046). That
     // operational child has no handle column; do not filter its UUID by handle.

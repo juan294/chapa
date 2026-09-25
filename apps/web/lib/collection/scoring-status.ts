@@ -14,8 +14,11 @@ export type ProviderStatusReason = "reconnect" | "rate_limited" | "temporary" | 
 export interface ProviderStatus {
   readonly provider: SourceProvider;
   readonly state: CollectionJobState;
-  /** 0-100; capped at 99 until the job is complete. An estimate: discovery can grow the operation count. */
-  readonly percent: number;
+  /** 0-100; capped at 99 until the job is complete. Null while this job is
+   * still discovering (#1342) -- its operation count is not yet final, so a
+   * percentage would be able to move backwards. Once non-null it never
+   * decreases, because a job's operation count is fixed from that point on. */
+  readonly percent: number | null;
   /** ISO timestamp when a waiting or retrying job resumes. */
   readonly resumesAt?: string;
   /** 1-based retry attempt for a retrying job. */
@@ -27,7 +30,7 @@ export interface ProviderStatus {
 
 export type ScoringStatus =
   | { readonly kind: "unregistered" }
-  | { readonly kind: "collecting"; readonly percent: number; readonly sources: readonly ProviderStatus[]; readonly hasPriorReceipt: boolean }
+  | { readonly kind: "collecting"; readonly percent: number | null; readonly sources: readonly ProviderStatus[]; readonly hasPriorReceipt: boolean }
   | { readonly kind: "action_needed"; readonly sources: readonly ProviderStatus[]; readonly hasPriorReceipt: boolean }
   | { readonly kind: "ready"; readonly receiptDate: string; readonly updating: boolean };
 

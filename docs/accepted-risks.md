@@ -18,11 +18,11 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
-## Pending-migrations gate tolerates one migra artifact on the `admin_users` view chain (#1064)
+## Pending-migrations gate tolerates one migra artifact on the admin view (#1064)
 
-- **Risk:** `pnpm run check:pending-migrations` treats a schema diff consisting *solely* of exact drop/recreate pairs for `public.admin_users` and its `public.admin_users_observed` dependent, matching two pinned bodies, as clean. A change that normalized to precisely those definitions would pass unnoticed.
-- **Why accepted:** The tolerated text is what both views already are, so reaching it requires changing them to themselves. migra emits the `admin_users` block on every run against the production project even when nothing differs — verified read-only on 2026-08-11: production's `pg_get_viewdef('public.admin_users')` is textually identical to what `014_views_security_invoker.sql` produces, `pg_class.reloptions` is `{security_invoker=true}` as that migration sets, and the emitted block is byte-for-byte identical whether or not a migration recreates the view. After migration 052 added `admin_users_observed`, the same false-positive recreation must also drop and restore that exact dependent view. The linked-production diff after applying migrations 049-052 contains only this expanded view chain. No migration content can silence the underlying artifact, which is why `032_reconcile_remote_schema.sql` deliberately omits the view. Without this tolerance the gate blocks every release PR.
-- **Mitigation:** The tolerance is pinned to the exact view-chain statements, whitespace-normalized, in `TOLERATED_MIGRA_ARTIFACT` (`scripts/check-pending-migrations.ts`). Regression tests assert that the gate still blocks when the artifact is accompanied by any other statement, when either body genuinely changes, and when the same body shape appears under a different view name. Real drift in any other object is unaffected. The proper fix is replacing migra with schema introspection, tracked in #1064.
+- **Risk:** `pnpm run check:pending-migrations` treats a schema diff consisting *solely* of an exact drop/recreate of `public.admin_users_observed`, matching one pinned body, as clean. A change that normalized to precisely that definition would pass unnoticed.
+- **Why accepted:** The tolerated text is what both views already are, so reaching it requires changing them to themselves. migra emits the `admin_users` block on every run against the production project even when nothing differs — verified read-only on 2026-08-11: production's `pg_get_viewdef('public.admin_users')` is textually identical to what `014_views_security_invoker.sql` produces, `pg_class.reloptions` is `{security_invoker=true}` as that migration sets, and the emitted block is byte-for-byte identical whether or not a migration recreates the view. After migration 052 added `admin_users_observed`, the same false-positive recreation must also drop and restore that exact dependent view. The linked-production diff after applying migrations 049-052 contains only this expanded view chain. No migration content can silence the underlying artifact, which is why `032_reconcile_remote_schema.sql` deliberately omits the view. Without this tolerance the gate blocks every release PR. Migration 059 (v4.1.0, 2026-09-25) dropped `admin_users` and rebuilt `admin_users_observed` on `users`, so the artifact shrank to a two-statement drop/recreate of that view. It was verified read-only the same way: production's `pg_get_viewdef` matches 059 and `reloptions` is `{security_invoker=true}`.
+- **Mitigation:** The tolerance is pinned to the exact view statements, whitespace-normalized, in `TOLERATED_MIGRA_ARTIFACT` (`scripts/check-pending-migrations.ts`). Regression tests assert that the gate still blocks when the artifact is accompanied by any other statement, when the body genuinely changes, when the retired pre-059 chain reappears, and when the same body shape appears under a different view name. Real drift in any other object is unaffected. The proper fix is replacing migra with schema introspection, tracked in #1064.
 - **Severity:** Low (two admin-only views, pinned bodies, blocking behavior preserved everywhere else)
 - **Accepted:** 2026-08-11
 
@@ -442,6 +442,46 @@ zero-evidence heuristic needs a softer signal (e.g. distinguishing "definitely
 zero" from "defect" some other way) rather than a blanket refusal.
 
 **Refs:** #1335
+
+---
+
+## GitHub collection shares one server token with the owner's account (2026-09-25)
+
+**Risk / trade-off:** every GitHub collection job, for every owner on the
+platform, authenticates with the server `GITHUB_TOKEN`
+(`apps/web/lib/platform/source-context.ts:49`), never the requesting owner's
+own OAuth session token. That token belongs to the owner's own personal
+GitHub account (user ID 3944118, confirmed in the `gh` rate-limit error).
+Collection therefore shares one 5,000-point-per-hour GraphQL allowance with
+that account's own everyday `gh` CLI use. A large collection run can starve
+the owner's own terminal, and vice versa.
+
+**Why accepted:** phase 1 of #1351 removes the GitHub issue-closure scan
+(`issues:`/`closures:` operations), which was 203,544 of about 206,000 known
+GitHub operations in unfinished jobs on 2026-09-24 and produced no scoring
+effect (`acceptedKind` in `lib/impact/v7-evidence.ts` never accepts an
+`issue_work` event this scan could produce). That reduces the largest
+observed jobs (w-winter, bbezerra82, awizemann) from 30,000-74,000 operations
+to under about 3,000, which is close to the whole hourly allowance rather than
+several multiples of it. A dedicated token pool, a GitHub App or a bot account
+(#1346) would remove the shared-allowance risk entirely. The owner chose on
+2026-09-25 to keep the shared token, because the reduction alone is expected
+to keep jobs finishing within one day.
+
+**Mitigation:** `/api/health`'s `scoringQueue` block and the
+`scoring_queue_stuck` alert (`docs/runbooks/scoring-collection-queue.md`)
+surface a job that cannot make progress, including one starved by allowance
+exhaustion. `gh api rate_limit` misreports this allowance (it does not reflect
+the GraphQL points this token actually spends); read the live
+`X-Ratelimit-Remaining` and `X-Ratelimit-Reset` headers from
+`gh api graphql -i` instead.
+
+**Revisit if:** a job cannot finish collection within one day, or the shared
+allowance is observed exhausted routinely rather than only under simultaneous
+heavy `gh` use. That would mean phase 1's reduction was not enough and #1346
+(a token pool, GitHub App, or bot account) needs to be taken up.
+
+**Refs:** #1351, #1346
 
 ## Review schedule
 

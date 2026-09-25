@@ -142,7 +142,7 @@ reads the flag.
 
 The tables, views and columns this plan retires (`metrics_snapshots`,
 `verification_records`, `latest_snapshots`, `admin_users`, the consent columns and
-the flag row) are dropped by `057_contract_v6_and_consent.sql`. That migration
+the flag row) are dropped by `059_contract_v6_and_consent.sql`. That migration
 first rebuilds `admin_users_observed` from `users` so the dependent views can be
 dropped. It ships in a follow-up release, after production is confirmed to be
 running the new code (expand-migrate-contract, `docs/runbooks/migrations.md:203-215`).
@@ -150,3 +150,8 @@ It is kept out of the first release because the release PR's pending-migrations
 gate requires the repository to match the production schema. Applying it is a
 production action that needs its own explicit authorization; it has not been run
 as of this document.
+
+Update 2026-09-25: production had run v4 code (v4.0.0 to v4.0.6) that reads none
+of these objects, so the owner chose to merge the file into `develop` (#1351). It
+ships with the next release together with `058_collection_attempt_policy.sql`.
+After it is applied, a rollback to v3 code is no longer possible.

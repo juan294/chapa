@@ -46,6 +46,12 @@ export interface SliceResult {
   readonly checkpoint: CollectorCheckpoint;
   /** Every operation in the checkpoint is complete. */
   readonly done: boolean;
+  /** No not-done operation can add operations. Once true for a job, its
+   * operation count is final -- a surface can start showing a percentage
+   * instead of "discovering" (#1342). Computed fresh from the checkpoint's
+   * current operations on every return path, never persisted as its own
+   * flag, so it always reflects the exact operations this result carries. */
+  readonly discoveryComplete: boolean;
   /** Present only when `done`; assembled from checkpoint operations and
    * reasons, never from staged event content (see `CollectSlice`). */
   readonly coverage: SourceCoverage | null;
