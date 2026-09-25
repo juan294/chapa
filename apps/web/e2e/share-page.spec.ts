@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { switchLocale } from "./helpers/locale-switch";
 
 // Use domcontentloaded instead of the default "load" event. The share page
 // embeds <img src="/u/:handle/badge.svg"> which triggers a second GitHub API
@@ -60,10 +61,8 @@ test.describe("Share page — /u/:handle", () => {
     await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(page.getByRole("img", { name: "Chapa de octocat" })).toBeAttached();
 
-    await page.getByRole("button", { name: "ES", exact: true }).click();
-    await page.getByRole("option", { name: "English" }).click();
+    await switchLocale(page, "ES", "English", smokeProfilePath);
 
-    await expect(page).toHaveURL(smokeProfilePath);
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
@@ -143,14 +142,12 @@ test.describe("Share page — /u/:handle", () => {
       page.getByRole("img", { name: "Chapa badge for octocat" }),
     ).toBeAttached();
 
-    await page.getByRole("button", { name: "EN", exact: true }).click();
-    await page.getByRole("option", { name: "Español" }).click();
-    await expect(page).toHaveURL(spanishPath);
+    await switchLocale(page, "EN", "Español", spanishPath);
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
     await expect(page.getByRole("img", { name: "Chapa de octocat" })).toBeAttached();
 
-    await page.getByRole("button", { name: "ES", exact: true }).click();
-    await page.getByRole("option", { name: "English" }).click();
-    await expect(page).toHaveURL(englishPath);
+    await switchLocale(page, "ES", "English", englishPath);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(
       page.getByRole("img", { name: "Chapa badge for octocat" }),
     ).toBeAttached();

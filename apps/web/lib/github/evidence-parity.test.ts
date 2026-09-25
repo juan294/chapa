@@ -55,8 +55,6 @@ function mockApi(overrides: Record<string, Handler> = {}) {
     V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([{ isRestricted: false, pullRequest: pr() }]) } } }),
     V7Reviews: () => ({ node: { reviews: page([{ id: "REV1", author: actor, submittedAt: "2026-09-03T00:00:00Z", state: "COMMENTED" }]) } }),
     V7Commits: () => ({ node: { defaultBranchRef: { target: { history: page([{ id: "C1", oid: "sha1", author: { user: actor }, authoredDate: "2026-09-02T00:00:00Z", additions: 1, deletions: 0 }, { id: "C2", oid: "sha2", author: { user: { id: "U2" } }, authoredDate: "2026-09-02T00:00:00Z" }]) } } } }),
-    V7Issues: () => ({ node: { issues: page([{ id: "I1", repository: repo }, { id: "I2", repository: repo }]) } }),
-    V7Closures: ({ id }) => ({ node: { timelineItems: page(id === "I1" ? [{ id: "CLOSE1", actor, createdAt: "2026-09-04T00:00:00Z", closer: null }] : []) } }),
     ...overrides,
   };
   const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
@@ -98,7 +96,6 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
         V7MergedChanges: { search: { ...page([pr()]), issueCount: 1 } },
         V7ReviewDiscovery: { user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } },
         V7Commits: { node: { isEmpty: true, defaultBranchRef: null } },
-        V7Issues: { node: { issues: page([]) } },
       };
       const result = handlers[operation];
       if (!result) throw new Error(`Unexpected operation ${operation}`);
@@ -212,11 +209,6 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
     const result = await runToCompletion();
     expect(result.events.some((e) => e.kind === "authored_commit")).toBe(false);
   });
-  it("classifies an unparseable issue-closure date as a parse stop", async () => {
-    mockApi({ V7Closures: ({ id }) => ({ node: { timelineItems: page(id === "I1" ? [{ id: "CLOSE1", actor, createdAt: "", closer: null }] : []) } }) });
-    const result = await runToCompletion();
-    expect(result.events.some((e) => e.kind === "issue_work")).toBe(false);
-  });
   it("a rate-limited V7Files response stops the slice as rate_limited (the old test's search-cap case, minus the removed 1,000-node cap)", async () => {
     mockApi({ V7Files: () => new Response("rate limited", { status: 429 }) });
     const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
@@ -250,11 +242,6 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
     const result = await runToCompletion();
     expect(result.events.filter((e) => e.kind === "review").map((e) => e.eventId).sort()).toEqual(["first", "second"]);
   });
-  it("does not attribute another person's closures or an unresolved opening to the subject", async () => {
-    mockApi({ V7Closures: () => ({ node: { timelineItems: page([{ id: "not-mine", actor: { id: "U2" }, createdAt: "2026-09-02T00:00:00Z" }]) } }) });
-    const result = await runToCompletion();
-    expect(result.events.filter((e) => e.kind === "issue_work")).toEqual([]);
-  });
   it("rejects future events and preserves restricted/null-node coverage", async () => {
     mockApi({
       V7MergedChanges: () => ({ search: { ...page([null, { ...pr(), mergedAt: "2026-09-05T13:00:00Z" }]), issueCount: 2 } }),
@@ -264,14 +251,6 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
     expect(result.events.some((e) => e.kind === "accepted_change")).toBe(false);
     expect(result.coverage.reasonCodes).toContain("not_accessible");
     expect(result.coverage.eventKinds.review).toBe("partial");
-  });
-  it("keeps a closure's actual date separate from its linked accepted-result date", async () => {
-    mockApi({ V7Closures: ({ id }) => ({ node: { timelineItems: page(id === "I1" ? [{ id: "CLOSE1", actor, createdAt: "2026-09-04T00:00:00Z", closer: { ...pr("OTHER-PR"), mergedAt: "2026-09-03T00:00:00Z" } }] : []) } }) });
-    const result = await runToCompletion();
-    expect(result.events.find((e) => e.eventId === "CLOSE1")?.occurredAt).toBe("2026-09-04T00:00:00.000Z");
-    const accepted = result.events.find((e) => e.eventId === "OTHER-PR");
-    expect(accepted?.acceptance).toMatchObject({ status: "observed", value: { acceptedAt: accepted?.occurredAt, acceptedResultId: "github:OTHER-PR" } });
-    expect(accepted?.workItemId).toBe("github:OTHER-PR");
   });
   it("retains a successfully collected page's cursor and resumes from the failed request instead of restarting", async () => {
     let after2Calls = 0;
@@ -304,7 +283,6 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
       V7MergedChanges: () => ({ search: { ...page([]), issueCount: 0 } }),
       V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } }),
       V7Commits: () => ({ node: { isEmpty: true, defaultBranchRef: null } }),
-      V7Issues: () => ({ node: { issues: page([]) } }),
     });
     const result = await runToCompletion(explicitInput);
     expect(result.events).toEqual([]);
@@ -322,32 +300,11 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
       V7MergedChanges: () => ({ search: { ...page([]), issueCount: 0 } }),
       V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } }),
       V7Commits: () => ({ node: { isEmpty: true, defaultBranchRef: null } }),
-      V7Issues: () => ({ node: { issues: page([]) } }),
     });
     const result = await runToCompletion(explicitInput);
     expect(result.coverage.status).toBe("partial");
     expect(result.coverage.unknownPeriods).toHaveLength(1);
     expect(result.coverage.reasonCodes).toContain("not_supported");
-  });
-  it.each([
-    { ...pr("OTHER"), author: { id: "U2" } },
-    { __typename: "Commit", id: "COMMIT-CLOSER" },
-    { __typename: "ProjectV2", id: "PROJECT-CLOSER" },
-  ])("does not credit someone else's accepted work or an unsupported closer $id", async (closer) => {
-    mockApi({ V7Closures: ({ id }) => ({ node: { timelineItems: page(id === "I1" ? [{ id: "CLOSE1", actor, createdAt: "2026-09-04T00:00:00Z", closer }] : []) } }) });
-    const result = await runToCompletion();
-    expect(result.events.some((e) => e.eventId === closer.id)).toBe(false);
-    const diagnostic = result.events.find((e) => e.eventId === "CLOSE1");
-    expect(diagnostic?.acceptance).toMatchObject({ status: "unknown", reasonCode: "attribution_unknown" });
-    expect(diagnostic?.artifactReferenceIds).toContain(`github:${closer.id}`);
-    expect(diagnostic?.categories).toEqual([]);
-    expect(result.coverage.reasonCodes).toContain("attribution_unknown");
-  });
-  it("deduplicates a source-authored linked PR and closure under the same work-item identity", async () => {
-    mockApi({ V7Closures: ({ id }) => ({ node: { timelineItems: page(id === "I1" ? [{ id: "CLOSE1", actor, createdAt: "2026-09-04T00:00:00Z", closer: pr() }] : []) } }) });
-    const result = await runToCompletion();
-    expect(result.events.find((e) => e.eventId === "CLOSE1")?.workItemId).toBe("github:PR1");
-    expect(result.events.filter((e) => e.kind === "accepted_change" && e.workItemId === "github:PR1")).toHaveLength(1);
   });
   it("does not infer a feature branch and leaves empty approvals unassessed with no category credit", async () => {
     mockApi({ V7Reviews: () => ({ node: { reviews: page([{ id: "APPROVAL", author: actor, submittedAt: "2026-09-03T00:00:00Z", state: "APPROVED", body: "", comments: { totalCount: 0 } }]) } }) });
@@ -369,7 +326,6 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
       V7MergedChanges: () => ({ search: { ...page([]), issueCount: 0 } }),
       V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } }),
       V7Commits: () => ({ node: { defaultBranchRef: { target: { history: page([{ id: "OLD", oid: "old-sha", author: { user: actor }, authoredDate: "2020-01-01T00:00:00Z" }]) } } } }),
-      V7Issues: () => ({ node: { issues: page([]) } }),
     });
     const result = await runToCompletion(explicitInput);
     expect(result.events).toEqual([]);

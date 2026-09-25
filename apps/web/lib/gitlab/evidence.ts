@@ -5,8 +5,8 @@ import {
 } from "@chapa/shared";
 import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
-  validateSliceWindow, type MutableSliceOperation,
+  assembleSliceCoverage, buildSliceCheckpoint, computeDiscoveryComplete, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory,
+  newSliceEvents, validateSliceWindow, type MutableSliceOperation,
 } from "@/lib/collection/slice-helpers";
 import {
   budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
@@ -60,6 +60,19 @@ interface GitlabMrMeta {
 }
 type MutableGitlabOperation = MutableSliceOperation;
 interface GitlabListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
+
+/** Operations that can still add operations (contract: `computeDiscoveryComplete`,
+ * #1342). From this file's call sites: `projects:owned`/`projects:contributed`
+ * register each discovered project; `authored_merged` and `merge_requests:*`
+ * both route every node through `registerMr`, which registers the MR's
+ * project, always queues a `notes:` operation, and -- when the MR is merged
+ * and authored by the subject -- queues a `details:` operation too;
+ * `details:*` queues a `diffs:` operation on its success path (the
+ * `not_accessible` absorb path emits the event directly, with no new
+ * operation); `issues:*` queues a `resource_state_events:` operation per
+ * issue. `profile`, `emails`, `diffs:*`, `notes:*`, `commits:*` and
+ * `resource_state_events:*` never add operations. */
+export const GITLAB_EXPANDING_OPERATIONS = ["projects:owned", "projects:contributed", "authored_merged", "merge_requests:", "details:", "issues:"] as const;
 
 /** Bounds an otherwise-unbounded commit history to the scoring window via
  * GitLab's native `since`/`until` commit list filters, per #1335 phase 3.
@@ -414,8 +427,9 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
 
   function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons, { verifiedEmails: [...verifiedEmails] }); }
   function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
+  const discoveryComplete = computeDiscoveryComplete(operations, GITLAB_EXPANDING_OPERATIONS);
 
-  if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
+  if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount, discoveryComplete };
 
   if (verifiedEmails.size === 0) reasons.add("attribution_unknown");
   if (!explicit) reasons.add("discovery_incomplete");
@@ -433,5 +447,5 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
   const coverage = assembleSliceCoverage({
     provider: "gitlab", host: "gitlab.com", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
   });
-  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
+  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount, discoveryComplete };
 };

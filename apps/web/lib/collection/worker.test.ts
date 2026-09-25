@@ -58,7 +58,7 @@ function makeJob(overrides: Partial<CollectionJob> = {}): CollectionJob {
 }
 
 function sliceResult(overrides: Partial<SliceResult> = {}): SliceResult {
-  return { events: [], checkpoint: EMPTY_CHECKPOINT, done: false, coverage: null, stop: null, requests: 1, ...overrides };
+  return { events: [], checkpoint: EMPTY_CHECKPOINT, done: false, coverage: null, stop: null, requests: 1, discoveryComplete: false, ...overrides };
 }
 
 /** Mirrors `seed.test.ts`'s helper -- a minimal but schema-shaped
@@ -183,6 +183,30 @@ describe("runCollectionSlice", () => {
     expect(deps.fail).not.toHaveBeenCalled();
   });
 
+  // #1342 -- the worker never recomputes discovery on its own; it only
+  // carries whatever the collector reported for this checkpoint.
+  it("slice progress carries the collector's discoveryComplete", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ discoveryComplete: true }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.checkpoint).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ discovering: false }),
+      expect.anything(),
+    );
+  });
+
+  it("slice progress reports discovering true when the collector's discoveryComplete is false", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ discoveryComplete: false, stop: { provider: "github", operation: "repositories", stopKind: "budget", httpStatus: null, retryAfterSeconds: null } }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.checkpoint).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ discovering: true }),
+      expect.anything(),
+    );
+  });
+
   it("still reaches complete when an absorbed not_accessible fan-out item left coverage partial, not just on full complete coverage", async () => {
     const deps = harness();
     const partialCoverage: SourceCoverage = { ...sampleCoverage, status: "partial", reasonCodes: ["not_accessible"] };
@@ -240,6 +264,37 @@ describe("runCollectionSlice", () => {
     );
   });
 
+  // #1351 (phase 3): migration 058 redefines `attempt` as "failures since
+  // the last progress" -- a `rate_limited` stop never increments it. This
+  // fake `fail()` applies that rule (the real rule lives in SQL, proven by
+  // collection-queue.contract.test.ts); what this test proves is that
+  // runCollectionSlice's own rate_limited branch never computes a null
+  // retryAt on its own, no matter how high `attempt` climbs, so a job that
+  // only ever sees rate limiting can never become terminal.
+  it("rate-limited stops never make a job terminal, however many slices see one", async () => {
+    const deps = harness();
+    let attempt = 0;
+    let state: "running" | "retrying" | "waiting_rate_limit" | "failed" = "running";
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "github", operation: "merged", stopKind: "rate_limited", httpStatus: 403, retryAfterSeconds: 60 },
+    }));
+    deps.fail = vi.fn().mockImplementation(async (_lease, stop: { stopKind: string }, retryAt: string | null) => {
+      if (retryAt === null) {
+        state = "failed";
+        return { status: "failed" };
+      }
+      attempt = stop.stopKind === "rate_limited" ? attempt : attempt + 1;
+      state = stop.stopKind === "rate_limited" ? "waiting_rate_limit" : "retrying";
+      return { status: state };
+    });
+
+    for (let i = 0; i < 20; i++) {
+      await runCollectionSlice(makeJob({ attempt, leaseToken: "lease-1" }), Date.now() + 60_000, deps);
+      expect(state).not.toBe("failed");
+    }
+    expect(attempt).toBe(0);
+  });
+
   it("fails a 5xx (http) stop with exponential backoff while attempts remain", async () => {
     const deps = harness();
     deps.collect = vi.fn().mockResolvedValue(sliceResult({ stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 503, retryAfterSeconds: null } }));
@@ -256,6 +311,39 @@ describe("runCollectionSlice", () => {
     deps.collect = vi.fn().mockResolvedValue(sliceResult({ stop: { provider: "github", operation: "merged", stopKind: "network", httpStatus: null, retryAfterSeconds: null } }));
     await runCollectionSlice(makeJob({ attempt: 7 }), Date.now() + 60_000, deps);
     expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), null);
+  });
+
+  // The slice's own checkpoint resets `attempt` in the database when it
+  // advances operationsDone (migration 058), so the in-memory claim-time
+  // attempt must not end a job that made progress before this stop.
+  describe("a stop after progress in the same slice", () => {
+    const advanced: CollectorCheckpoint = {
+      version: 1,
+      operations: [{ key: "profile", cursor: null, done: true }, { key: "merged:a", cursor: null, done: true }, { key: "merged:b", cursor: null, done: false }],
+      discovered: { repositoryIds: [] },
+    };
+    const priorProgress = { operationsDone: 1, operationsKnown: 3, events: 0, requests: 0 };
+
+    it("still retries an http stop at the claim-time budget edge", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ checkpoint: advanced, stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 502, retryAfterSeconds: null } }));
+      await runCollectionSlice(makeJob({ attempt: 7, progress: priorProgress }), Date.now() + 60_000, deps);
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), new Date(Date.parse("2026-09-05T12:00:00.000Z") + 60_000).toISOString());
+    });
+
+    it("still retries a structural stop at the claim-time budget edge", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ checkpoint: advanced, stop: { provider: "github", operation: "merged", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null } }));
+      await runCollectionSlice(makeJob({ attempt: 2, progress: priorProgress }), Date.now() + 60_000, deps);
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.any(String));
+    });
+
+    it("ends the job when the slice made no progress", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ checkpoint: advanced, stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 502, retryAfterSeconds: null } }));
+      await runCollectionSlice(makeJob({ attempt: 7, progress: { ...priorProgress, operationsDone: 2 } }), Date.now() + 60_000, deps);
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.anything(), null);
+    });
   });
 
   it("gives a protocol/parse stop only a 3-try budget, stricter than http/network", async () => {
@@ -322,11 +410,31 @@ describe("runCollectionSlice", () => {
       const seededCheckpoint: CollectorCheckpoint = {
         version: 1,
         operations: [{ key: "files:github:PR1", cursor: null, done: true }],
-        discovered: { repositoryIds: ["R1"], itemIds: { seededWorkItemIds: ["github:PR1"] } },
-        state: { seededDataThrough: "2026-09-04T12:00:00.000Z" },
+        discovered: { repositoryIds: [], itemIds: { seededWorkItemIds: ["github:PR1"] } },
       };
       expect(deps.checkpoint).toHaveBeenNthCalledWith(1, { id: "job-1", leaseToken: "lease-1" }, seededCheckpoint, [merged], expect.any(Object), false);
       expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), new Set([engineeringEventKey(merged)]));
+    });
+
+    // #1342 -- a seed pre-write never runs the collector, so its progress
+    // must read as still discovering, not a false N/N=99%.
+    it("seed writes discovering true", async () => {
+      const deps = harness();
+      const merged = event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" });
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [merged] }));
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      expect(deps.checkpoint).toHaveBeenNthCalledWith(
+        1,
+        expect.anything(),
+        expect.anything(),
+        [merged],
+        expect.objectContaining({ discovering: true }),
+        false,
+      );
     });
 
     it("does not seed when the checkpoint already has progress or events are already staged (not the job's first slice)", async () => {

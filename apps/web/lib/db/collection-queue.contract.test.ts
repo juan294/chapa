@@ -46,7 +46,7 @@ describe("collection queue (real local database)", () => {
     expect(second.progress).toEqual(EMPTY_PROGRESS);
   });
 
-  it("resets a failed job back to queued when re-enqueued with a recovery reason, clearing staged events", async () => {
+  it("retry after protocol failure clears checkpoint (today's behavior, unchanged by migration 058)", async () => {
     const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
     const claimed = (await claimCollectionJobs(1, 120))[0]!;
     await checkpointCollectionJob(
@@ -182,7 +182,7 @@ describe("collection queue (real local database)", () => {
     expect(rows.data).toEqual([{ state: "failed", last_stop: stop }]);
   });
 
-  it("routes a rate_limited stop to waiting_rate_limit and any other transient stop to retrying, incrementing attempt", async () => {
+  it("routes a rate_limited stop to waiting_rate_limit without touching attempt (migration 058)", async () => {
     await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
     const claimed = (await claimCollectionJobs(1, 120))[0]!;
     const retryAt = new Date(Date.now() + 60_000).toISOString();
@@ -192,7 +192,150 @@ describe("collection queue (real local database)", () => {
       retryAt,
     )).toEqual({ status: "waiting_rate_limit" });
     const rows = await db().from("scoring_collection_jobs").select("state,attempt").eq("id", claimed.id);
-    expect(rows.data).toEqual([{ state: "waiting_rate_limit", attempt: 1 }]);
+    expect(rows.data).toEqual([{ state: "waiting_rate_limit", attempt: 0 }]);
+  });
+
+  it("fail with rate_limited keeps attempt across repeated rate limiting", async () => {
+    await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    let claimed = (await claimCollectionJobs(1, 120))[0]!;
+    for (let i = 0; i < 3; i++) {
+      const retryAt = new Date(Date.now() - 1000).toISOString(); // already due, so the next claim picks it straight back up
+      await failCollectionJob(
+        { id: claimed.id, leaseToken: claimed.leaseToken! },
+        { provider: "github", operation: "merged", stopKind: "rate_limited", httpStatus: 403, retryAfterSeconds: 60 },
+        retryAt,
+      );
+      claimed = (await claimCollectionJobs(1, 120))[0]!;
+    }
+    const rows = await db().from("scoring_collection_jobs").select("attempt").eq("id", claimed.id);
+    expect(rows.data).toEqual([{ attempt: 0 }]);
+  });
+
+  it("fail with http increments attempt (keeps today's behavior)", async () => {
+    await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const claimed = (await claimCollectionJobs(1, 120))[0]!;
+    const retryAt = new Date(Date.now() + 60_000).toISOString();
+    expect(await failCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      { provider: "github", operation: "merged", stopKind: "http", httpStatus: 503, retryAfterSeconds: null },
+      retryAt,
+    )).toEqual({ status: "retrying" });
+    const rows = await db().from("scoring_collection_jobs").select("state,attempt").eq("id", claimed.id);
+    expect(rows.data).toEqual([{ state: "retrying", attempt: 1 }]);
+  });
+
+  it("checkpoint with more done operations resets attempt", async () => {
+    await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    let claimed = (await claimCollectionJobs(1, 120))[0]!;
+    await checkpointCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      EMPTY_CHECKPOINT, [], { ...EMPTY_PROGRESS, operationsDone: 1 }, false,
+    );
+    await failCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      { provider: "github", operation: "merged", stopKind: "http", httpStatus: 503, retryAfterSeconds: null },
+      new Date(Date.now() - 1000).toISOString(),
+    );
+    claimed = (await claimCollectionJobs(1, 120))[0]!;
+    const afterFail = await db().from("scoring_collection_jobs").select("attempt").eq("id", claimed.id);
+    expect(afterFail.data).toEqual([{ attempt: 1 }]);
+    await checkpointCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      EMPTY_CHECKPOINT, [], { ...EMPTY_PROGRESS, operationsDone: 2 }, false,
+    );
+    const afterProgress = await db().from("scoring_collection_jobs").select("attempt").eq("id", claimed.id);
+    expect(afterProgress.data).toEqual([{ attempt: 0 }]);
+  });
+
+  it("checkpoint with the same done count keeps attempt", async () => {
+    await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    let claimed = (await claimCollectionJobs(1, 120))[0]!;
+    await checkpointCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      EMPTY_CHECKPOINT, [], { ...EMPTY_PROGRESS, operationsDone: 1 }, false,
+    );
+    await failCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      { provider: "github", operation: "merged", stopKind: "http", httpStatus: 503, retryAfterSeconds: null },
+      new Date(Date.now() - 1000).toISOString(),
+    );
+    claimed = (await claimCollectionJobs(1, 120))[0]!;
+    await checkpointCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      EMPTY_CHECKPOINT, [], { ...EMPTY_PROGRESS, operationsDone: 1 }, false,
+    );
+    const rows = await db().from("scoring_collection_jobs").select("attempt").eq("id", claimed.id);
+    expect(rows.data).toEqual([{ attempt: 1 }]);
+  });
+
+  it("retry after http failure keeps checkpoint, staged events and progress, resetting attempt to 0", async () => {
+    const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const claimed = (await claimCollectionJobs(1, 120))[0]!;
+    const checkpoint = { version: 1 as const, operations: [{ key: "repositories", cursor: "abc", done: false }], discovered: { repositoryIds: [] } };
+    const event = sourceEventFixture(source, window);
+    await checkpointCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      checkpoint, [event], { ...EMPTY_PROGRESS, operationsKnown: 1, events: 1 }, false,
+    );
+    expect(await failCollectionJob(
+      { id: claimed.id, leaseToken: claimed.leaseToken! },
+      { provider: "github", operation: "repositories", stopKind: "http", httpStatus: 503, retryAfterSeconds: null },
+      null,
+    )).toEqual({ status: "failed" });
+    const retried = await enqueueCollectionJob(owner, "github", "retry", window.referenceTime);
+    expect(retried.id).toBe(job.id);
+    expect(retried.state).toBe("queued");
+    expect(retried.attempt).toBe(0);
+    expect(retried.checkpoint).toEqual(checkpoint);
+    expect(retried.progress).toEqual({ ...EMPTY_PROGRESS, operationsKnown: 1, events: 1 });
+    const staged = await db().from("scoring_collection_staged_events").select("event_key").eq("job_id", job.id);
+    expect(staged.data).toEqual([{ event_key: engineeringEventKey(event) }]);
+  });
+
+  it("progress accepts an optional boolean discovering key", async () => {
+    await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const claimed = (await claimCollectionJobs(1, 120))[0]!;
+    const { data, error } = await db().rpc("scoring_collection_checkpoint", {
+      p_job_id: claimed.id,
+      p_lease_token: claimed.leaseToken,
+      p_checkpoint: EMPTY_CHECKPOINT,
+      p_event_keys: [],
+      p_events: [],
+      p_progress: { operationsDone: 0, operationsKnown: 0, events: 0, requests: 0, discovering: true },
+      p_release: false,
+    });
+    expect(error).toBeNull();
+    expect((data as { status: string } | null)?.status).toBe("ok");
+  });
+
+  it("progress rejects a non-boolean discovering value", async () => {
+    await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const claimed = (await claimCollectionJobs(1, 120))[0]!;
+    const { error } = await db().rpc("scoring_collection_checkpoint", {
+      p_job_id: claimed.id,
+      p_lease_token: claimed.leaseToken,
+      p_checkpoint: EMPTY_CHECKPOINT,
+      p_event_keys: [],
+      p_events: [],
+      p_progress: { operationsDone: 0, operationsKnown: 0, events: 0, requests: 0, discovering: "yes" },
+      p_release: false,
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("progress still rejects unknown keys", async () => {
+    await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const claimed = (await claimCollectionJobs(1, 120))[0]!;
+    const { error } = await db().rpc("scoring_collection_checkpoint", {
+      p_job_id: claimed.id,
+      p_lease_token: claimed.leaseToken,
+      p_checkpoint: EMPTY_CHECKPOINT,
+      p_event_keys: [],
+      p_events: [],
+      p_progress: { operationsDone: 0, operationsKnown: 0, events: 0, requests: 0, bogus: true },
+      p_release: false,
+    });
+    expect(error).not.toBeNull();
   });
 
   it("reports in-progress only for a non-terminal job on the given day", async () => {

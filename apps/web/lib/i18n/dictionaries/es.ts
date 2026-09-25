@@ -449,6 +449,7 @@ export const es: Translations = {
   scoring: {
     status: {
       badgeCollecting: 'Puntuación en curso, {percent}%',
+      badgeDiscovering: 'Puntuación en curso, descubriendo actividad',
       badgeActionNeeded: 'Puntuación en pausa: se necesita una acción',
       badgeUnregistered: 'Aún no está en Chapa',
       badgeUnregisteredDomain: 'chapa.thecreativetoken.com',
@@ -464,8 +465,8 @@ export const es: Translations = {
       panelReady: 'Tu puntuación está actualizada.',
       panelUpdating: 'Actualizando con la actividad de hoy…',
       panelCollecting: 'Recopilando evidencia — {percent}% completado',
+      panelDiscovering: 'Descubriendo tu actividad. El porcentaje aparece cuando se conoce el total.',
       panelActionNeeded: 'Puntuación en pausa: se necesita una acción',
-      panelPercentEstimate: 'Estimado: el total puede crecer a medida que se descubre más actividad.',
       stateQueued: 'En cola',
       stateRunning: 'Recopilando',
       stateWaitingRateLimit: 'Límite de solicitudes alcanzado, se reanuda a las {time}',

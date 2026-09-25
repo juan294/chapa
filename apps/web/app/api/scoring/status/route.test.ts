@@ -59,6 +59,14 @@ describe("GET /api/scoring/status", () => {
     expect(mockReadScoringStatus).toHaveBeenCalledWith("octocat");
   });
 
+  // #1342 -- a still-discovering job reports percent: null, not a number.
+  it("passes through a null percent when collection is still discovering", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: null, sources: [], hasPriorReceipt: false });
+    const res = await GET(makeRequest("GET"));
+    const body = await res.json();
+    expect(body).toEqual({ scoringStatus: { kind: "collecting", percent: null, sources: [], hasPriorReceipt: false } });
+  });
+
   it("returns 503 (not unregistered) when the authority read itself fails", async () => {
     mockReadScoringStatus.mockResolvedValue(null);
     const res = await GET(makeRequest("GET"));

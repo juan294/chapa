@@ -529,6 +529,29 @@ describe("GeneratingProgress", () => {
       vi.unstubAllGlobals();
     });
 
+    // #1342 -- while the job can still add operations, the status endpoint
+    // reports percent: null. Step 1 must never show a percentage for that.
+    it("shows the discovering copy (no — N%) while the status percent is null", async () => {
+      vi.stubGlobal("fetch", vi.fn((url: string) => {
+        if (url === "/api/scoring/status") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ scoringStatus: { kind: "collecting", percent: null } }),
+          });
+        }
+        return Promise.resolve({ ok: true });
+      }));
+      render(<GeneratingProgress handle="testuser" />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(document.querySelector('[data-step="1"]')?.textContent).not.toContain("%");
+      expect(document.querySelector('[data-step="1"]')?.textContent).toContain("Collecting contribution data");
+      vi.unstubAllGlobals();
+    });
+
     it("stops polling (schedules no further timer) once the status is ready", async () => {
       vi.stubGlobal("fetch", vi.fn((url: string) => {
         if (url === "/api/scoring/status") {

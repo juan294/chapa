@@ -75,6 +75,12 @@ original count bounds must yield point dimensions. Saturated bounds can agree;
 otherwise the archetype is null. Existing names remain, with no new report
 mastery labels or fabricated archetype-specific coaching.
 
+GitHub issue closures are not collected. Every event that scan could produce
+carried an acceptance the scoring rules never admit, so it changed no
+delivery unit, active week, project or category, and never changed a
+displayed score. Not collecting it only lowers the number of requests
+collection makes.
+
 ## Optional report-derived Craft
 
 `Craft = 100 × (fully + 0.7 × mostly + 0.3 × partially) / totalSessions`.

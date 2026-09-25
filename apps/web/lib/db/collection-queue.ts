@@ -20,6 +20,13 @@ export interface CollectionProgress {
   readonly operationsKnown: number;
   readonly events: number;
   readonly requests: number;
+  /** True while this job's collector can still add operations to the
+   * checkpoint (#1342) -- `operationsKnown` is not yet final, so a
+   * percentage would move backwards as discovery finds more work. Optional
+   * for backward compatibility with rows written before this field existed:
+   * a legacy row with no key is treated as still discovering unless the job
+   * is `complete` (`lib/collection/status.ts`'s `discovering()`). */
+  readonly discovering?: boolean;
 }
 export const EMPTY_PROGRESS: CollectionProgress = { operationsDone: 0, operationsKnown: 0, events: 0, requests: 0 };
 
@@ -69,6 +76,7 @@ const progressSchema: z.ZodType<CollectionProgress> = z.union([
     operationsKnown: z.number().int().nonnegative(),
     events: z.number().int().nonnegative(),
     requests: z.number().int().nonnegative(),
+    discovering: z.boolean().optional(),
   }).strict(),
 ]);
 const stopSchema = z.object({

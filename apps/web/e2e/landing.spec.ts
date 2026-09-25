@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { switchLocale } from "./helpers/locale-switch";
 
 async function expectLandingLocale(page: Page, locale: "en" | "es") {
   await expect(page.locator("html")).toHaveAttribute("lang", locale);
@@ -96,16 +97,10 @@ test.describe("Landing page — sections and content", () => {
   test("locale switch reloads all landing copy through the canonical URL", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "ES", exact: true }).click();
-    await page.getByRole("option", { name: "English" }).click();
-
-    await expect(page).toHaveURL("/");
+    await switchLocale(page, "ES", "English", "/");
     await expectLandingLocale(page, "en");
 
-    await page.getByRole("button", { name: "EN", exact: true }).click();
-    await page.getByRole("option", { name: "Español" }).click();
-
-    await expect(page).toHaveURL("/");
+    await switchLocale(page, "EN", "Español", "/");
     await expectLandingLocale(page, "es");
   });
 
@@ -115,10 +110,7 @@ test.describe("Landing page — sections and content", () => {
     await page.goto("/es");
     await expectLandingLocale(page, "es");
 
-    await page.getByRole("button", { name: "ES", exact: true }).click();
-    await page.getByRole("option", { name: "English" }).click();
-
-    await expect(page).toHaveURL("/");
+    await switchLocale(page, "ES", "English", "/");
     await expectLandingLocale(page, "en");
   });
 });

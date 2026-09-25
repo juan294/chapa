@@ -1,7 +1,11 @@
 /**
  * v7 only. Legacy CONTRIBUTION_QUERY remains a v6 reader.
  * Semantics checked against https://docs.github.com/en/graphql/reference/users,
- * /commits, /pulls and /issues. Review contributions discover PRs, not all reviews.
+ * /commits and /pulls. Review contributions discover PRs, not all reviews.
+ * GitHub issue closures are not collected (#1351): every `issue_work` event
+ * the collector produced was inadmissible for scoring (see v7-evidence.ts's
+ * `acceptedKind`), so a linked-issue scan spent GraphQL points with no
+ * effect on the displayed score.
  */
 const pageInfo = "pageInfo { hasNextPage endCursor } totalCount";
 const repository = "repository { id nameWithOwner }";
@@ -10,9 +14,9 @@ const change = `id ${repository} author { ... on User { id } } merged mergedAt c
   closingIssuesReferences(first: 1) { totalCount }`;
 
 function commitHistoryQuery(name: string, lineFields: string): string {
-  return `query ${name}($id: ID!, $subjectId: ID!, $since: GitTimestamp!, $after: String) {
+  return `query ${name}($id: ID!, $subjectId: ID!, $since: GitTimestamp!, $after: String, $first: Int!) {
     node(id: $id) { ... on Repository { isEmpty defaultBranchRef { target { ... on Commit {
-      history(first: 50, after: $after, since: $since, author: {id: $subjectId}) {
+      history(first: $first, after: $after, since: $since, author: {id: $subjectId}) {
         ${pageInfo} nodes { id oid author { user { id } } authoredDate${lineFields ? ` ${lineFields}` : ""} }
       }
     } } } } }
@@ -54,26 +58,11 @@ export const GITHUB_EVIDENCE_QUERIES = {
   // `since` filters by committed date, not authored date, so the caller sets
   // it a margin before the window and still filters each node by authoredDate.
   // Unbounded history walked a repository's whole past and answered 502 on
-  // large histories; smaller pages keep each request well inside GitHub's timeout.
+  // large histories; smaller pages keep each request well inside GitHub's
+  // timeout. `first` is a variable so a failing page can retry smaller
+  // (evidence.ts's commit-history 5xx retry ladder, #1351).
   commits: commitHistoryQuery("V7Commits", "additions deletions"),
   // The same page without line counts. GitHub nulls a commit whose lines it
   // cannot count; this variant recovers that commit with unknown lines.
   commitsWithoutLines: commitHistoryQuery("V7CommitsWithoutLines", ""),
-  issues: `query V7Issues($id: ID!, $since: DateTime!, $after: String) {
-    node(id: $id) { ... on Repository {
-      issues(first: 100, after: $after, filterBy: {since: $since}, orderBy: {field: UPDATED_AT, direction: DESC}) {
-        ${pageInfo} nodes { id ${repository} }
-      }
-    } }
-  }`,
-  closures: `query V7Closures($id: ID!, $after: String) {
-    node(id: $id) { ... on Issue { timelineItems(first: 100, after: $after, itemTypes: [CLOSED_EVENT]) {
-      ${pageInfo} nodes { ... on ClosedEvent { id createdAt actor { ... on User { id } }
-        closer { __typename
-          ... on PullRequest { id author { ... on User { id } } merged mergedAt headRefOid repository { id nameWithOwner } }
-          ... on Commit { id }
-        }
-      } }
-    } } }
-  }`,
 } as const;

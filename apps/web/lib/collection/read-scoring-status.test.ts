@@ -55,12 +55,27 @@ describe("readScoringStatus", () => {
     mockListCollectionJobsForDate.mockResolvedValue([
       { id: "1", ownerHandle: "octocat", provider: "github", referenceDate: "2026-09-23", referenceTime: "2026-09-23T10:00:00.000Z",
         state: "running", checkpoint: { version: 1, operations: [], discovered: { repositoryIds: [] } },
-        progress: { operationsDone: 10, operationsKnown: 40, events: 2, requests: 10 }, attempt: 0,
+        progress: { operationsDone: 10, operationsKnown: 40, events: 2, requests: 10, discovering: false }, attempt: 0,
         nextRunAt: "2026-09-23T10:00:00.000Z", leaseToken: null, leaseExpiresAt: null, lastStop: null,
         enqueueReason: "signup", observationId: null },
     ]);
     const status = await readScoringStatus("octocat");
     expect(status).toMatchObject({ kind: "collecting", percent: 25 });
+  });
+
+  // #1342 -- a job still discovering reports percent: null through the full
+  // read-scoring-status wiring, not just in the pure deriveScoringStatus unit.
+  it("returns a null percent for a registered subject whose job is still discovering", async () => {
+    mockDbIsScoringSubject.mockResolvedValue("registered");
+    mockListCollectionJobsForDate.mockResolvedValue([
+      { id: "1", ownerHandle: "octocat", provider: "github", referenceDate: "2026-09-23", referenceTime: "2026-09-23T10:00:00.000Z",
+        state: "running", checkpoint: { version: 1, operations: [], discovered: { repositoryIds: [] } },
+        progress: { operationsDone: 2, operationsKnown: 6, events: 0, requests: 2, discovering: true }, attempt: 0,
+        nextRunAt: "2026-09-23T10:00:00.000Z", leaseToken: null, leaseExpiresAt: null, lastStop: null,
+        enqueueReason: "signup", observationId: null },
+    ]);
+    const status = await readScoringStatus("octocat");
+    expect(status).toMatchObject({ kind: "collecting", percent: null });
   });
 
   it("returns ready when a current, non-retracted receipt exists", async () => {

@@ -70,6 +70,22 @@ export function ensureSliceOperation(operations: MutableSliceOperation[], key: s
   if (!operations.some((op) => op.key === key)) operations.push({ key, cursor: null, done: false });
 }
 
+/** True when `key` matches one of `expanding`'s entries: an exact key, or a
+ * `"prefix:"` entry (trailing colon) matched by `startsWith`. Every engine's
+ * `<PROVIDER>_EXPANDING_OPERATIONS` constant (#1342) lists exactly the
+ * operation keys/prefixes whose processing can call `ensureOp`/`registerRepo`
+ * -- i.e. can still grow the checkpoint's operation count. */
+export function isExpandingOperation(expanding: readonly string[], key: string): boolean {
+  return expanding.some((entry) => (entry.endsWith(":") ? key.startsWith(entry) : key === entry));
+}
+
+/** `discoveryComplete` for a slice's current operations list: no not-done
+ * operation is in `expanding` (#1342). Shared so every engine computes the
+ * flag identically; each engine still owns its own `expanding` list. */
+export function computeDiscoveryComplete(operations: readonly MutableSliceOperation[], expanding: readonly string[]): boolean {
+  return !operations.some((op) => !op.done && isExpandingOperation(expanding, op.key));
+}
+
 /** This slice's newly discovered events, minus any the caller already staged
  * in an earlier slice (identity is `engineeringEventKey`). */
 export function newSliceEvents(

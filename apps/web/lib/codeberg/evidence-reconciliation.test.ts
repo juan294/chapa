@@ -67,7 +67,6 @@ it("reconciles the GitHub and Codeberg slice engines through verified project/wo
     V7Files: { node: { files: connection([{ path: "docs/a.md" }]) } },
     V7ReviewDiscovery: { user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: connection([]) } } },
     V7Commits: { node: { isEmpty: true, defaultBranchRef: null } },
-    V7Issues: { node: { issues: connection([]) } },
   };
   vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init?: RequestInit) => {
     const operation = /query (\w+)/.exec(JSON.parse(String((init as RequestInit).body)).query)?.[1] ?? "";

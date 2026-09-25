@@ -241,6 +241,17 @@ describe("remote MCP server tools", () => {
     expect(comparison).toEqual({ handle: "collecting-owner", scoringStatus: { kind: "collecting", percent: 40, sources: [], hasPriorReceipt: false } });
   });
 
+  // #1342 -- a still-discovering job reports percent: null, not a number.
+  it("passes through a null percent when collection is still discovering", async () => {
+    mocks.readPublicObservedScore.mockResolvedValue({ status: "missing" });
+    mocks.readScoringStatus.mockResolvedValue({ kind: "collecting", percent: null, sources: [], hasPriorReceipt: false });
+
+    const profile = parseResult(
+      await tool("get_impact_profile").execute({ handle: "collecting-owner" }),
+    );
+    expect(profile).toEqual({ handle: "collecting-owner", scoringStatus: { kind: "collecting", percent: null, sources: [], hasPriorReceipt: false } });
+  });
+
   it("reports unregistered handles distinctly from an unavailable authority read", async () => {
     mocks.readPublicObservedScore.mockResolvedValue({ status: "missing" });
     mocks.readScoringStatus.mockResolvedValue({ kind: "unregistered" });
