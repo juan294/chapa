@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify and repair failed CI
-        uses: juan294/sutura@dd1a7687aeed9d0e72719a87338a16f584cd1e0d
+        uses: juan294/sutura@4e177b38cd43cc7233873b4455d4dc18dee706b8
         with:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
