@@ -24,6 +24,7 @@ import { observedReceiptViewModel } from "./score-view-model";
 // not what this file is testing.
 vi.mock("@/lib/platform/source-collectors", () => ({
   selectSourceEvidence: vi.fn(async () => ({ status: "unlinked" })),
+  selectSourceManifest: vi.fn(async () => ({ status: "unlinked" })),
 }));
 // Exercise the durable path rather than the Redis mirror.
 vi.mock("@/lib/cache/snapshot-cache", () => ({ getCachedReceiptSnapshotV7: vi.fn(async () => null) }));

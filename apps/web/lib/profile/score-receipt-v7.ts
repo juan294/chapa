@@ -16,7 +16,8 @@ import {
   type SourceCoverage,
 } from "@chapa/shared";
 import { computeImpactV7 } from "@/lib/impact/v7";
-import { selectSourceEvidence } from "@/lib/platform/source-collectors";
+import { selectSourceEvidence, selectSourceManifest } from "@/lib/platform/source-collectors";
+import type { SourceManifestSelection } from "@/lib/platform/source-coordinator";
 import type { SourceProvider } from "@/lib/platform/source-authorization";
 import { dbReadEngineeringEvidence } from "@/lib/db/engineering-evidence";
 import { projectEngineeringLedger } from "@/lib/evidence/projection";
@@ -50,6 +51,12 @@ interface CollectedEvidence {
   readonly sources: SourceCoverage[];
   readonly excludedSources: ScoringScope["excludedSources"];
   readonly events: NormalizedEngineeringEvent[];
+}
+
+export interface CollectedSourceManifests {
+  readonly sources: SourceCoverage[];
+  readonly excludedSources: ScoringScope["excludedSources"];
+  readonly streams: readonly Extract<SourceManifestSelection, { status: "observed" | "stale" }>[];
 }
 
 /**
@@ -99,6 +106,48 @@ export async function collectSources(
     });
   }
   return { sources, excludedSources, events };
+}
+
+/** Provider-order manifest selection for observed issuance. The stream
+ * capabilities validate each immutable generation only when fully drained. */
+export async function collectSourceManifests(
+  owner: string,
+  window: ScoringWindow,
+  options: ReceiptMaterializationOptions,
+): Promise<CollectedSourceManifests> {
+  const scope = { discovery: "owned_and_contributed" as const, repositoryIds: [] as readonly string[], eventKinds: [] as readonly string[] };
+  const results = await Promise.all(
+    RECEIPT_SOURCE_PROVIDERS.map(async provider => ({
+      provider,
+      selection: await selectSourceManifest({
+        owner, provider, window, scope,
+        ...(options.token !== undefined ? { token: options.token } : {}),
+        readOnly: options.readOnly === true,
+        refresh: options.refresh === true,
+      }),
+    })),
+  );
+  const sources: SourceCoverage[] = [];
+  const excludedSources: ScoringScope["excludedSources"][number][] = [];
+  const streams: Extract<SourceManifestSelection, { status: "observed" | "stale" }>[] = [];
+  for (const { provider, selection } of results) {
+    if (selection.status === "observed" || selection.status === "stale") {
+      sources.push(selection.status === "stale"
+        ? { ...selection.manifest.coverage, status: "stale", reasonCodes: [...new Set([...selection.manifest.coverage.reasonCodes, "stale_data" as const])] }
+        : selection.manifest.coverage);
+      streams.push(selection);
+      continue;
+    }
+    if (selection.status === "unlinked") { excludedSources.push({ provider, reason: "not_connected" }); continue; }
+    if (selection.status === "disabled") { excludedSources.push({ provider, reason: "not_consented" }); continue; }
+    sources.push({
+      source: { provider, host: `${provider === "github" ? "github.com" : provider === "gitlab" ? "gitlab.com" : provider === "bitbucket" ? "bitbucket.org" : "codeberg.org"}`, subjectId: owner },
+      window, dataThrough: null, status: "unavailable", discovery: "owned_and_contributed",
+      repositoryIds: [], repositoryDiscoveryComplete: false,
+      eventKinds: {}, reasonCodes: [selection.status === "unsupported" ? "not_supported" : "not_accessible"], unknownPeriods: [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
+    });
+  }
+  return { sources, excludedSources, streams };
 }
 
 /** Assessments the receipt may publish: resolved, non-retracted verdicts only. */

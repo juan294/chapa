@@ -1,15 +1,16 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { canonicalJson, createScoringWindow, evidenceSourceKey, projectReceiptEvidence, scoringInstant, sealObservedScoreReceipt, RECEIPT_ALGORITHM_OBSERVED, SCORING_OBSERVED_POLICY,
-  type EngineeringAggregation, type EngineeringEvidenceInput, type HashedObservedScoreReceipt, type PrivateCriterionAssessment, type PublicCriterionResult,
+import { canonicalJson, createScoringWindow, projectReceiptEvidence, scoringInstant, sealObservedScoreReceipt, RECEIPT_ALGORITHM_OBSERVED, SCORING_OBSERVED_POLICY,
+  type EngineeringEvidenceInput, type HashedObservedScoreReceipt, type PrivateCriterionAssessment, type PublicCriterionResult,
   type PublicObservedCraft, type PublicObservedScoringReceipt, type QualityCriterion, type ScoringWindow } from "@chapa/shared";
-import { computeObservedImpactV7 } from "@/lib/impact/observed-v7";
+import { computeObservedImpactV7FromReduction } from "@/lib/impact/observed-v7-streaming";
+import { beginObservedEvidence, type StreamingObservedEvidence } from "@/lib/impact/v7-evidence-streaming";
 import { dbReadEngineeringEvidence } from "@/lib/db/engineering-evidence";
 import { projectEngineeringLedger } from "@/lib/evidence/projection";
 import { dbPublishObservedReceipt, dbReadObservedReceipt, type ObservedTrendAnchor, type StoredObservedReceipt } from "@/lib/db/score-receipts-observed";
 import { captureServerError } from "@/lib/analytics/server-errors";
-import { collectSources, type ReceiptMaterializationOptions } from "./score-receipt-v7";
-import { canonicalizeReceiptEvidence, observedSemanticIdentity, receiptSemanticIdentity } from "./receipt-semantic-identity";
+import { collectSourceManifests, type ReceiptMaterializationOptions } from "./score-receipt-v7";
+import { beginCanonicalReceiptEvidenceSpool, canonicalizeReceiptEvidence, observedSemanticIdentity } from "./receipt-semantic-identity";
 
 export interface ObservedReceiptSnapshot {
   readonly receipt: HashedObservedScoreReceipt;
@@ -37,7 +38,7 @@ const qualityCriteria: readonly QualityCriterion[] = ["rationale", "verification
  * its full private revision chains. A counted public row must also have the
  * same contemporaneous artifact support as the actual core calculation.
  */
-function resolvedCriteria(aggregation: EngineeringAggregation): PublicCriterionResult[] {
+function resolvedCriteria(aggregation: StreamingObservedEvidence): PublicCriterionResult[] {
   const latest = new Map<string, PrivateCriterionAssessment>();
   for (const row of aggregation.assessments) if (!latest.has(row.assessmentId) || latest.get(row.assessmentId)!.revision < row.revision) latest.set(row.assessmentId, row);
   const registered = new Set(aggregation.scope.ledgerRevisionIds);
@@ -60,29 +61,17 @@ function resolvedCriteria(aggregation: EngineeringAggregation): PublicCriterionR
     const key = JSON.stringify([first.workItemId, first.criterion]);
     works.set(key, [...(works.get(key) ?? []), { work: first.workItemId, criterion: first.criterion as QualityCriterion, status, supporting: status === "accepted" ? accepted : status === "rejected" ? rejected : [], rows }]);
   }
-  const unresolved = new Set(aggregation.scope.sources.filter(source => source.reasonCodes.includes("alias_unresolved")).map(source => evidenceSourceKey(source.source)));
-  const selections = new Map(aggregation.acceptanceSelections.map(row => [row.workItemId, row.acceptedEventId]));
-  const known = aggregation.events.filter(event => {
-    if (unresolved.has(evidenceSourceKey(event))) return false;
-    const selected = selections.get(event.workItemId);
-    if (!selected || selected === event.eventId) return true;
-    const method = event.acceptance.status === "observed" ? event.acceptance.value.method : null;
-    const accepted = (event.kind === "accepted_change" && (method === "merged_change" || method === "linked_issue_result"))
-      || (event.kind === "authored_commit" && method === "default_branch_first_reachability") || (event.kind === "issue_work" && method === "linked_issue_result")
-      || ((event.kind === "documentation_design" || event.kind === "maintenance") && method === "accepted_artifact");
-    return event.kind !== "accepted_change" && !accepted;
-  });
   const refs = new Map<string, string>();
   const provenanceOrder = ["source_observed", "self_reported", "automated_assessment", "human_assessed", "independently_corroborated"];
   const result: PublicCriterionResult[] = [];
   for (const [, group] of [...works].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
     const first = group[0]!;
-    const events = known.filter(event => event.workItemId === first.work);
-    if (!events.length) continue;
+    const support = aggregation.selectedWorkSupport.get(first.work);
+    if (!support) continue;
     const status = group.some(row => row.status === "accepted") ? "accepted" : group.every(row => row.status === "rejected") ? "rejected" : "unknown";
     const supporting = group.filter(row => row.status === status).flatMap(row => row.supporting);
     const references = new Set(supporting.flatMap(row => row.evidenceReferenceIds));
-    const supported = events.some(event => event.artifactReferenceIds.some(ref => references.has(ref)));
+    const supported = [...references].some(reference => support.has(reference));
     const verdict = supported ? status : "unknown";
     const provenance = [...(supporting.length ? supporting : group.flatMap(row => row.rows))].sort((a, b) => provenanceOrder.indexOf(a.provenance) - provenanceOrder.indexOf(b.provenance))[0]!.provenance;
     if (!refs.has(first.work)) refs.set(first.work, `work-${refs.size + 1}`);
@@ -154,7 +143,7 @@ export async function materializeObservedScoreReceipt(owner: string, options: Ob
     }
     const ledgerSnapshot = await dbReadEngineeringEvidence(handle, handle, window);
     const ledger = projectEngineeringLedger(ledgerSnapshot, window);
-    const collected = await collectSources(handle, window, { ...options, readOnly: options.reportUpdate && previous.status === "found" ? true : options.readOnly });
+    const collected = await collectSourceManifests(handle, window, { ...options, readOnly: options.reportUpdate && previous.status === "found" ? true : options.readOnly });
     const sources = collected.sources.map(source => {
       // The read-only coordinator labels a retained normalized observation
       // stale when its original window differs. Re-evaluate its dated events
@@ -172,9 +161,11 @@ export async function materializeObservedScoreReceipt(owner: string, options: Ob
     let craft: PublicObservedCraft;
     try { craft = await options.readCraft(handle, window); } catch { return preserve("craft_error"); }
     if (craft.status === "unavailable") return preserve("craft_error");
-    const evidence: EngineeringEvidenceInput = canonicalizeReceiptEvidence({ schemaVersion: "v7", window,
+    const canonicalMetadata = canonicalizeReceiptEvidence({ schemaVersion: "v7", window,
       scope: { sources: [...sources, ...ledger.scope.sources], excludedSources: [...collected.excludedSources, ...ledger.scope.excludedSources], ledgerRevisionIds: ledger.scope.ledgerRevisionIds },
-      events: [...collected.events, ...ledger.events], repositoryAliases: ledger.repositoryAliases, equivalentWorkItems: ledger.equivalentWorkItems, assessments: ledger.assessments });
+      events: [], repositoryAliases: ledger.repositoryAliases, equivalentWorkItems: ledger.equivalentWorkItems, assessments: ledger.assessments });
+    const { events: _events, ...evidence } = canonicalMetadata;
+    void _events;
     // No connected/legacy source reported unavailable above, but "observed" and
     // "unlinked" both pass that guard even when nothing was actually collected --
     // a disconnected provider, or a completed-but-empty collection round, look
@@ -186,28 +177,66 @@ export async function materializeObservedScoreReceipt(owner: string, options: Ob
     // different failure an operator needs to be able to tell apart. A
     // subject's own first-ever issuance is unaffected: there is no established
     // receipt yet to regress away from, so a genuine zero is recorded normally.
-    if (previous.status === "found" && previous.envelope.receipt.action !== "retract"
-      && previous.envelope.receipt.core.composite.exact > 0 && evidence.events.length === 0 && evidence.assessments.length === 0) return preserve("empty_evidence");
-    const core = computeObservedImpactV7(evidence);
-    const projected = { ...projectReceiptEvidence(evidence.scope, []), criteria: resolvedCriteria(core.aggregation) };
-    for (const criterion of qualityCriteria) {
-      if (projected.criteria.filter(row => row.criterion === criterion && row.qualifyingCount === 1).length !== core.observedCounts.quality[criterion]) throw new Error("Public criterion projection diverged from credited evidence");
+    const spool = await beginCanonicalReceiptEvidenceSpool();
+    let publication: { envelope: HashedObservedScoreReceipt; semanticDigest: string; coreSemanticDigest: string } | null = null;
+    try {
+      let eventCount = 0;
+      for (const stream of collected.streams) {
+        const pages = stream.pages()[Symbol.asyncIterator]();
+        while (true) {
+          // Only a source iterator failure is a source_error. Spool, reducer,
+          // digest and publish failures retain the storage_error path below.
+          let next: IteratorResult<readonly EngineeringEvidenceInput["events"][number][]>;
+          try { next = await pages.next(); }
+          catch (error) {
+            void captureServerError({ route: "score-receipt-observed", statusCode: 500, error });
+            return preserve("source_error");
+          }
+          if (next.done) break;
+          await spool.addPage(next.value);
+          eventCount += next.value.length;
+        }
+      }
+      await spool.addPage(ledger.events);
+      eventCount += ledger.events.length;
+      if (previous.status === "found" && previous.envelope.receipt.action !== "retract"
+        && previous.envelope.receipt.core.composite.exact > 0 && eventCount === 0 && evidence.assessments.length === 0) return preserve("empty_evidence");
+      const reducer = beginObservedEvidence(evidence);
+      let page: EngineeringEvidenceInput["events"][number][] = [];
+      for await (const event of spool.scorerSortedEvents()) {
+        page.push(event);
+        if (page.length === 500) { reducer.addSortedPage(page); page = []; }
+      }
+      if (page.length) reducer.addSortedPage(page);
+      const reduced = reducer.finish();
+      const core = computeObservedImpactV7FromReduction(reduced);
+      const projected = { ...projectReceiptEvidence(evidence.scope, []), criteria: resolvedCriteria(reduced) };
+      for (const criterion of qualityCriteria) {
+        if (projected.criteria.filter(row => row.criterion === criterion && row.qualifyingCount === 1).length !== core.observedCounts.quality[criterion]) throw new Error("Public criterion projection diverged from credited evidence");
+      }
+      const prior = correction?.envelope.receipt;
+      const candidate: PublicObservedScoringReceipt = {
+        schemaVersion: "v7", policyVersion: "v7.2", receiptId: prior?.receiptId ?? randomUUID(), revisionId: randomUUID(), subjectRef: "subject-1",
+        revision: (prior?.revision ?? 0) + 1, supersedesRevisionId: prior?.revisionId ?? null, action: prior ? "correct" : "create", recordedAt: window.referenceTime, window,
+        inputs: core.inputs, core: core.core, craft, ...projected, limitations: [...core.limitations].sort(),
+        serializationVersion: "canonical-json-v1", algorithm: RECEIPT_ALGORITHM_OBSERVED, calculation: { rules: SCORING_OBSERVED_POLICY, core: core.trace },
+      };
+      // Seal before no-op comparison too: an invalid injected Craft result must
+      // never bypass the strict parser merely because other evidence is stable.
+      const envelope = await sealObservedScoreReceipt(candidate);
+      const coreSemanticDigest = await spool.digest({ ...envelope.receipt, craft: { status: "no_report", unlocked: false, report: null } }, evidence, ledgerSnapshot);
+      const semanticDigest = await observedSemanticIdentity(coreSemanticDigest, craft);
+      const baseline = correction ?? (previous.status === "found" ? previous : null);
+      const unchanged = baseline && baseline.envelope.receipt.action !== "retract" && baseline.envelope.receipt.window.referenceDate === window.referenceDate && baseline.semanticDigest === semanticDigest;
+      publication = { envelope: unchanged ? baseline.envelope : envelope, semanticDigest, coreSemanticDigest };
+    } finally { await spool.dispose(); }
+    if (!publication) throw new Error("Receipt evidence reduction did not complete");
+    try { await Promise.all(collected.streams.map(stream => stream.assertCurrent())); }
+    catch (error) {
+      void captureServerError({ route: "score-receipt-observed", statusCode: 500, error });
+      return preserve("source_error");
     }
-    const prior = correction?.envelope.receipt;
-    const candidate: PublicObservedScoringReceipt = {
-      schemaVersion: "v7", policyVersion: "v7.2", receiptId: prior?.receiptId ?? randomUUID(), revisionId: randomUUID(), subjectRef: "subject-1",
-      revision: (prior?.revision ?? 0) + 1, supersedesRevisionId: prior?.revisionId ?? null, action: prior ? "correct" : "create", recordedAt: window.referenceTime, window,
-      inputs: core.inputs, core: core.core, craft, ...projected, limitations: [...core.limitations].sort(),
-      serializationVersion: "canonical-json-v1", algorithm: RECEIPT_ALGORITHM_OBSERVED, calculation: { rules: SCORING_OBSERVED_POLICY, core: core.trace },
-    };
-    // Seal before no-op comparison too: an invalid injected Craft result must
-    // never bypass the strict parser merely because other evidence is stable.
-    const envelope = await sealObservedScoreReceipt(candidate);
-    const coreSemanticDigest = await receiptSemanticIdentity({ ...envelope.receipt, craft: { status: "no_report", unlocked: false, report: null } }, evidence, ledgerSnapshot);
-    const semanticDigest = await observedSemanticIdentity(coreSemanticDigest, craft);
-    const baseline = correction ?? (previous.status === "found" ? previous : null);
-    const unchanged = baseline && baseline.envelope.receipt.action !== "retract" && baseline.envelope.receipt.window.referenceDate === window.referenceDate && baseline.semanticDigest === semanticDigest;
-    const published = await publish(handle, handle, unchanged ? baseline.envelope : envelope, semanticDigest, undefined, coreSemanticDigest);
+    const published = await publish(handle, handle, publication.envelope, publication.semanticDigest, undefined, publication.coreSemanticDigest);
     if (published.status === "failed") return preserve("storage_error");
     // The database winner may be another caller's identical root. Always
     // return that stored envelope rather than the locally allocated candidate.

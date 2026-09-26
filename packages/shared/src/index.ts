@@ -68,6 +68,7 @@ export * from "./scoring-evidence";
 export { createCoreScoringInputs } from "./stats-schema";
 
 export * from "./scoring-aggregation-v7";
+export * from "./scoring-aggregation-v7-streaming";
 
 export * from "./canonical-json";
 export * from "./score-receipt";

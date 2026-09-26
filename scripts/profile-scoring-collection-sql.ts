@@ -39,17 +39,17 @@ type Metadata = {
   accessContextId: string;
 };
 
-function object(value: unknown, name: string): JsonObject {
+export function object(value: unknown, name: string): JsonObject {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${name} must be a JSON object`);
   return value as JsonObject;
 }
 
-function string(value: unknown, name: string): string {
+export function string(value: unknown, name: string): string {
   if (typeof value !== "string" || !value) throw new Error(`${name} must be a nonempty string`);
   return value;
 }
 
-function parseArgs(args: string[]): { metadataPath: string; outputPath: string | null } | null {
+export function parseArgs(args: string[]): { metadataPath: string; outputPath: string | null } | null {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) return null;
   if (![2, 4].includes(args.length) || args[0] !== "--metadata" || !args[1] || !isAbsolute(args[1])
     || (args.length === 4 && (args[2] !== "--output" || !args[3] || !isAbsolute(args[3])))) {
@@ -62,7 +62,7 @@ function parseArgs(args: string[]): { metadataPath: string; outputPath: string |
   return { metadataPath: args[1], outputPath };
 }
 
-function parseMetadata(path: string): Metadata {
+export function parseMetadata(path: string): Metadata {
   const value = object(JSON.parse(readFileSync(path, "utf8")), "metadata");
   const keys = Object.keys(value).sort();
   if (JSON.stringify(keys) !== JSON.stringify(["accessContextId", "count", "coverage", "jobId", "owner", "requested", "scope", "seed", "source", "window"])) {
@@ -99,7 +99,7 @@ function parseMetadata(path: string): Metadata {
   return { count, seed, owner, jobId, source, requested, scope, window, coverage, accessContextId };
 }
 
-function configValue(config: string, section: string, key: string): string | null {
+export function configValue(config: string, section: string, key: string): string | null {
   const part = config.split(/(?=^\[)/m).find(block => block.split("\n", 1)[0] === `[${section}]`);
   return part?.match(new RegExp(`^${key}\\s*=\\s*(.+)$`, "m"))?.[1]?.trim() ?? null;
 }
@@ -123,7 +123,7 @@ function assertLocalTarget(): void {
   }
 }
 
-function sqlLiteral(value: unknown): string {
+export function sqlLiteral(value: unknown): string {
   return `'${(typeof value === "string" ? value : JSON.stringify(value)).replaceAll("'", "''")}'`;
 }
 
@@ -160,14 +160,14 @@ function inspectJob(metadata: Metadata): { owner: string; count: number } {
   return { owner, count };
 }
 
-function payloadSetup(jobId: string): string {
+export function payloadSetup(jobId: string): string {
   return `SET LOCAL statement_timeout = '${setupTimeout}';
 CREATE TEMP TABLE benchmark_payload ON COMMIT DROP AS
 SELECT coalesce(jsonb_agg(event ORDER BY event_key), '[]'::jsonb) AS events
 FROM public.scoring_collection_staged_events WHERE job_id=${sqlLiteral(jobId)}::uuid;`;
 }
 
-function checkpointBatchSetup(jobId: string, batchSize: number): string {
+export function checkpointBatchSetup(jobId: string, batchSize: number): string {
   // Clone bodies from the already synthetic job and give them new keys. This
   // models the next checkpoint batch without provider data or external input.
   // The staged-event key is indexed; no synthetic key survives ROLLBACK.
@@ -288,4 +288,6 @@ WHERE s.owner_handle=${owner} AND s.provider=${sqlLiteral(metadata.source.provid
   if (timedOut) process.exitCode = 2;
 }
 
-try { main(); } catch (error) { console.error((error as Error).message); process.exitCode = 1; }
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try { main(); } catch (error) { console.error((error as Error).message); process.exitCode = 1; }
+}

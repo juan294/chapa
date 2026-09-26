@@ -3,19 +3,19 @@ import { createScoringWindow } from "@chapa/shared";
 import { buildReceiptSnapshotV7 } from "@/lib/history/snapshot";
 import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
 
-vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: vi.fn() }));
+vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: vi.fn(), selectSourceManifest: vi.fn() }));
 vi.mock("@/lib/db/engineering-evidence", () => ({ dbReadEngineeringEvidence: vi.fn() }));
 vi.mock("@/lib/db/craft-v7", () => ({ dbReadCraftV7: vi.fn() }));
 vi.mock("@/lib/db/snapshots", () => ({ dbPublishReceiptV7: vi.fn(), dbReadReceiptV7: vi.fn() }));
 vi.mock("@/lib/cache/snapshot-cache", () => ({ getCachedReceiptSnapshotV7: vi.fn() }));
 vi.mock("@/lib/analytics/server-errors", () => ({ captureServerError: vi.fn() }));
 
-import { selectSourceEvidence } from "@/lib/platform/source-collectors";
+import { selectSourceEvidence, selectSourceManifest } from "@/lib/platform/source-collectors";
 import { dbReadEngineeringEvidence } from "@/lib/db/engineering-evidence";
 import { dbReadCraftV7 } from "@/lib/db/craft-v7";
 import { dbPublishReceiptV7, dbReadReceiptV7 } from "@/lib/db/snapshots";
 import { getCachedReceiptSnapshotV7 } from "@/lib/cache/snapshot-cache";
-import { materializeScoreReceiptV7, readScoreReceiptV7, RECEIPT_SOURCE_PROVIDERS } from "./score-receipt-v7";
+import { collectSourceManifests, materializeScoreReceiptV7, readScoreReceiptV7, RECEIPT_SOURCE_PROVIDERS } from "./score-receipt-v7";
 
 const referenceTime = "2026-09-01T12:00:00.000Z";
 const ledgerSnapshot = {
@@ -47,8 +47,28 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(dbReadEngineeringEvidence).mockResolvedValue(ledgerSnapshot as never);
   vi.mocked(selectSourceEvidence).mockResolvedValue({ status: "unlinked" } as never);
+  vi.mocked(selectSourceManifest).mockResolvedValue({ status: "unlinked" });
   vi.mocked(dbReadCraftV7).mockRejectedValue(new Error("no portfolio"));
   vi.mocked(dbPublishReceiptV7).mockImplementation(async () => ({ status: "inserted", snapshot: await snapshot() }) as never);
+});
+
+it("selects observed source manifests in provider order without consuming pages", async () => {
+  const window = createScoringWindow(referenceTime);
+  const coverage = { source: { provider: "github" as const, host: "github.com", subjectId: "alice" }, window,
+    dataThrough: referenceTime, status: "complete" as const, discovery: "owned_and_contributed" as const,
+    repositoryIds: [], repositoryDiscoveryComplete: true, eventKinds: {}, reasonCodes: [], unknownPeriods: [] };
+  const manifest = { id: "11111111-1111-4111-8111-111111111111", window, coverage, storageMode: "rows" as const, eventCount: 0,
+    eventGenerationId: "22222222-2222-4222-8222-222222222222", eventKeysSha256: "0".repeat(64) };
+  const pages = vi.fn(async function* () { yield []; });
+  vi.mocked(selectSourceManifest).mockImplementation(async input => input.provider === "github"
+    ? { status: "observed", manifest, pages, assertCurrent: async () => {}, inProgress: false }
+    : { status: "unlinked" });
+  const collected = await collectSourceManifests("alice", window, {});
+  expect(collected.sources).toEqual([coverage]);
+  expect(collected.streams).toHaveLength(1);
+  expect(pages).not.toHaveBeenCalled();
+  expect(collected.excludedSources).toEqual(RECEIPT_SOURCE_PROVIDERS.slice(1).map(provider => ({ provider, reason: "not_connected" })));
+  expect(selectSourceEvidence).not.toHaveBeenCalled();
 });
 
 describe("v7 receipt materialization", () => {

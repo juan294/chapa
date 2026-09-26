@@ -5,7 +5,7 @@ import { assertLocalSqlTarget } from "@/test/contract/local-sql";
 const owner = "contract-observed-upload";
 const capturedAt = "2026-09-08T12:00:00.000Z";
 const controlled = vi.hoisted(() => ({ source: vi.fn(async (input: unknown) => { void input; return { status: "unlinked" }; }), invalidate: vi.fn(async () => ({ redis: true, edge: "skipped" })) }));
-vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: controlled.source }));
+vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: controlled.source, selectSourceManifest: controlled.source }));
 vi.mock("@/lib/auth/resolve-request-auth", () => ({ resolveRequestAuth: async () => ({ handle: "contract-observed-upload" }) }));
 vi.mock("@/lib/render/badge-svg-cache", () => ({ invalidateBadgeSvgCacheForHandle: controlled.invalidate, isBadgeCacheRefreshed: (r: { redis: boolean; edge: string }) => r.redis && r.edge !== "failed" }));
 import { POST } from "./route";

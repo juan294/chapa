@@ -1,7 +1,7 @@
 import "server-only";
-import { discoverStoredSource, readSourceObservation } from "@/lib/db/source-context";
+import { discoverStoredSource, readSourceManifest, readSourceObservation, readSourcePages } from "@/lib/db/source-context";
 import { enqueueCollectionJob, isCollectionJobInProgress } from "@/lib/db/collection-queue";
-import { createSourceCoordinator } from "./source-coordinator";
+import { createSourceCoordinator, createSourceManifestCoordinator } from "./source-coordinator";
 import { readSourceAuthorization } from "./source-authorization";
 
 /** Live v7.2 entry point; legacy scalar consumers remain a separate boundary.
@@ -16,6 +16,17 @@ export const selectSourceEvidence = createSourceCoordinator({
   authorize: readSourceAuthorization,
   discover: discoverStoredSource,
   read: readSourceObservation,
+  enqueue: enqueueCollectionJob,
+  jobInProgress: isCollectionJobInProgress,
+});
+
+/** Issuance-only selection: retains a private page capability and never
+ * materializes a provider's entire event array in the coordinator. */
+export const selectSourceManifest = createSourceManifestCoordinator({
+  authorize: readSourceAuthorization,
+  discover: discoverStoredSource,
+  readManifest: readSourceManifest,
+  readPages: readSourcePages,
   enqueue: enqueueCollectionJob,
   jobInProgress: isCollectionJobInProgress,
 });
