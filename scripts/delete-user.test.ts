@@ -454,6 +454,7 @@ describe("SUPABASE_TABLES", () => {
       "merge_operations.target_handle",
       "report_craft_reports.owner_handle",
       "report_craft_selection.owner_handle",
+      "scoring_collection_generations.owner_handle",
       "scoring_collection_jobs.owner_handle",
       "scoring_issuance_attempts.owner_handle",
       "scoring_observed_current.owner_handle",

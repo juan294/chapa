@@ -160,7 +160,7 @@ export async function enqueueCollectionJob(
  */
 export async function claimCollectionJobs(limit: number, leaseSeconds: number): Promise<CollectionJob[]> {
   try {
-    const data = await rpc("scoring_collection_claim", { p_limit: limit, p_lease_seconds: leaseSeconds });
+    const data = await rpc("scoring_collection_claim_v2", { p_limit: limit, p_lease_seconds: leaseSeconds });
     return z.array(z.unknown()).parse(data).map(mapJobRow);
   } catch (error) {
     throw new Error(`Collection claim unavailable: ${(error as Error).message}`, { cause: error });
@@ -176,6 +176,7 @@ const checkpointResultSchema = z.union([
   z.object({ status: z.literal("ok"), stagedCount: z.number().int().nonnegative() }).strict(),
   z.object({ status: z.literal("event_limit"), stagedCount: z.number().int().nonnegative() }).strict(),
   z.object({ status: z.literal("lease_mismatch") }).strict(),
+  z.object({ status: z.literal("importing"), importedCount: z.number().int().nonnegative(), remainingCount: z.number().int().nonnegative() }).strict(),
 ]);
 
 /**
@@ -192,7 +193,7 @@ export async function checkpointCollectionJob(
   release: boolean,
 ): Promise<CheckpointOutcome> {
   try {
-    const data = await rpc("scoring_collection_checkpoint", {
+    const input = {
       p_job_id: job.id,
       p_lease_token: job.leaseToken,
       p_checkpoint: checkpoint,
@@ -200,8 +201,29 @@ export async function checkpointCollectionJob(
       p_events: events,
       p_progress: progress,
       p_release: release,
-    });
-    return checkpointResultSchema.parse(data);
+    };
+    let result = checkpointResultSchema.parse(await rpc("scoring_collection_checkpoint_v2", input));
+    if (result.status !== "importing") return result;
+
+    // A pre-migration job can already hold thousands of staged rows. The v2
+    // RPC imports at most 2,000 per call and ignores the new slice until the
+    // import is complete. Poll with empty batches, then send this slice once.
+    // A non-decreasing remainder is a protocol error, not an infinite loop.
+    let previousRemaining = Number.POSITIVE_INFINITY;
+    for (let page = 0; page < 32; page++) {
+      if (result.status !== "importing") throw new Error("Legacy import returned an unexpected checkpoint result");
+      if (result.remainingCount >= previousRemaining) throw new Error("Legacy import made no progress");
+      previousRemaining = result.remainingCount;
+      if (result.remainingCount === 0) {
+        result = checkpointResultSchema.parse(await rpc("scoring_collection_checkpoint_v2", input));
+        if (result.status === "importing") throw new Error("Legacy import restarted after completion");
+        return result;
+      }
+      result = checkpointResultSchema.parse(await rpc("scoring_collection_checkpoint_v2", {
+        ...input, p_event_keys: [], p_events: [], p_release: false,
+      }));
+    }
+    throw new Error("Legacy import exceeded its bounded page budget");
   } catch (error) {
     throw new Error(`Collection checkpoint unavailable: ${(error as Error).message}`, { cause: error });
   }
@@ -225,13 +247,12 @@ export type FinishOutcome =
   | { readonly status: "lease_mismatch" };
 
 const finishResultSchema = z.union([
-  z.object({ status: z.literal("ok"), observationId: z.uuid(), appended: z.unknown() }).loose(),
+  z.object({ status: z.literal("ok"), observationId: z.uuid(), eventCount: z.number().int().nonnegative() }).strict(),
   z.object({ status: z.literal("event_limit"), stagedCount: z.number().int().nonnegative() }).strict(),
   z.object({ status: z.literal("lease_mismatch") }).strict(),
 ]);
 
-/** Calls the existing append path (`scoring_v7_append_source`, migration 045)
- * with the job's complete staged event set as the payload, in the same
+/** Publishes a small manifest for the immutable event generation in the same
  * transaction as the `complete` state transition.
  */
 export async function finishCollectionJob(
@@ -239,7 +260,7 @@ export async function finishCollectionJob(
   args: FinishAppendArgs,
 ): Promise<FinishOutcome> {
   try {
-    const data = await rpc("scoring_collection_finish", {
+    const data = await rpc("scoring_collection_finish_v2", {
       p_job_id: job.id,
       p_lease_token: job.leaseToken,
       p_coverage: args.coverage,
@@ -262,24 +283,43 @@ export async function finishCollectionJob(
  * slices (and this one, once its own checkpoint call has landed), so the
  * worker can pass `stagedKeys` to the next `CollectSlice` call per
  * `lib/collection/plan.ts`. A `CollectSlice` only ever dedupes against these
- * keys -- it never needs the staged rows' full JSONB bodies (up to 50,000
- * per job), which `checkpoint()`/`finish()` read and write server-side --
- * so this reads the `event_key` column only, not `event`.
+ * keys. It never needs the rows' full JSONB bodies, so this reads only the
+ * `event_key` column from the current generation and any legacy staging.
  */
 export async function listStagedEventKeys(jobId: string): Promise<ReadonlySet<string>> {
   const db = getSupabase();
   if (!db) throw new Error("listStagedEventKeys: Supabase client unavailable");
+  const { data: job, error: jobError } = await db.from("scoring_collection_jobs")
+    .select("current_generation_id").eq("id", jobId).maybeSingle();
+  if (jobError) throw new Error(`listStagedEventKeys failed: ${jobError.message}`);
+  if (!job) throw new Error(`listStagedEventKeys failed: job ${jobId} not found`);
   // PostgREST returns at most `max_rows` (1,000) rows per request, so page
   // explicitly: a truncated key set makes every later slice re-send events.
+  // During a legacy import both tables can contain keys. Once import is
+  // complete, the generation has the full key set and only it needs paging.
   const keys = new Set<string>();
-  for (let from = 0; ; from += STAGED_KEYS_PAGE) {
-    const { data, error } = await db.from("scoring_collection_staged_events").select("event_key").eq("job_id", jobId)
-      .order("event_key").range(from, from + STAGED_KEYS_PAGE - 1);
-    if (error) throw new Error(`listStagedEventKeys failed: ${error.message}`);
-    const rows = z.array(z.object({ event_key: z.string() }).strict()).parse(data ?? []);
-    for (const row of rows) keys.add(row.event_key);
-    if (rows.length < STAGED_KEYS_PAGE) return keys;
+  let sources: readonly ("legacy" | "generation")[] = ["legacy"];
+  if (job.current_generation_id) {
+    const { data: generation, error: generationError } = await db.from("scoring_collection_generations")
+      .select("legacy_import_done").eq("id", job.current_generation_id).single();
+    if (generationError || !generation) {
+      throw new Error(`listStagedEventKeys failed: ${generationError?.message ?? "generation not found"}`);
+    }
+    sources = generation.legacy_import_done ? ["generation"] : ["legacy", "generation"];
   }
+  for (const source of sources) {
+    for (let from = 0; ; from += STAGED_KEYS_PAGE) {
+      const query = source === "legacy"
+        ? db.from("scoring_collection_staged_events").select("event_key").eq("job_id", jobId)
+        : db.from("scoring_collection_generation_events").select("event_key").eq("generation_id", job.current_generation_id!);
+      const { data, error } = await query.order("event_key").range(from, from + STAGED_KEYS_PAGE - 1);
+      if (error) throw new Error(`listStagedEventKeys failed: ${error.message}`);
+      const rows = z.array(z.object({ event_key: z.string() }).strict()).parse(data ?? []);
+      for (const row of rows) keys.add(row.event_key);
+      if (rows.length < STAGED_KEYS_PAGE) break;
+    }
+  }
+  return keys;
 }
 const STAGED_KEYS_PAGE = 1_000;
 

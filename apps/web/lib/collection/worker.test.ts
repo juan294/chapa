@@ -183,6 +183,56 @@ describe("runCollectionSlice", () => {
     expect(deps.fail).not.toHaveBeenCalled();
   });
 
+  it("writes a large completed slice in 1,000-event batches and advances state only on the final write", async () => {
+    const deps = harness();
+    const previousCheckpoint: CollectorCheckpoint = { version: 1, operations: [{ key: "merged", cursor: "before", done: false }], discovered: { repositoryIds: ["R1"] } };
+    const previousProgress = { operationsDone: 0, operationsKnown: 1, events: 3, requests: 2 };
+    const nextCheckpoint: CollectorCheckpoint = { version: 1, operations: [{ key: "merged", cursor: null, done: true }], discovered: { repositoryIds: ["R1"] } };
+    const events = Array.from({ length: 4_005 }, (_, index) => event({ eventId: `bulk-${index}`, occurredAt: "2026-09-01T00:00:00.000Z" }));
+    deps.listStagedKeys = vi.fn().mockResolvedValue(new Set(["old-1", "old-2", "old-3"]));
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ events, checkpoint: nextCheckpoint, done: true, coverage: sampleCoverage, requests: 9, discoveryComplete: true }));
+
+    await runCollectionSlice(makeJob({ checkpoint: previousCheckpoint, progress: previousProgress }), Date.now() + 60_000, deps);
+
+    expect(deps.checkpoint).toHaveBeenCalledTimes(5);
+    for (let batch = 0; batch < 4; batch++) {
+      expect(deps.checkpoint).toHaveBeenNthCalledWith(batch + 1, { id: "job-1", leaseToken: "lease-1" },
+        previousCheckpoint, events.slice(batch * 1_000, (batch + 1) * 1_000), previousProgress, false);
+    }
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(5, { id: "job-1", leaseToken: "lease-1" }, nextCheckpoint, events.slice(4_000),
+      { operationsDone: 1, operationsKnown: 1, events: 4_008, requests: 9, discovering: false }, false);
+    expect(deps.finish).toHaveBeenCalledOnce();
+  });
+
+  it("releases only the final batch, and never finishes after a partial checkpoint result", async () => {
+    const deps = harness();
+    const events = Array.from({ length: 2_001 }, (_, index) => event({ eventId: `bulk-${index}`, occurredAt: "2026-09-01T00:00:00.000Z" }));
+    const nextCheckpoint: CollectorCheckpoint = { version: 1, operations: [{ key: "merged", cursor: "next", done: false }], discovered: { repositoryIds: ["R1"] } };
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ events, checkpoint: nextCheckpoint,
+      stop: { provider: "github", operation: "merged", stopKind: "budget", httpStatus: null, retryAfterSeconds: null } }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.checkpoint).toHaveBeenCalledTimes(3);
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(1, expect.anything(), EMPTY_CHECKPOINT, events.slice(0, 1_000), makeJob().progress, false);
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(2, expect.anything(), EMPTY_CHECKPOINT, events.slice(1_000, 2_000), makeJob().progress, false);
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(3, expect.anything(), nextCheckpoint, events.slice(2_000), expect.anything(), true);
+
+    const failing = harness();
+    failing.collect = vi.fn().mockResolvedValue(sliceResult({ events, checkpoint: nextCheckpoint, done: true, coverage: sampleCoverage }));
+    failing.checkpoint = vi.fn().mockResolvedValueOnce({ status: "event_limit", stagedCount: 0 });
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, failing);
+    expect(failing.checkpoint).toHaveBeenCalledTimes(1);
+    expect(failing.finish).not.toHaveBeenCalled();
+
+    const throwing = harness();
+    throwing.collect = vi.fn().mockResolvedValue(sliceResult({ events, checkpoint: nextCheckpoint, done: true, coverage: sampleCoverage }));
+    throwing.checkpoint = vi.fn()
+      .mockResolvedValueOnce({ status: "ok", stagedCount: 1_000 })
+      .mockRejectedValueOnce(new Error("checkpoint timeout"));
+    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, throwing)).rejects.toThrow("checkpoint timeout");
+    expect(throwing.checkpoint).toHaveBeenCalledTimes(2);
+    expect(throwing.finish).not.toHaveBeenCalled();
+  });
+
   // #1342 -- the worker never recomputes discovery on its own; it only
   // carries whatever the collector reported for this checkpoint.
   it("slice progress carries the collector's discoveryComplete", async () => {

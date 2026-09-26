@@ -196,10 +196,39 @@ const LEASE_SECONDS = 120;
 /** Per-slice request budget and wall-clock share of the tick's deadline. */
 const MAX_REQUESTS_PER_SLICE = 150;
 const SLICE_TIME_BUDGET_MS = 60_000;
+const MAX_EVENTS_PER_CHECKPOINT = 1_000;
 /** Stop claiming new work this long before the tick's own deadline, so the
  * last claimed batch has time to finish and the response can still return.
  */
 const TICK_SAFETY_MARGIN_MS = 20_000;
+
+/** Stage event bodies in bounded writes. The durable collector cursor and
+ * progress advance only after every body in this slice has been accepted.
+ */
+async function checkpointInBatches(
+  deps: CollectionWorkerDeps,
+  lease: { readonly id: string; readonly leaseToken: string },
+  previousCheckpoint: CollectorCheckpoint,
+  previousProgress: CollectionProgress,
+  nextCheckpoint: CollectorCheckpoint,
+  events: readonly NormalizedEngineeringEvent[],
+  nextProgress: CollectionProgress,
+  release: boolean,
+): ReturnType<typeof checkpointCollectionJob> {
+  if (events.length === 0) return deps.checkpoint(lease, nextCheckpoint, [], nextProgress, release);
+  for (let start = 0; start < events.length; start += MAX_EVENTS_PER_CHECKPOINT) {
+    const batch = events.slice(start, start + MAX_EVENTS_PER_CHECKPOINT);
+    const final = start + batch.length === events.length;
+    const outcome = await deps.checkpoint(lease,
+      final ? nextCheckpoint : previousCheckpoint,
+      batch,
+      final ? nextProgress : previousProgress,
+      final && release,
+    );
+    if (outcome.status !== "ok" || final) return outcome;
+  }
+  throw new Error("checkpointInBatches: no batch written");
+}
 
 /**
  * Reads yesterday's complete observation for this exact source, if any, and
@@ -295,6 +324,7 @@ export async function runCollectionSlice(
   const { resolved } = credentialResult;
 
   let checkpoint = job.checkpoint;
+  let persistedProgress = job.progress;
   let stagedKeys = await deps.listStagedKeys(job.id);
 
   // Incremental daily reuse (phase-3.md): only on this job's very first
@@ -317,11 +347,11 @@ export async function runCollectionSlice(
         // first real slice appends any operations.
         discovering: true,
       };
-      const outcome = await deps.checkpoint(lease, seed.checkpoint, seed.seededEvents, seedProgress, false);
-      if (outcome.status !== "lease_mismatch") {
-        checkpoint = seed.checkpoint;
-        stagedKeys = new Set([...stagedKeys, ...seed.seededEvents.map(engineeringEventKey)]);
-      }
+      const outcome = await checkpointInBatches(deps, lease, checkpoint, persistedProgress, seed.checkpoint, seed.seededEvents, seedProgress, false);
+      if (outcome.status !== "ok") return;
+      checkpoint = seed.checkpoint;
+      persistedProgress = seedProgress;
+      stagedKeys = new Set([...stagedKeys, ...seed.seededEvents.map(engineeringEventKey)]);
     }
   }
 
@@ -364,7 +394,8 @@ export async function runCollectionSlice(
   });
 
   if (result.done) {
-    await deps.checkpoint(lease, result.checkpoint, result.events, progress, false);
+    const outcome = await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, false);
+    if (outcome.status !== "ok") return;
     if (!result.coverage) throw new Error(`runCollectionSlice: job ${job.id} reported done with no coverage`);
     const observationId = randomUUID();
     const finished = await deps.finish(lease, {
@@ -386,7 +417,7 @@ export async function runCollectionSlice(
   if (!stop) {
     // Nothing left to do this slice (e.g. a checkpoint-only pass with no
     // stop reported) but not done either -- release for another slice.
-    await deps.checkpoint(lease, result.checkpoint, result.events, progress, true);
+    await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, true);
     return;
   }
 
@@ -396,13 +427,14 @@ export async function runCollectionSlice(
   deps.emitDiagnostics(job.ownerHandle, [stop]);
 
   if (stop.stopKind === "budget" || stop.stopKind === "deadline") {
-    await deps.checkpoint(lease, result.checkpoint, result.events, progress, true);
+    await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, true);
     return;
   }
 
   // Every other stop kind persists this slice's progress (release=false --
   // fail() owns the next state transition) before deciding retry policy.
-  await deps.checkpoint(lease, result.checkpoint, result.events, progress, false);
+  const outcome = await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, false);
+  if (outcome.status !== "ok") return;
 
   if (stop.stopKind === "rate_limited") {
     const retryAt = new Date(deps.now() + (stop.retryAfterSeconds ?? 60) * 1000).toISOString();

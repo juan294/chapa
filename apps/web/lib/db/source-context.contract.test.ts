@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createScoringWindow } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey } from "@chapa/shared";
 import { getServiceClient } from "@/test/contract/invoke";
 import { assertLocalSqlTarget, inspectLocalSql } from "@/test/contract/local-sql";
 import { sourceEventFixture } from "./source-context-fixture";
 import { readSourceObservation } from "./source-context";
 import { databaseInstantMicros } from "./source-time";
+import { EMPTY_CHECKPOINT } from "@/lib/collection/plan";
+import { EMPTY_PROGRESS, enqueueCollectionJob } from "./collection-queue";
 const owner = "contract-source-context";
 const db = getServiceClient;
 const window = createScoringWindow("2026-09-05T12:00:00Z");
@@ -22,7 +24,83 @@ async function cleanup() {
 }
 beforeEach(async () => { await cleanup(); expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull(); });
 afterEach(cleanup);
+async function leaseV2Fixture(jobId: string) {
+ const lease = randomUUID();
+ const result = await db().from("scoring_collection_jobs")
+  .update({ state: "running", lease_token: lease, lease_expires_at: new Date(Date.now() + 120_000).toISOString() })
+  .eq("id", jobId).eq("state", "queued").select("id").single();
+ expect(result.error).toBeNull();
+ return lease;
+}
 describe("source context RPC draft contracts", () => {
+ it("forces RLS and restricts generation tables and v2 RPCs to the service role", () => {
+  const tables = inspectLocalSql("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity,has_table_privilege('anon',c.oid,'SELECT'),has_table_privilege('authenticated',c.oid,'SELECT'),has_table_privilege('service_role',c.oid,'SELECT'),has_table_privilege('service_role',c.oid,'INSERT'),has_table_privilege('service_role',c.oid,'UPDATE'),has_table_privilege('service_role',c.oid,'DELETE') FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('scoring_collection_generations','scoring_collection_generation_events') ORDER BY c.relname");
+  expect(tables.split("\n")).toEqual([
+   "scoring_collection_generation_events|t|t|f|f|t|f|f|f",
+   "scoring_collection_generations|t|t|f|f|t|f|f|f",
+  ]);
+  const functions = inspectLocalSql("SELECT p.proname,has_function_privilege('anon',p.oid,'EXECUTE'),has_function_privilege('authenticated',p.oid,'EXECUTE'),has_function_privilege('service_role',p.oid,'EXECUTE'),p.proconfig::text FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('scoring_collection_checkpoint_v2','scoring_collection_finish_v2') ORDER BY p.proname");
+  const lines = functions.split("\n");
+  expect(lines).toHaveLength(2);
+  for (const line of lines) {
+   expect(line).toMatch(/^scoring_collection_(checkpoint|finish)_v2\|f\|f\|t\|/);
+   expect(line).toContain("search_path=");
+  }
+ });
+ it("fails closed when the legacy read RPC selects a row-mode observation", async () => {
+  const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+  const lease = await leaseV2Fixture(job.id);
+  const event = sourceEventFixture(source, window);
+  const checkpoint = await db().rpc("scoring_collection_checkpoint_v2", {
+   p_job_id: job.id, p_lease_token: lease, p_checkpoint: EMPTY_CHECKPOINT,
+   p_event_keys: [engineeringEventKey(event)], p_events: [event],
+   p_progress: { ...EMPTY_PROGRESS, events: 1 }, p_release: false,
+  });
+  expect(checkpoint.error).toBeNull();
+  const finished = await db().rpc("scoring_collection_finish_v2", {
+   p_job_id: job.id, p_lease_token: lease, p_coverage: { ...coverage, repositoryIds: [event.repositoryId] },
+   p_observation: randomUUID(), p_requested: requested, p_access: base().p_access,
+   p_scope: { ...scope, repositoryIds: [event.repositoryId] }, p_link_id: null, p_link_version: null,
+  });
+  expect(finished.error).toBeNull();
+  const legacyRead = await db().rpc("scoring_v7_read_source", {
+   ...base(), p_scope: { ...scope, repositoryIds: [event.repositoryId] }, p_window: window, p_prior: false,
+  });
+  expect(legacyRead.error).not.toBeNull();
+ });
+ it("rejects a changed linked grant at finish and withdrawal removes its generation rows", async () => {
+  const linkId = randomUUID();
+  expect((await db().from("user_platforms").insert({ id: linkId, handle: owner, platform: "gitlab", remote_login: "linked", access_token: "fixture-ciphertext" })).error).toBeNull();
+  const link = await db().from("user_platforms").select("updated_at").eq("id", linkId).single();
+  expect(link.error).toBeNull();
+  const linkedSource = { provider: "gitlab" as const, host: "gitlab.com", subjectId: "synthetic-linked-subject" };
+  const event = sourceEventFixture(linkedSource, window);
+  const linkedRequested = { provider: "gitlab", host: "gitlab.com", login: "linked" };
+  const linkedScope = { ...scope, repositoryIds: [event.repositoryId] };
+  const linkedCoverage = { ...coverage, source: linkedSource, repositoryIds: [event.repositoryId] };
+  const job = await enqueueCollectionJob(owner, "gitlab", "signup", window.referenceTime);
+  const lease = await leaseV2Fixture(job.id);
+  const checkpoint = await db().rpc("scoring_collection_checkpoint_v2", {
+   p_job_id: job.id, p_lease_token: lease, p_checkpoint: EMPTY_CHECKPOINT,
+   p_event_keys: [engineeringEventKey(event)], p_events: [event],
+   p_progress: { ...EMPTY_PROGRESS, events: 1 }, p_release: false,
+  });
+  expect(checkpoint.error).toBeNull();
+  expect((await db().from("user_platforms").update({ access_token: "rotated-ciphertext" }).eq("id", linkId)).error).toBeNull();
+  const observationId = randomUUID();
+  const finish = await db().rpc("scoring_collection_finish_v2", {
+   p_job_id: job.id, p_lease_token: lease, p_coverage: linkedCoverage,
+   p_observation: observationId, p_requested: linkedRequested, p_access: base().p_access,
+   p_scope: linkedScope, p_link_id: linkId, p_link_version: link.data!.updated_at,
+  });
+  expect(finish.error).not.toBeNull();
+  expect((await db().from("scoring_v7_source_observations").select("id").eq("id", observationId)).data).toEqual([]);
+  const generation = (await db().from("scoring_collection_jobs").select("current_generation_id").eq("id", job.id).single()).data!.current_generation_id;
+  const withdrawn = await db().rpc("scoring_v7_withdraw_with_receipts", { p_owner: owner, p_actor: owner, p_acknowledged: true });
+  expect(withdrawn.error).toBeNull();
+  expect((await db().from("scoring_collection_generations").select("id").eq("owner_handle", owner)).data).toEqual([]);
+  expect((await db().from("scoring_collection_generation_events").select("generation_id").eq("generation_id", generation)).data).toEqual([]);
+ });
  it("denies browser roles all source and token mutation RPCs", () => {
   const query = "SELECT p.proname,has_function_privilege('anon',p.oid,'EXECUTE'),has_function_privilege('authenticated',p.oid,'EXECUTE'),has_function_privilege('service_role',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('scoring_v7_append_source','scoring_v7_read_source','scoring_v7_discover_source','scoring_v7_cas_link_tokens') ORDER BY p.proname";
   expect(inspectLocalSql(query).split("\n")).toEqual([

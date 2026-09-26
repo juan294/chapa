@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createScoringWindow } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
+import { sourceEventFixture } from "./source-context-fixture";
 import { getSupabase } from "./supabase";
-import { EMPTY_PROGRESS, claimCollectionJobs, enqueueCollectionJob, type CollectionProgress } from "./collection-queue";
+import { EMPTY_PROGRESS, checkpointCollectionJob, claimCollectionJobs, enqueueCollectionJob, finishCollectionJob, type CollectionProgress } from "./collection-queue";
 
 vi.mock("./supabase", () => ({ getSupabase: vi.fn() }));
 
@@ -48,6 +50,48 @@ const fullCheckpoint: CollectorCheckpoint = {
 const fullProgress: CollectionProgress = { operationsDone: 3, operationsKnown: 10, events: 42, requests: 17 };
 
 describe("collection queue checkpoint/progress schema round-trip (no database)", () => {
+  it("claims through the generation-aware RPC during old/new worker overlap", async () => {
+    rpc.mockResolvedValueOnce({ data: [], error: null });
+    expect(await claimCollectionJobs(1, 120)).toEqual([]);
+    expect(rpc).toHaveBeenCalledWith("scoring_collection_claim_v2", { p_limit: 1, p_lease_seconds: 120 });
+  });
+
+  it("uses the generation-aware checkpoint RPC", async () => {
+    const lease = { id: baseRow.id, leaseToken: "22222222-2222-4222-8222-222222222222" };
+    rpc.mockResolvedValueOnce({ data: { status: "ok", stagedCount: 0 }, error: null });
+    expect(await checkpointCollectionJob(lease, EMPTY_CHECKPOINT, [], EMPTY_PROGRESS, false))
+      .toEqual({ status: "ok", stagedCount: 0 });
+    expect(rpc).toHaveBeenCalledWith("scoring_collection_checkpoint_v2", expect.objectContaining({ p_job_id: lease.id }));
+  });
+
+  it("imports an old staged job in bounded calls before sending the new batch once", async () => {
+    const lease = { id: baseRow.id, leaseToken: "22222222-2222-4222-8222-222222222222" };
+    const event = sourceEventFixture(
+      { provider: "github", host: "github.com", subjectId: "canonical-node" },
+      createScoringWindow("2026-09-05T12:00:00Z"),
+    );
+    rpc.mockResolvedValueOnce({ data: { status: "importing", importedCount: 2000, remainingCount: 2000 }, error: null });
+    rpc.mockResolvedValueOnce({ data: { status: "importing", importedCount: 4000, remainingCount: 0 }, error: null });
+    rpc.mockResolvedValueOnce({ data: { status: "ok", stagedCount: 4001 }, error: null });
+    expect(await checkpointCollectionJob(lease, EMPTY_CHECKPOINT, [event], EMPTY_PROGRESS, false))
+      .toEqual({ status: "ok", stagedCount: 4001 });
+    expect(rpc).toHaveBeenCalledTimes(3);
+    expect(rpc.mock.calls.map(([, input]) => input.p_events)).toEqual([[event], [], [event]]);
+  });
+
+  it("uses the generation-aware finish RPC with a small response", async () => {
+    const lease = { id: baseRow.id, leaseToken: "22222222-2222-4222-8222-222222222222" };
+    const observationId = "33333333-3333-4333-8333-333333333333";
+    rpc.mockResolvedValueOnce({ data: { status: "ok", observationId, eventCount: 0 }, error: null });
+    expect(await finishCollectionJob(lease, {
+      coverage: {}, observationId,
+      requested: { provider: "github", host: "github.com", login: "alice" },
+      access: "a".repeat(64), scope: { discovery: "owned_and_contributed", repositoryIds: [], eventKinds: [] },
+      linkId: null, linkVersion: null,
+    })).toEqual({ status: "ok", observationId });
+    expect(rpc).toHaveBeenCalledWith("scoring_collection_finish_v2", expect.objectContaining({ p_observation: observationId }));
+  });
+
   it("round-trips a full checkpoint through enqueueCollectionJob's row parsing", async () => {
     rpc.mockResolvedValue({ data: { ...baseRow, checkpoint: fullCheckpoint, progress: EMPTY_PROGRESS }, error: null });
     const job = await enqueueCollectionJob("alice", "github", "signup", "2026-09-05T12:00:00.000Z");

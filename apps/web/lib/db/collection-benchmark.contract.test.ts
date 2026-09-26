@@ -251,7 +251,11 @@ async function benchmark(count: number): Promise<void> {
   }
 }
 
-describe("local high-volume collection baseline", () => {
+// Phase 1 baseline is historical evidence for the legacy queue. Running it
+// after the v2 migration would call the old finish RPC on row-mode jobs and
+// overwrite the pinned measurements. Opt in only when profiling that path.
+const baselineSuite = process.env.SCORING_RUN_LEGACY_BASELINE === "1" ? describe : describe.skip;
+baselineSuite("local high-volume collection baseline", () => {
   for (const count of counts) {
     it(`records ${count} synthetic events through the real queue`, async () => benchmark(count), 900_000);
   }
