@@ -1,5 +1,5 @@
 name: Sutura repair monitor
-run-name: "${{ format('{0}: {1} #{2} ({3}) on {4}', github.event.workflow_run.conclusion == 'success' && 'No repair needed' || (github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'timed_out') && 'Repair requested' || 'Repair not triggered', github.event.workflow_run.name, github.event.workflow_run.run_number, github.event.workflow_run.conclusion, github.event.workflow_run.head_branch) }}"
+run-name: "${{ format('Sutura monitor: {0} #{1} ({2} / {3})', github.event.workflow_run.name, github.event.workflow_run.run_number, github.event.workflow_run.event, github.event.workflow_run.conclusion) }}"
 
 on:
   workflow_run:
@@ -21,13 +21,14 @@ jobs:
     name: Attempt verified CI repair
     if: >-
       ${{
-        github.event.workflow_run.conclusion == 'failure' ||
-        github.event.workflow_run.conclusion == 'timed_out'
+        github.event.workflow_run.event == 'pull_request' &&
+        (github.event.workflow_run.conclusion == 'failure' ||
+         github.event.workflow_run.conclusion == 'timed_out')
       }}
     runs-on: ubuntu-latest
     steps:
       - name: Verify and repair failed CI
-        uses: juan294/sutura@4e177b38cd43cc7233873b4455d4dc18dee706b8
+        uses: juan294/sutura@34731374d7c92ecf6b50700fb1affd3321323b89
         with:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
