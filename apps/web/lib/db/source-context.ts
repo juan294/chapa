@@ -22,7 +22,7 @@ const acceptance = z.object({ method: z.enum(["merged_change", "default_branch_f
 const eventSchema = sourceSchema.extend({ repositoryId: text, actorId: text, eventId: text, schemaVersion: z.literal("v7"), kind,
  occurredAt: instant, dataThrough: instant, canonicalProjectId: text, workItemId: text, artifactRevision: text, artifactReferenceIds: z.array(text).max(1000),
  attribution: z.enum(["individual", "team_participation", "unclear"]), provenance, coverage: status,
- measurements: z.object({ changedFiles: observation(z.array(text).max(1000)), additions: observation(z.number().int().nonnegative()), deletions: observation(z.number().int().nonnegative()), leadTimeHours: observation(z.number().nonnegative()), hasDescription: observation(z.boolean()), hasIssueLink: observation(z.boolean()), usesFeatureBranch: observation(z.boolean()) }).strict(),
+ measurements: z.object({ changedFiles: observation(z.array(text).max(10000)), additions: observation(z.number().int().nonnegative()), deletions: observation(z.number().int().nonnegative()), leadTimeHours: observation(z.number().nonnegative()), hasDescription: observation(z.boolean()), hasIssueLink: observation(z.boolean()), usesFeatureBranch: observation(z.boolean()) }).strict(),
  categories: z.array(z.object({ category: z.enum(["implementation", "verification_review", "documentation_design", "maintenance_support"]), evidenceReferenceIds: z.array(text).max(1000) }).strict()).max(4),
  acceptance: observation(acceptance),
 }).strict();

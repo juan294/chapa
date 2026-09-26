@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-09-26
+
+### Fixed
+
+- Complete GitHub collection for pull requests with more than 1,000 changed
+  files. The source validator now accepts up to 10,000 paths, consistent with
+  the existing source list bound. Previously, a valid large pull request could
+  leave a fully collected account without a score receipt or visible badge
+  (migration 060).
+
 ## [4.1.0] - 2026-09-25
 
 ### Removed
@@ -1918,7 +1928,9 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.3...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v4.1.1...HEAD
+[4.1.1]: https://github.com/juan294/chapa/compare/v4.1.0...v4.1.1
+[4.1.0]: https://github.com/juan294/chapa/compare/v4.0.7...v4.1.0
 [3.0.3]: https://github.com/juan294/chapa/compare/v3.0.2...v3.0.3
 [3.0.2]: https://github.com/juan294/chapa/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/juan294/chapa/compare/v3.0.0...v3.0.1
