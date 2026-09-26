@@ -82,3 +82,69 @@ Implementation branch: `fix/high-volume-badge-collection`, based on `26648ab9d48
 - **Database health:** Final local `SELECT 1` succeeded; the PostgreSQL postmaster start time remained `2026-09-26 12:03:57 UTC`. From the final default/scale gates onward, logs showed no signal-9 backend termination, statement timeout, FATAL/PANIC, recovery, or out-of-memory match. No production data was used.
 - **Simplify pass:** Reuse review retained the shared body-staging helper for both collector slices and prior seeding. Quality review kept page integrity in one iterator and lease transitions in the worker. Efficiency review confirmed the worker no longer scans the entire staged-key table on each slice and corrected the stale `CollectSlice` comment; no further behavior-changing cleanup was justified after the loaded-scale qualification.
 - **Next gate:** Phase 4 must replace the coordinator's materialized event array with manifest/page issuance, preserve exact observed scoring and semantic digest parity, and prove memory/runtime budgets before Phase 5 raises the writer cap. The production badge remains unfixed.
+
+### Phase 4: compact scorer projections preserve the pinned algorithm digest
+
+- **Plan said:** Reduce paged events into cross-source facts without retaining
+  full event objects, while keeping the v7.2 scorer and private semantic digest
+  exact.
+- **Found:** The pinned scorer expects an event array. Adding streaming helpers
+  to its listed source files changed the public algorithm source digest and
+  would change the private receipt identity despite identical scoring rules.
+  A direct fact-only rewrite would duplicate the policy's selection and bounds
+  logic. The compact adapter retains one schema-shaped scoring projection per
+  distinct event but replaces the original changed-file list with a one-path
+  representative that preserves complete-list equality and documentation
+  classification. Exact original event bodies live only in bounded private
+  spool files. This is O(event count) compact memory, not constant memory.
+- **Chose:** Keep the three pinned scorer files byte-for-byte unchanged. Put
+  the page-to-compact adapter in separate pre-scorer modules, then invoke the
+  original pinned scorer on compact input. Keep the prior algorithm digest and
+  require original-versus-compact parity tests, including conflicting file
+  facts, duplicates, aliases, unclear attribution, and quality support. The
+  100,000-event full materializer measured 1,332,740,096 bytes OS peak RSS,
+  under the 70%-of-2-GiB gate; a mixed-provider 10%-unclear scorer/digest
+  fixture measured 1,369,178,112 bytes.
+- **Why:** The source digest is an integrity boundary for the pure policy.
+  This transport adapter changes representation before that policy, as source
+  normalization already does. Keeping it separate preserves unchanged
+  receipt identity; measured bounds and parity constrain the adapter. Future
+  event schema or file-classification changes must revisit that boundary.
+
+## Phase 4 handoff
+
+- **Scope and state:** Local code commit `bac03bfd` on
+  `fix/high-volume-badge-collection`, still using only the disposable
+  `chapa-volume-20260926` stack. The temporary `supabase/config.toml` port
+  override is uncommitted and excluded. No push, production migration,
+  release, or badge repair has occurred.
+- **Design:** Observed issuance drains authorized, verified 500-event source
+  pages, writes canonical evidence into private bounded disk runs, derives a
+  compact scorer input, calls the unchanged pinned v7.2 scorer, and streams
+  an exact private semantic digest. It disposes the spool and rechecks source
+  authorization before publication. Page, reducer, or digest faults preserve
+  the prior receipt; report-only and legacy v7 paths remain in place.
+- **Parity and memory:** Default tests cover small/page-boundary cases and
+  eighty seeded original-versus-compact cases across three page sizes.
+  A 17,572-event mixed-provider case matches the legacy scorer and digest.
+  The 100,000-event full materializer completed in 33.61 seconds with
+  1,332,740,096 bytes OS peak RSS. A mixed-provider 100,000-event scorer and
+  digest run with 10% unclear attribution used 1,369,178,112 bytes. Both
+  are below 70% of the checked 2 GiB allocation. The full materializer uses
+  mocked storage; only Phase 5 can prove a real database-to-badge run.
+- **Verification:** `pnpm run typecheck`, `pnpm run lint`, and
+  `pnpm run test:coverage` passed; coverage was 92.87/87.02/94.48/95.86%
+  for app/shared statements/branches/functions/lines and
+  60.51/63.52/71.00/62.29% for scripts. The full default local contract
+  suite passed 258 tests across 57 files. Two stale contract mocks initially
+  failed under the new selector, were corrected, then their focused and full
+  suites passed. The `bac03bfd` hook repeated typecheck, lint, and the full
+  unit suite with 9,363 tests passing. PostgreSQL postmaster start time stayed
+  unchanged, with no timeout, backend kill, or recovery log match in the
+  final gate interval.
+- **Independent review and next gate:** Review found no further correctness
+  or authorization blocker after the compact-memory and artifact-boundary
+  deviations above were documented and parity expanded. Phase 5 must make
+  finish failures bounded and visible, raise the writer cap to 100,000 only
+  with a passing real end-to-end fixture, and verify owner status/badge
+  consistency. The production badge is still unfixed.
