@@ -2,7 +2,8 @@
   "git": {
     "deploymentEnabled": {
       "develop": false,
-      "hotfix/*": false
+      "hotfix/*": false,
+      "sutura/*": false
     }
   },
   "crons": [
