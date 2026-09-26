@@ -5,7 +5,8 @@ import { setRedesignSession, redesignFixtureClient } from "./helpers/redesign-fi
 import { assertScoringFixtureEnvironment, scoringReportHtml, enqueueGithubJob, seedFailedGithubJob } from "./helpers/scoring-point-fixtures";
 import { studioRoot, studioControl, studioBadgePreview } from "./helpers/studio";
 
-const admitted = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
+const admitted = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign"
+  || process.env.SCORING_DISPOSABLE_PROJECT === "chapa-volume-20260926";
 if (process.env.RELEASE_VERIFICATION_MODE === "local-candidate" && !admitted) throw new Error("Local scoring qualification requires disposable fixtures");
 test.skip(!admitted, "requires explicitly seeded disposable local scoring fixtures");
 test.describe.configure({ mode: "serial" });
@@ -333,6 +334,18 @@ test("registered owner with a queued job shows collecting, then ready with an id
   }
   expect(completed).toBe(true);
 
+  // The worker must publish an immutable row generation rather than a
+  // legacy JSONB event array, including for a zero-activity source.
+  const observation = await db.from("scoring_v7_source_observations")
+    .select("id,event_storage_mode,event_generation_id").eq("owner_handle", owner).single();
+  expect(observation.error).toBeNull();
+  expect(observation.data!.event_storage_mode).toBe("rows");
+  const generation = await db.from("scoring_collection_generations")
+    .select("id,event_count,published_at").eq("id", observation.data!.event_generation_id).single();
+  expect(generation.error).toBeNull();
+  expect(generation.data).toMatchObject({ id: observation.data!.event_generation_id, event_count: 0 });
+  expect(generation.data!.published_at).toBeTruthy();
+
   // The owner then shows ready with an identical v7.2 score everywhere.
   await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 15_000 }).toBe("v7.2");
   const profile = await api(page, owner);
@@ -405,4 +418,30 @@ test("a failed collection job shows the reason and a Retry action to the owner",
   await expect
     .poll(async () => (await db.from("scoring_collection_jobs").select("state").eq("owner_handle", owner).eq("provider", "github").single()).data?.state)
     .not.toBe("failed");
+});
+
+test("a terminal finish storage failure offers Retry and support", async ({ page, context, baseURL }, testInfo) => {
+  assertScoringFixtureEnvironment(process.env);
+  const owner = `chapa-collectq-storage-${testInfo.project.name}`;
+  await setRedesignSession(context, baseURL!, owner);
+  await seedFailedGithubJob(redesignFixtureClient(), owner, new Date().toISOString(), {
+    provider: "github", operation: "finish", stopKind: "storage", httpStatus: null, retryAfterSeconds: null,
+  });
+  await page.goto("/settings?lang=en");
+  await expect(page.getByText("We could not save this score. Retry or contact support if it happens again.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", "mailto:support@chapa.thecreativetoken.com");
+});
+
+test("a terminal event limit directs the owner to support without an ineffective Retry", async ({ page, context, baseURL }, testInfo) => {
+  assertScoringFixtureEnvironment(process.env);
+  const owner = `chapa-collectq-capacity-${testInfo.project.name}`;
+  await setRedesignSession(context, baseURL!, owner);
+  await seedFailedGithubJob(redesignFixtureClient(), owner, new Date().toISOString(), {
+    provider: "github", operation: "event_limit", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null,
+  });
+  await page.goto("/settings?lang=en");
+  await expect(page.getByText("This collection reached the current capacity limit. Contact support; retrying alone will not resolve it.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Contact support" })).toBeVisible();
 });

@@ -24,6 +24,12 @@ export const SCORING_POINT_HANDLES = ["chapa-score-chromium", "chapa-score-mobil
 const DAY = 86_400_000;
 export function assertScoringFixtureEnvironment(env: Record<string, string | undefined>): void {
   localCandidateTarget("local", "local-candidate", env.SUPABASE_URL ?? "");
+  if (env.SCORING_DISPOSABLE_PROJECT !== undefined) {
+    if (env.SCORING_DISPOSABLE_PROJECT !== "chapa-volume-20260926" || env.REDESIGN_DISPOSABLE_PROJECT !== undefined)
+      throw new Error("Task scoring fixture acknowledgment must name only chapa-volume-20260926");
+    if (env.SUPABASE_URL !== "http://127.0.0.1:55431") throw new Error("Task scoring fixture database must use exact loopback port 55431");
+    return;
+  }
   if (new URL(env.SUPABASE_URL!).port !== "55331") throw new Error("Dedicated scoring fixture database must use port 55331");
   if (env.REDESIGN_DISPOSABLE_PROJECT !== "chapa-redesign") throw new Error("Disposable scoring project acknowledgment required");
 }
@@ -85,7 +91,7 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
     }
     const tombstones = await check(db.from("scoring_v7_revocations").select("receipt_id", { count: "exact", head: true }));
     // Content-free tombstones intentionally survive withdrawal until the dedicated task database is disposed.
-    console.info(`[scoring fixture cleanup] dedicated55331 retained ${tombstones.count ?? 0} content-free revocation tombstones`);
+    console.info(`[scoring fixture cleanup] dedicated local stack retained ${tombstones.count ?? 0} content-free revocation tombstones`);
     if (errors.length) throw new AggregateError(errors, "Scoring fixture cleanup failed");
   };
   try {
@@ -117,7 +123,12 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
  * handles from `SCORING_POINT_HANDLES` above, which bypasses collection
  * entirely by writing a receipt straight into the DB.
  */
-export const COLLECTION_QUEUE_HANDLES = ["chapa-collectq-chromium", "chapa-collectq-mobile", "chapa-collectq-failed-chromium", "chapa-collectq-failed-mobile"] as const;
+export const COLLECTION_QUEUE_HANDLES = [
+  "chapa-collectq-chromium", "chapa-collectq-mobile",
+  "chapa-collectq-failed-chromium", "chapa-collectq-failed-mobile",
+  "chapa-collectq-storage-chromium", "chapa-collectq-storage-mobile",
+  "chapa-collectq-capacity-chromium", "chapa-collectq-capacity-mobile",
+] as const;
 
 /**
  * Canned zero-activity responses for the 5 GitHub v7.2 collection GraphQL
@@ -188,7 +199,7 @@ export async function bootstrapCollectionQueueFixtures(db: SupabaseClient, optio
     const errors: unknown[] = [];
     for (const owner of COLLECTION_QUEUE_HANDLES) await check(db.rpc("scoring_v7_withdraw", { p_owner: owner })).catch(error => errors.push(error));
     for (const table of ["studio_configs", "tool_insights", "users"]) await check(db.from(table).delete().in("handle", [...COLLECTION_QUEUE_HANDLES])).catch(error => errors.push(error));
-    for (const table of ["scoring_v7_subjects", "scoring_v7_sources", "scoring_v7_evidence", "scoring_v7_raw_artifacts", "scoring_v7_receipts", "scoring_observed_current", "scoring_collection_jobs", "scoring_issuance_attempts", "report_craft_reports", "report_craft_selection"]) {
+    for (const table of ["scoring_v7_subjects", "scoring_v7_sources", "scoring_v7_evidence", "scoring_v7_raw_artifacts", "scoring_v7_receipts", "scoring_observed_current", "scoring_collection_jobs", "scoring_collection_generations", "scoring_issuance_attempts", "report_craft_reports", "report_craft_selection"]) {
       const residue = await check(db.from(table).select("owner_handle").in("owner_handle", [...COLLECTION_QUEUE_HANDLES])).catch(error => { errors.push(error); return null; });
       if (residue?.data?.length) errors.push(new Error(`Collection queue fixture residue in ${table}`));
     }

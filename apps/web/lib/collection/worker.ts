@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
 import {
   checkpointCollectionJob, claimCollectionJobs, failCollectionJob, finishCollectionJob,
-  dbReadCollectionQueueHealth, type CollectionJob, type CollectionProgress, type CollectionQueueHealth,
+  dbReadCollectionQueueHealth, readCollectionJobRecovery, type CollectionJob, type CollectionProgress,
+  type CollectionQueueHealth, type CollectionJobRecovery,
 } from "@/lib/db/collection-queue";
 import { discoverStoredSource, readSourceManifest, readSourcePages, type SourceStorageContext } from "@/lib/db/source-context";
 import { readSourceAuthorization, type SourceAuthorization, type SourceProvider } from "@/lib/platform/source-authorization";
@@ -95,6 +96,7 @@ export interface CollectionWorkerDeps {
   readonly claim: (limit: number, leaseSeconds: number) => Promise<readonly CollectionJob[]>;
   readonly checkpoint: typeof checkpointCollectionJob;
   readonly finish: typeof finishCollectionJob;
+  readonly readRecovery: typeof readCollectionJobRecovery;
   readonly fail: typeof failCollectionJob;
   readonly resolveCredential: ResolveCredential;
   readonly collect: CollectSlice;
@@ -175,6 +177,7 @@ export const productionCollectionWorkerDeps: CollectionWorkerDeps = {
   claim: claimCollectionJobs,
   checkpoint: checkpointCollectionJob,
   finish: finishCollectionJob,
+  readRecovery: readCollectionJobRecovery,
   fail: failCollectionJob,
   resolveCredential,
   collect: collectSourceSlice,
@@ -200,6 +203,9 @@ const MAX_EVENTS_PER_CHECKPOINT = 1_000;
 /** Leaves time for a lease-fenced fail RPC after an in-flight page or stage. */
 const SEED_TRANSITION_MARGIN_MS = 20_000;
 class PriorSeedDeadline extends Error {}
+class PriorSeedCheckpointOutcome extends Error {
+  constructor(readonly status: "event_limit" | "lease_mismatch") { super(`Prior seed checkpoint returned ${status}`); }
+}
 /** Stop claiming new work this long before the tick's own deadline, so the
  * last claimed batch has time to finish and the response can still return.
  */
@@ -296,7 +302,7 @@ async function trySeedFromPrior(
         const retained = seed.acceptPage(next.value);
         if (retained.length === 0) continue;
         const staged = await stageEventBatches(deps, lease, job.checkpoint, job.progress, retained, ensureBudget);
-        if (staged.status !== "ok") throw new Error(`Prior seed checkpoint returned ${staged.status}`);
+        if (staged.status !== "ok") throw new PriorSeedCheckpointOutcome(staged.status);
         stagedCount = staged.stagedCount;
         wroteBodies = true;
       }
@@ -305,7 +311,7 @@ async function trySeedFromPrior(
     }
     if (!wroteBodies) {
       const staged = await stageEventBatches(deps, lease, job.checkpoint, job.progress, [], ensureBudget);
-      if (staged.status !== "ok") throw new Error(`Prior seed checkpoint returned ${staged.status}`);
+      if (staged.status !== "ok") throw new PriorSeedCheckpointOutcome(staged.status);
       stagedCount = staged.stagedCount;
     }
     const checkpoint = seed.finish();
@@ -318,9 +324,10 @@ async function trySeedFromPrior(
     };
     ensureBudget();
     const completed = await deps.checkpoint(lease, checkpoint, [], progress, false);
-    if (completed.status !== "ok") throw new Error(`Prior seed completion returned ${completed.status}`);
+    if (completed.status !== "ok") throw new PriorSeedCheckpointOutcome(completed.status);
     return { checkpoint, progress: { ...progress, events: completed.stagedCount } };
   } catch (error) {
+    if (error instanceof PriorSeedCheckpointOutcome) throw error;
     const message = error instanceof Error ? error.message : String(error);
     await deps.captureError({
       route: "lib/collection/worker:trySeedFromPrior",
@@ -345,24 +352,72 @@ export async function runCollectionSlice(
   if (!job.leaseToken) throw new Error(`runCollectionSlice: job ${job.id} has no lease token`);
   const lease = { id: job.id, leaseToken: job.leaseToken };
 
+  const reportTerminal = (stop: SourceDiagnostic): void => {
+    scheduleServerEvent("scoring_collection_failed", {
+      handle: job.ownerHandle, provider: stop.provider, stopKind: stop.stopKind,
+      httpStatus: stop.httpStatus, operation: stop.operation, attempt: job.attempt,
+    });
+    void deps.onJobFailed?.(job, stop);
+  };
+
   // Wraps deps.fail: a terminal outcome (retryAt === null landing on
   // "failed") fires the scoring_collection_failed event and P2 alert exactly
   // once, from the one place every fail() call in this function funnels
   // through (#1335 phase 4, observability step 4.7).
   const failJob: typeof deps.fail = async (leaseArg, stop, retryAt) => {
     const outcome = await deps.fail(leaseArg, stop, retryAt);
-    if (outcome.status === "failed") {
-      scheduleServerEvent("scoring_collection_failed", {
-        handle: job.ownerHandle,
-        provider: stop.provider,
-        stopKind: stop.stopKind,
-        httpStatus: stop.httpStatus,
-        operation: stop.operation,
-        attempt: job.attempt,
-      });
-      void deps.onJobFailed?.(job, stop);
-    }
+    if (outcome.status === "failed") reportTerminal(stop);
     return outcome;
+  };
+
+  const storageStop = (operation: string): SourceDiagnostic => ({
+    provider: job.provider, operation, stopKind: "storage", httpStatus: null, retryAfterSeconds: null,
+  });
+  const emitStop = (stop: SourceDiagnostic): void => {
+    try { deps.emitDiagnostics(job.ownerHandle, [stop]); }
+    catch { /* Telemetry must not prevent the lease-fenced transition. */ }
+  };
+  const reportStorageError = async (operation: string, error: unknown): Promise<void> => {
+    try {
+      await deps.captureError({ route: `lib/collection/worker:${operation}`, statusCode: 500,
+        error: error instanceof Error ? error : new Error(String(error)) });
+    } catch { /* Error capture must not prevent the lease-fenced transition. */ }
+  };
+  const readRecovery = async (): Promise<CollectionJobRecovery | null> => {
+    try { return await deps.readRecovery(job.id); }
+    catch (error) { await reportStorageError("read_recovery", error); return null; }
+  };
+  const stopStorage = async (
+    operation: string, error: unknown, recovered?: CollectionJobRecovery | null, alreadyCaptured = false,
+  ): Promise<void> => {
+    if (!alreadyCaptured) await reportStorageError(operation, error);
+    const state = recovered === undefined ? await readRecovery() : recovered;
+    if (state?.state === "failed" && state.lastStop?.operation === "event_limit") {
+      reportTerminal(state.lastStop);
+      return;
+    }
+    if (state && (state.state !== "running" || state.leaseToken !== lease.leaseToken)) return;
+    const stop = storageStop(operation);
+    emitStop(stop);
+    await failJob(lease, stop, structuralRetryAt(state?.attempt ?? job.attempt, deps));
+  };
+  const persistCheckpoint = async (
+    previousCheckpoint: CollectorCheckpoint, previousProgress: CollectionProgress,
+    nextCheckpoint: CollectorCheckpoint, events: readonly NormalizedEngineeringEvent[],
+    nextProgress: CollectionProgress, release: boolean,
+  ): ReturnType<typeof checkpointCollectionJob> => {
+    try {
+      const outcome = await checkpointInBatches(deps, lease, previousCheckpoint, previousProgress,
+        nextCheckpoint, events, nextProgress, release);
+      if (outcome.status === "event_limit") reportTerminal({
+        provider: job.provider, operation: "event_limit", stopKind: "protocol",
+        httpStatus: null, retryAfterSeconds: null,
+      });
+      return outcome;
+    } catch (error) {
+      await stopStorage("checkpoint", error);
+      return { status: "lease_mismatch" };
+    }
   };
 
   const credentialResult = await deps.resolveCredential(job.ownerHandle, job.provider, job.referenceTime);
@@ -389,15 +444,22 @@ export async function runCollectionSlice(
     try {
       seed = await trySeedFromPrior(deps, resolved, job, lease, ensureSeedBudget);
     } catch (error) {
-      // The current diagnostic schema has no storage stop kind. The stable
-      // operation identifies this as prior-source storage, not a provider
-      // request; `protocol` gives it the bounded structural retry budget.
-      await failJob(lease, {
-        provider: job.provider,
-        operation: error instanceof PriorSeedDeadline ? "prior_source_seed" : "prior_source_storage",
-        stopKind: error instanceof PriorSeedDeadline ? "deadline" : "protocol",
-        httpStatus: null, retryAfterSeconds: null,
-      }, structuralRetryAt(job.attempt, deps));
+      if (error instanceof PriorSeedCheckpointOutcome) {
+        if (error.status === "event_limit") reportTerminal({
+          provider: job.provider, operation: "event_limit", stopKind: "protocol",
+          httpStatus: null, retryAfterSeconds: null,
+        });
+        return;
+      }
+      if (error instanceof PriorSeedDeadline) {
+        const stop: SourceDiagnostic = { provider: job.provider, operation: "prior_source_seed",
+          stopKind: "deadline", httpStatus: null, retryAfterSeconds: null };
+        emitStop(stop);
+        await failJob(lease, stop, structuralRetryAt(job.attempt, deps));
+      } else {
+        // trySeedFromPrior already captured the failing storage operation.
+        await stopStorage("prior_source_storage", error, undefined, true);
+      }
       return;
     }
     if (seed) {
@@ -445,21 +507,40 @@ export async function runCollectionSlice(
   });
 
   if (result.done) {
-    const outcome = await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, false);
+    const outcome = await persistCheckpoint(checkpoint, persistedProgress, result.checkpoint, result.events, progress, false);
     if (outcome.status !== "ok") return;
     if (!result.coverage) throw new Error(`runCollectionSlice: job ${job.id} reported done with no coverage`);
     const observationId = randomUUID();
-    const finished = await deps.finish(lease, {
-      coverage: result.coverage,
-      observationId,
-      requested: resolved.requested,
-      access: resolved.accessContextId,
-      scope: FULL_COLLECTION_SCOPE,
-      linkId: resolved.link?.id ?? null,
-      linkVersion: resolved.link?.updatedAt ?? null,
-    });
+    let finished: Awaited<ReturnType<typeof deps.finish>>;
+    try {
+      finished = await deps.finish(lease, {
+        coverage: result.coverage,
+        observationId,
+        requested: resolved.requested,
+        access: resolved.accessContextId,
+        scope: FULL_COLLECTION_SCOPE,
+        linkId: resolved.link?.id ?? null,
+        linkVersion: resolved.link?.updatedAt ?? null,
+      });
+    } catch (error) {
+      const recovered = await readRecovery();
+      if (recovered?.state === "complete" && recovered.observationDurable && recovered.observationId === observationId) {
+        await deps.onJobComplete({ ...job, state: "complete", observationId });
+      } else {
+        await stopStorage("finish", error, recovered);
+      }
+      return;
+    }
     if (finished.status === "ok") {
       await deps.onJobComplete({ ...job, state: "complete", observationId: finished.observationId });
+    } else if (finished.status === "event_limit") {
+      reportTerminal({ provider: job.provider, operation: "event_limit", stopKind: "protocol",
+        httpStatus: null, retryAfterSeconds: null });
+    } else {
+      const recovered = await readRecovery();
+      if (recovered?.state === "complete" && recovered.observationDurable && recovered.observationId === observationId) {
+        await deps.onJobComplete({ ...job, state: "complete", observationId });
+      }
     }
     return;
   }
@@ -468,7 +549,7 @@ export async function runCollectionSlice(
   if (!stop) {
     // Nothing left to do this slice (e.g. a checkpoint-only pass with no
     // stop reported) but not done either -- release for another slice.
-    await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, true);
+    await persistCheckpoint(checkpoint, persistedProgress, result.checkpoint, result.events, progress, true);
     return;
   }
 
@@ -478,13 +559,13 @@ export async function runCollectionSlice(
   deps.emitDiagnostics(job.ownerHandle, [stop]);
 
   if (stop.stopKind === "budget" || stop.stopKind === "deadline") {
-    await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, true);
+    await persistCheckpoint(checkpoint, persistedProgress, result.checkpoint, result.events, progress, true);
     return;
   }
 
   // Every other stop kind persists this slice's progress (release=false --
   // fail() owns the next state transition) before deciding retry policy.
-  const outcome = await checkpointInBatches(deps, lease, checkpoint, persistedProgress, result.checkpoint, result.events, progress, false);
+  const outcome = await persistCheckpoint(checkpoint, persistedProgress, result.checkpoint, result.events, progress, false);
   if (outcome.status !== "ok") return;
 
   if (stop.stopKind === "rate_limited") {

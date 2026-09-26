@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { qualificationRuntimeEnvironment, seedQualificationCache, QUALIFICATION_SESSION_SECRET, withQualificationServer, discardQualificationFetchCache } from "./local-scoring-qualification";
 const local = { SUPABASE_URL: "http://127.0.0.1:55331", SUPABASE_SERVICE_ROLE_KEY: "local-service-key", UPSTASH_REDIS_REST_URL: "http://127.0.0.1:56380", UPSTASH_REDIS_REST_TOKEN: "local-redis-key", REDESIGN_DISPOSABLE_PROJECT: "chapa-redesign" };
+const task = { SUPABASE_URL: "http://127.0.0.1:55431", SUPABASE_SERVICE_ROLE_KEY: "local-service-key", UPSTASH_REDIS_REST_URL: "http://127.0.0.1:56480", UPSTASH_REDIS_REST_TOKEN: "local-redis-key", SCORING_DISPOSABLE_PROJECT: "chapa-volume-20260926" };
 describe("disposable scoring qualification launcher", () => {
   it("constructs only local explicit runtime settings without inherited production routing", () => {
     const env = qualificationRuntimeEnvironment("/repo", "/repo/logs/qualification", { ...local, PATH: "/bin", VERCEL_ENV: "production", NEXTAUTH_SECRET: "external", DATABASE_URL: "remote", NODE_OPTIONS: "--require unwanted", GITHUB_TOKEN: "external" }, 3217);
@@ -18,6 +19,17 @@ describe("disposable scoring qualification launcher", () => {
     expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...local, REDESIGN_DISPOSABLE_PROJECT: "" }, 3217)).toThrow(/acknowledg/);
     expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...local, SUPABASE_SERVICE_ROLE_KEY: "" }, 3217)).toThrow(/credential/);
   });
+  it("admits only the named task stack with its own acknowledgement and cache", () => {
+    const env = qualificationRuntimeEnvironment("/repo", "/evidence", task, 3217);
+    expect(env).toMatchObject({ SUPABASE_URL: task.SUPABASE_URL, UPSTASH_REDIS_REST_URL: task.UPSTASH_REDIS_REST_URL, SCORING_DISPOSABLE_PROJECT: task.SCORING_DISPOSABLE_PROJECT });
+    expect(env.REDESIGN_DISPOSABLE_PROJECT).toBeUndefined();
+    expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...task, REDESIGN_DISPOSABLE_PROJECT: "chapa-redesign" })).toThrow(/only/);
+    expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...task, SCORING_DISPOSABLE_PROJECT: "other" })).toThrow(/acknowledg/);
+    expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...task, SUPABASE_URL: local.SUPABASE_URL })).toThrow(/target/);
+    expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...task, UPSTASH_REDIS_REST_URL: local.UPSTASH_REDIS_REST_URL })).toThrow(/target/);
+    expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...task, SUPABASE_URL: "http://localhost:55431" })).toThrow(/target/);
+    expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...task, UPSTASH_REDIS_REST_URL: "https://redis.example" })).toThrow(/target/);
+  });
   it("seeds real Redis through guarded REST, checks every reply and cleans only inserted keys", async () => {
     const fetch = vi.fn().mockResolvedValueOnce(Response.json([{ result: "OK" }, { result: null }])).mockResolvedValueOnce(Response.json({ result: 1 }));
     await expect(seedQualificationCache(local.UPSTASH_REDIS_REST_URL, "local-key", { "stats:v3:one": "first", "stats:v3:two": "second" }, fetch)).rejects.toThrow(/existing|seed/);
@@ -29,6 +41,14 @@ describe("disposable scoring qualification launcher", () => {
     const fetch = vi.fn();
     await expect(seedQualificationCache("https://real.upstash.io", "key", { key: "value" }, fetch)).rejects.toThrow(/target/);
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it("accepts only the matching task cache target", async () => {
+    const send = vi.fn().mockResolvedValue(Response.json([{ result: "OK" }]));
+    const cleanup = await seedQualificationCache(task.UPSTASH_REDIS_REST_URL, "key", { one: "value" }, send, task.UPSTASH_REDIS_REST_URL);
+    expect(send).toHaveBeenCalledWith(`${task.UPSTASH_REDIS_REST_URL}/pipeline`, expect.any(Object));
+    send.mockResolvedValueOnce(Response.json({ result: 1 }));
+    await cleanup();
+    expect(() => qualificationRuntimeEnvironment("/repo", "/evidence", { ...local, UPSTASH_REDIS_REST_URL: task.UPSTASH_REDIS_REST_URL })).toThrow(/target/);
   });
 });
 

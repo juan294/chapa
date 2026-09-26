@@ -42,7 +42,10 @@ function clampPercent(job: CollectionJob): number | null {
 }
 
 function reasonForFailedJob(job: CollectionJob): ProviderStatusReason {
-  return job.lastStop?.stopKind === "not_accessible" ? "reconnect" : "failed";
+  const stop = job.lastStop;
+  if (stop?.operation === "event_limit") return "capacity";
+  if (stop?.stopKind === "storage" || stop?.operation === "finish" || stop?.operation === "checkpoint" || stop?.operation === "prior_source_storage") return "storage";
+  return stop?.stopKind === "not_accessible" ? "reconnect" : "failed";
 }
 
 function toProviderStatus(job: CollectionJob): ProviderStatus {
@@ -94,16 +97,18 @@ export function deriveScoringStatus(
 
   const hasPriorReceipt = receipt !== null;
 
-  if (receipt?.current) {
-    const updating = jobs.some((job) => IN_PROGRESS_STATES.has(job.state));
-    return { kind: "ready", receiptDate: receipt.date, updating };
-  }
-
   const sources = jobs.map(toProviderStatus);
-
   if (jobs.some((job) => job.state === "failed")) {
-    return { kind: "action_needed", sources, hasPriorReceipt };
+    return { kind: "action_needed", sources, hasPriorReceipt, ...(receipt?.current ? { priorReceiptDate: receipt.date } : {}) };
   }
 
-  return { kind: "collecting", percent: overallPercent(jobs), sources, hasPriorReceipt };
+  if (receipt?.current) {
+    const newerJobs = jobs.filter((job) => job.referenceDate > receipt.date);
+    const finalizing = newerJobs.length > 0 && newerJobs.every((job) => job.state === "complete");
+    const updating = finalizing || jobs.some((job) => IN_PROGRESS_STATES.has(job.state));
+    return { kind: "ready", receiptDate: receipt.date, updating, ...(finalizing ? { finalizing: true } : {}) };
+  }
+
+  const finalizing = jobs.length > 0 && jobs.every((job) => job.state === "complete");
+  return { kind: "collecting", percent: finalizing ? null : overallPercent(jobs), ...(finalizing ? { finalizing: true } : {}), sources, hasPriorReceipt };
 }

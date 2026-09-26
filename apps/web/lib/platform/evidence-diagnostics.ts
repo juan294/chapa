@@ -19,6 +19,7 @@ export type StopKind =
   | "network"
   | "protocol"
   | "parse"
+  | "storage"
   | "not_accessible";
 
 /** Private collection diagnostic. Never a URL, request/response body or token
@@ -66,6 +67,7 @@ export function reasonFor(stopKind: StopKind): EvidenceReasonCode {
     case "network":
     case "protocol":
     case "parse":
+    case "storage":
       return "source_error";
   }
 }

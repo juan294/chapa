@@ -51,7 +51,13 @@ describe("ScoringStatusPanel", () => {
 
     it("shows the updating message for a ready-but-updating status", () => {
       render(<ScoringStatusPanel initialStatus={{ kind: "ready", receiptDate: "2026-09-23", updating: true }} />);
-      expect(screen.getByText("Updating with today’s activity…")).toBeDefined();
+      expect(screen.getByText("Showing your score from 2026-09-23 while we collect newer activity.")).toBeDefined();
+    });
+
+    it("dates a prior score while newer completed evidence waits for publication", () => {
+      render(<ScoringStatusPanel initialStatus={{ kind: "ready", receiptDate: "2026-09-22", updating: true, finalizing: true }} />);
+      expect(screen.getByText("Showing your score from 2026-09-22 while we finish the newer score.")).toBeDefined();
+      expect(screen.queryByText(/up to date/)).toBeNull();
     });
 
     it("renders the collecting percent and per-provider rows", () => {
@@ -86,6 +92,33 @@ describe("ScoringStatusPanel", () => {
 
       const codebergRow = screen.getByTestId("scoring-status-source-codeberg");
       expect(codebergRow.querySelector("button")?.textContent).toBe("Retry");
+    });
+
+    it("offers Retry and support for a terminal storage failure and dates the prior score", () => {
+      render(<ScoringStatusPanel initialStatus={{ kind: "action_needed", hasPriorReceipt: true, priorReceiptDate: "2026-09-22", sources: [
+        { provider: "github", state: "failed", percent: null, reason: "storage" },
+      ] }} />);
+      expect(screen.getByTestId("scoring-status-prior-receipt").textContent).toContain("2026-09-22");
+      const row = screen.getByTestId("scoring-status-source-github");
+      expect(row.textContent).toContain("We could not save this score.");
+      expect(row.querySelector("button")?.textContent).toBe("Retry");
+      expect(row.querySelector('a[href="mailto:support@chapa.thecreativetoken.com"]')?.textContent).toBe("Contact support");
+    });
+
+    it("directs terminal capacity failures to support without promising a Retry", () => {
+      render(<ScoringStatusPanel initialStatus={{ kind: "action_needed", hasPriorReceipt: false, sources: [
+        { provider: "github", state: "failed", percent: null, reason: "capacity" },
+      ] }} />);
+      const row = screen.getByTestId("scoring-status-source-github");
+      expect(row.textContent).toContain("reached the current capacity limit");
+      expect(row.querySelector("button")).toBeNull();
+      expect(row.querySelector("a")?.textContent).toBe("Contact support");
+    });
+
+    it("shows finalizing instead of 99% after provider collection is complete", () => {
+      render(<ScoringStatusPanel initialStatus={{ kind: "collecting", percent: null, finalizing: true, hasPriorReceipt: false, sources: [] }} />);
+      expect(screen.getByText("Evidence collected. Finishing your score…")).toBeDefined();
+      expect(screen.queryByText(/99%/)).toBeNull();
     });
 
     it("shows the unregistered fallback text and never fetches", () => {

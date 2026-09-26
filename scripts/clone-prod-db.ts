@@ -22,6 +22,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 interface Endpoint {
   url: string;
@@ -86,6 +87,29 @@ function endpoint(path: string, label: string): Endpoint {
   return { url, key };
 }
 
+/** The PostgREST clone cannot write immutable generation rows or preserve the
+ * job/generation FK cycle. Refuse a partial copy before deleting local rows.
+ * A source predating migration 061 has no generation table or row-mode column.
+ */
+export async function preflightCollectionStorage(source: Endpoint): Promise<void> {
+  const headers = { apikey: source.key, Authorization: `Bearer ${source.key}` };
+  const inspect = async (table: string, query: string, absentCode: string): Promise<Record<string, unknown>[]> => {
+    const response = await fetch(`${source.url}/rest/v1/${table}?${query}`, { headers });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { code?: string } | null;
+      if (body?.code === absentCode) return [];
+      throw new Error(`Cannot inspect ${table} before clone: HTTP ${response.status} (${body?.code ?? "unknown"})`);
+    }
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows)) throw new Error(`Cannot inspect ${table} before clone: invalid response`);
+    return rows as Record<string, unknown>[];
+  };
+  const generations = await inspect("scoring_collection_generations", "select=id&limit=1", "PGRST205");
+  if (generations.length) throw new Error("Cannot clone generation-backed collection rows through PostgREST; local database is unchanged");
+  const rowObservations = await inspect("scoring_v7_source_observations", "select=id&event_storage_mode=eq.rows&limit=1", "42703");
+  if (rowObservations.length) throw new Error("Cannot clone row-mode observations through PostgREST; local database is unchanged");
+}
+
 async function readPage(source: Endpoint, table: string, from: number): Promise<Record<string, unknown>[]> {
   const res = await fetch(`${source.url}/rest/v1/${table}?select=*`, {
     headers: {
@@ -141,6 +165,7 @@ export async function cloneProdDb(sourcePath: string, targetPath: string): Promi
   if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(target.url)) {
     throw new Error(`refusing to write to a non-local target: ${target.url}`);
   }
+  await preflightCollectionStorage(source);
 
   let total = 0;
   for (const table of TABLES) {
@@ -200,4 +225,4 @@ function main(): void {
   });
 }
 
-main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

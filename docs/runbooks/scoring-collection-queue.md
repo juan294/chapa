@@ -16,6 +16,12 @@ checkpointed collector slice per job per tick. When every one of an owner's
 connected providers finishes a day, fan-in (migration 056,
 `scoring_issuance_attempts`) issues the receipt.
 
+Migrations 061-063 store each run in an immutable event generation. A worker
+stages at most 1,000 events per checkpoint, finish publishes only a small
+manifest, and issuance reads verified pages of at most 500 events. The row
+generation cap is 100,000 events per source. Legacy JSONB observations and
+in-flight legacy imports retain their 50,000-event bound.
+
 A job's `state` is one of:
 
 | State | Meaning |
@@ -73,6 +79,8 @@ Migration `058_collection_attempt_policy.sql` redefines `attempt` as
 | `fail` with any other retryable stop | +1 |
 | `checkpoint` whose `progress.operationsDone` is greater than the stored value | reset to 0 |
 | `enqueue` `retry` on a `failed` job whose `last_stop.stopKind` is `http`, `network`, `deadline` or `budget` | reset to 0, keep checkpoint, staged events and progress |
+| `enqueue` `retry` after a `storage` stop | reset to 0, keep checkpoint, generation and staged progress |
+| `enqueue` `retry` after `event_limit` | remains failed; owner Retry cannot change the current cap |
 | `enqueue` `retry` after any other stop kind, or `reconnect`/`refresh` | reset to 0 and clear, as before |
 
 A job that only ever waits for the shared allowance can never spend its
@@ -81,7 +89,9 @@ an occasional 5xx in between never runs out of retries. A Retry after a
 transient stop (`http`, `network`, `deadline`, `budget`) resumes from the
 saved checkpoint instead of restarting the day's collection; a Retry after a
 structural stop (`graphql`, `protocol`, `parse`) clears the checkpoint, since
-a bad cursor should not repeat.
+a bad cursor should not repeat. A storage stop resumes the staged generation;
+it does not recollect provider operations. A capacity stop requires an
+operator-led correction or a higher cap; an ordinary Retry leaves it failed.
 
 ## Commit-history 5xx retry ladder
 
@@ -194,11 +204,21 @@ secrets. Read those to diagnose:
 - a `structural` failure (an integrity check like `assessRawFetchIntegrity`
   rejecting the payload) needs the same investigation as any other scoring
   data-integrity rejection.
+- a `storage` stop with operation `finish`, `checkpoint`, or
+  `prior_source_storage` means durable persistence failed. Check the database
+  and PostgREST logs. The worker retries under a bounded lease-fenced budget;
+  after a terminal failure the owner sees Retry and support, and Retry keeps
+  the staged generation rather than starting collection again.
+- operation `event_limit` means 100,001 or more distinct events were offered.
+  The owner sees a capacity message and support path. Ordinary Retry is
+  rejected while the cap is unchanged; an operator can requeue through the
+  explicit admin path after a capacity change or correction.
 
 **Retrying a failed job.** The owner has a Retry action in `/settings` and on
-the badge/share collecting state, which calls `POST /api/scoring/status`
+the badge/share collecting state for retryable failures, which calls `POST /api/scoring/status`
 with `{ "action": "retry", "provider": "<provider>" }`. This resets the
-existing `failed` row back to `queued` (attempt 0, checkpoint cleared) and
+existing `failed` row back to `queued` (attempt 0; checkpoint retained for
+transient and storage failures, cleared for structural failures) and
 runs one slice in the background immediately, rather than waiting for the
 next 5-minute tick. An operator can do the same by calling that endpoint as
 the owner, or by enqueuing directly:
@@ -214,7 +234,9 @@ alert from the job-level `scoring_collection_failed`. The job stays
 `complete`; nothing needs re-enqueuing. The next `collect-evidence` tick
 retries the fan-in for every complete-but-unissued day at the start of the
 tick (`retryPendingFanIns`), so this self-heals without operator action once
-the underlying storage issue is fixed.
+the underlying storage issue is fixed. Until a new receipt is durable, the
+owner sees that the previous score remains visible and the newer score is
+still being finalized; a completed job alone never makes the badge ready.
 
 **Queue backlog with no individual stuck job.** If `queued` is consistently
 high but no single job trips the 2h/30min thresholds, throughput is the
@@ -232,12 +254,34 @@ provider's own reset time.
 
 ## Event limit per source
 
-One source can hold at most 50,000 events (migration 057; it was 10,000). The
-limit is checked when events are staged, when a job finishes and when a source
-is read back. Above it, the job fails with operation `event_limit`. On
-2026-09-24 one GitHub source reached 11,124 authored commits in the window.
-Measured locally at 30,000 events of about 1.5 KB each: finish took 4.7 s and
-read-back took 3.6 s.
+One row-generation source can hold at most 100,000 events (migration 063).
+The limit is checked when events are staged, when a job finishes, and when a
+source is read back. Above it, the job fails terminally with operation
+`event_limit`; no partial extra batch or receipt is published. Legacy JSONB
+sources remain capped at 50,000. The worker's small finish response and
+keyset-paged reads replace the old whole-source payload. The local scale
+contract stages, publishes, and reads a synthetic 100,000-event generation;
+it also proves that event 100,001 fails without publication.
+
+To inspect a large job without returning event bodies:
+
+```sql
+select j.owner_handle, j.provider, j.reference_date, j.state, j.attempt,
+       j.last_stop, j.observation_id, g.id as generation_id,
+       g.event_count, g.published_at
+from public.scoring_collection_jobs j
+left join public.scoring_collection_generations g
+  on g.id = j.current_generation_id
+where j.owner_handle = :owner
+order by j.reference_date desc, j.provider;
+```
+
+Completed generations remain immutable until owner withdrawal or deletion.
+Withdrawal and full user deletion cascade to their private event rows. A
+local PostgREST clone refuses generation-backed production data before it
+deletes any local rows; use a supported database snapshot process when that
+private history is required locally. Never use production user data for the
+synthetic release qualification.
 
 ## Enqueueing by hand
 

@@ -85,6 +85,21 @@ export const POST = withErrorCapture("/api/scoring/status", async (request: Next
     return NextResponse.json({ error: "A valid provider is required." }, { status: 400 });
   }
 
+  const beforeRetry = await readScoringStatus(session.login);
+  if (!beforeRetry) {
+    return NextResponse.json(
+      { error: "Scoring status is temporarily unavailable. Try again shortly." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  if (beforeRetry.kind === "action_needed" && beforeRetry.sources.some((source) =>
+    source.provider === provider && source.state === "failed" && source.reason === "capacity")) {
+    return NextResponse.json(
+      { error: "This collection reached the current capacity limit. Contact support; retrying alone will not resolve it.", code: "event_limit" },
+      { status: 409, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   await enqueueCollection(session.login, "retry", provider);
   scheduleCollectionAdvance();
 

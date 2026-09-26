@@ -35,6 +35,13 @@ describe("disposable scoring browser fixture", () => {
     expect(() => assertScoringFixtureEnvironment({ SUPABASE_URL: "http://127.0.0.1:55331" })).toThrow(/acknowledgment/);
     expect(() => assertScoringFixtureEnvironment({ SUPABASE_URL: "http://127.0.0.1:55331", REDESIGN_DISPOSABLE_PROJECT: "chapa-redesign" })).not.toThrow();
     expect(() => assertScoringFixtureEnvironment({ SUPABASE_URL: "http://127.0.0.1:54331", REDESIGN_DISPOSABLE_PROJECT: "chapa-redesign" })).toThrow(/55331|dedicated/);
+    const task = { SUPABASE_URL: "http://127.0.0.1:55431", SCORING_DISPOSABLE_PROJECT: "chapa-volume-20260926" };
+    expect(() => assertScoringFixtureEnvironment(task)).not.toThrow();
+    expect(() => assertScoringFixtureEnvironment({ ...task, SCORING_DISPOSABLE_PROJECT: "other" })).toThrow(/acknowledgment/);
+    expect(() => assertScoringFixtureEnvironment({ ...task, REDESIGN_DISPOSABLE_PROJECT: "chapa-redesign" })).toThrow(/only/);
+    expect(() => assertScoringFixtureEnvironment({ ...task, SUPABASE_URL: "http://127.0.0.1:55331" })).toThrow(/55431/);
+    expect(() => assertScoringFixtureEnvironment({ ...task, SUPABASE_URL: "http://localhost:55431" })).toThrow(/55431/);
+    expect(() => assertScoringFixtureEnvironment({ ...task, SUPABASE_URL: "https://remote.example" })).toThrow(/loopback/);
   });
 
   // #1335 phase 4.8 — the E2E collection-queue fixture drives the REAL

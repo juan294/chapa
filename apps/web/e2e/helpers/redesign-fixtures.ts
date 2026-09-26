@@ -8,7 +8,7 @@ import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY, canon
 import { buildRedesignGitHubFixture } from './redesign-github';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
 import { DEMO_STATS } from '../../lib/render/demoData';
-import { SCORING_POINT_HANDLES, COLLECTION_QUEUE_HANDLES, fixtureStatsCacheEntry } from "./scoring-point-fixtures";
+import { SCORING_POINT_HANDLES, COLLECTION_QUEUE_HANDLES, fixtureStatsCacheEntry, assertScoringFixtureEnvironment } from "./scoring-point-fixtures";
 import { observedReceiptFixture } from '../../lib/history/__fixtures__/receipts-observed';
 import { observedSemanticIdentity } from '../../lib/profile/receipt-semantic-identity';
 
@@ -78,8 +78,7 @@ export async function issueObservedVerification(
 
 export function redesignFixtureClient() {
   const url = process.env.SUPABASE_URL ?? '';
-  assertLocalFixtureTarget(url);
-  if (process.env.REDESIGN_DISPOSABLE_PROJECT !== 'chapa-redesign') throw new Error('Disposable project acknowledgement required');
+  assertScoringFixtureEnvironment(process.env);
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Local service key required');
   return createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 }

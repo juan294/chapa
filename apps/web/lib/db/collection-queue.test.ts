@@ -3,7 +3,8 @@ import { createScoringWindow } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import { sourceEventFixture } from "./source-context-fixture";
 import { getSupabase } from "./supabase";
-import { EMPTY_PROGRESS, checkpointCollectionJob, claimCollectionJobs, enqueueCollectionJob, finishCollectionJob, type CollectionProgress } from "./collection-queue";
+import { EMPTY_PROGRESS, checkpointCollectionJob, claimCollectionJobs, enqueueCollectionJob, finishCollectionJob,
+  readCollectionJobRecovery, type CollectionProgress } from "./collection-queue";
 
 vi.mock("./supabase", () => ({ getSupabase: vi.fn() }));
 
@@ -50,6 +51,21 @@ const fullCheckpoint: CollectorCheckpoint = {
 const fullProgress: CollectionProgress = { operationsDone: 3, operationsKnown: 10, events: 42, requests: 17 };
 
 describe("collection queue checkpoint/progress schema round-trip (no database)", () => {
+  it("reads a committed job and matching durable observation for lost finish response recovery", async () => {
+    const observationId = "33333333-3333-4333-8333-333333333333";
+    const from = vi.fn((table: string) => ({
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue(table === "scoring_collection_jobs"
+        ? { data: { state: "complete", observation_id: observationId, lease_token: null, attempt: 0,
+          progress: EMPTY_PROGRESS, last_stop: null, owner_handle: "alice", provider: "github", reference_time: baseRow.reference_time }, error: null }
+        : { data: { id: observationId, owner_handle: "alice", reference_time: baseRow.reference_time }, error: null }) })) })),
+    }));
+    vi.mocked(getSupabase).mockReturnValue({ from } as never);
+    expect(await readCollectionJobRecovery(baseRow.id)).toEqual({ state: "complete", observationId,
+      observationDurable: true, leaseToken: null, attempt: 0, progress: EMPTY_PROGRESS, lastStop: null });
+    expect(from).toHaveBeenCalledWith("scoring_collection_jobs");
+    expect(from).toHaveBeenCalledWith("scoring_v7_source_observations");
+  });
+
   it("claims through the generation-aware RPC during old/new worker overlap", async () => {
     rpc.mockResolvedValueOnce({ data: [], error: null });
     expect(await claimCollectionJobs(1, 120)).toEqual([]);

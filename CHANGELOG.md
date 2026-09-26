@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-09-26
+
+### Fixed
+
+- High-volume badge collection now stages immutable event generations, reads
+  them in verified pages, and issues a v7.2 receipt without returning or
+  retaining a whole source payload. The row-generation limit is 100,000
+  events per source. Storage failures use bounded retries and an owner-visible
+  action-needed state instead of silently repeating at 99%; an event beyond
+  the limit is reported as a capacity failure with a support path. The
+  scoring policy and existing receipt identity are unchanged.
+
 ## [4.1.1] - 2026-09-26
 
 ### Fixed
@@ -1928,7 +1940,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v4.1.1...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v4.1.2...HEAD
+[4.1.2]: https://github.com/juan294/chapa/compare/v4.1.1...v4.1.2
 [4.1.1]: https://github.com/juan294/chapa/compare/v4.1.0...v4.1.1
 [4.1.0]: https://github.com/juan294/chapa/compare/v4.0.7...v4.1.0
 [3.0.3]: https://github.com/juan294/chapa/compare/v3.0.2...v3.0.3

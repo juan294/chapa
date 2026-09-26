@@ -35,7 +35,7 @@ describe("deriveScoringStatus", () => {
   });
 
   it("reports ready with updating:false when a current receipt exists and nothing is in progress", () => {
-    expect(deriveScoringStatus([job({ state: "complete" })], current, true)).toEqual({
+    expect(deriveScoringStatus([job({ state: "complete", referenceDate: current.date })], current, true)).toEqual({
       kind: "ready",
       receiptDate: "2026-09-22",
       updating: false,
@@ -59,7 +59,14 @@ describe("deriveScoringStatus", () => {
   );
 
   it("reports ready with updating:false when a current receipt exists and the only job for today is complete", () => {
-    expect(deriveScoringStatus([job({ state: "complete" })], current, true)).toMatchObject({ updating: false });
+    expect(deriveScoringStatus([job({ state: "complete", referenceDate: current.date })], current, true)).toMatchObject({ updating: false });
+  });
+
+  it("keeps a prior receipt drawable but marks a newer complete job as finalizing until issuance", () => {
+    const newerComplete = job({ state: "complete", referenceDate: "2026-09-23", progress: { operationsDone: 10, operationsKnown: 10, events: 2, requests: 10, discovering: false } });
+    expect(deriveScoringStatus([newerComplete], current, true)).toEqual({
+      kind: "ready", receiptDate: "2026-09-22", updating: true, finalizing: true,
+    });
   });
 
   it("treats a non-current (superseded/retracted) receipt as no receipt for the ready/collecting split", () => {
@@ -87,6 +94,21 @@ describe("deriveScoringStatus", () => {
       lastStop: { provider: "github", operation: "profile", stopKind: "not_accessible", httpStatus: 401, retryAfterSeconds: null },
     });
     expect(deriveScoringStatus([failed], stale, true)).toMatchObject({ kind: "action_needed", hasPriorReceipt: true });
+  });
+
+  it("shows a failed update as action needed while preserving the current receipt date", () => {
+    const failed = job({ state: "failed", lastStop: { provider: "github", operation: "finish", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null } });
+    expect(deriveScoringStatus([failed], current, true)).toMatchObject({
+      kind: "action_needed", hasPriorReceipt: true, priorReceiptDate: current.date,
+      sources: [{ reason: "storage", state: "failed" }],
+    });
+  });
+
+  it("distinguishes the capacity limit from retryable storage failure", () => {
+    const limited = job({ state: "failed", lastStop: { provider: "github", operation: "event_limit", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null } });
+    expect(deriveScoringStatus([limited], null, true)).toMatchObject({ kind: "action_needed", sources: [{ reason: "capacity" }] });
+    const checkpoint = job({ state: "failed", lastStop: { provider: "github", operation: "checkpoint", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null } });
+    expect(deriveScoringStatus([checkpoint], null, true)).toMatchObject({ kind: "action_needed", sources: [{ reason: "storage" }] });
   });
 
   it("labels a failed not_accessible job as reconnect and any other failed job as failed", () => {
@@ -136,11 +158,12 @@ describe("deriveScoringStatus", () => {
     expect(status).toMatchObject({ kind: "collecting", percent: 99 });
   });
 
-  it("reports collecting at 99% when every job is complete but no receipt has been issued yet (fan-in pending)", () => {
+  it("reports finalizing without a healthy-looking 99% when every job is complete but no receipt has been issued yet", () => {
     const done = job({ state: "complete", progress: { operationsDone: 40, operationsKnown: 40, events: 5, requests: 40 } });
     expect(deriveScoringStatus([done], null, true)).toEqual({
       kind: "collecting",
-      percent: 99,
+      percent: null,
+      finalizing: true,
       hasPriorReceipt: false,
       sources: [{ provider: "github", state: "complete", percent: 100 }],
     });
@@ -227,7 +250,7 @@ describe("deriveScoringStatus", () => {
         progress: { operationsDone: 40, operationsKnown: 40, events: 5, requests: 40, discovering: true },
       });
       const status = deriveScoringStatus([done], null, true);
-      expect(status).toMatchObject({ kind: "collecting", percent: 99, sources: [{ provider: "github", percent: 100 }] });
+      expect(status).toMatchObject({ kind: "collecting", percent: null, finalizing: true, sources: [{ provider: "github", percent: 100 }] });
     });
 
     it("legacy progress without the discovering key is treated as discovering, unless the job is complete", () => {

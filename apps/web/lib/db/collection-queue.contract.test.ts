@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createScoringWindow, engineeringEventKey, observed } from "@chapa/shared";
@@ -6,37 +10,47 @@ import { getServiceClient } from "@/test/contract/invoke";
 import { inspectLocalSql } from "@/test/contract/local-sql";
 import { sourceEventFixture } from "./source-context-fixture";
 import { readSourceObservation } from "./source-context";
+import { readSourceManifest, readSourcePages } from "./source-context";
+import { dbGetLinkedPlatformStrict, dbUpsertLinkedPlatform } from "./user-platforms";
+import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
+import { readRenderableReceipt, scoreModelFrom } from "@/lib/profile/score-model";
+import { hasDrawableCurrentReceipt, readScoringStatus } from "@/lib/collection/read-scoring-status";
+import { observedReceiptViewModel } from "@/lib/profile/score-view-model";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
+import { getReceiptVerificationV7 } from "@/lib/verification/store";
 import { EMPTY_CHECKPOINT } from "@/lib/collection/plan";
+import { createSourceContext } from "@/lib/platform/source-context";
 import { syntheticCollectionEvents, syntheticCollectionSource } from "./synthetic-collection-fixture";
 import { EMPTY_PROGRESS,
   claimCollectionJobs, checkpointCollectionJob, enqueueCollectionJob, failCollectionJob, finishCollectionJob,
-  isCollectionJobInProgress, listStagedEventKeys,
+  isCollectionJobInProgress, listStagedEventKeys, readCollectionJobRecovery,
 } from "./collection-queue";
 
 const owner = "contract-collection-queue";
 const db = getServiceClient;
+const scale = process.env.SCORING_RUN_SCALE_CONTRACT === "1" ? it : it.skip;
 const window = createScoringWindow("2026-09-05T12:00:00Z");
 const source = { provider: "github" as const, host: "github.com", subjectId: "canonical-node" };
 const requested = { provider: "github" as const, host: "github.com", login: owner };
-const scope = { discovery: "owned_and_contributed", repositoryIds: [] as readonly string[], eventKinds: [] as readonly string[] };
+const scope = { discovery: "owned_and_contributed" as const, repositoryIds: [] as readonly string[], eventKinds: [] as readonly string[] };
 const coverage = {
   source, window, dataThrough: window.referenceTime, status: "complete", discovery: scope.discovery,
   repositoryIds: ["known"], repositoryDiscoveryComplete: true, eventKinds: {}, reasonCodes: [], unknownPeriods: [],
 };
-const access = "a".repeat(64);
+const access = createSourceContext({ owner, requestedSource: requested, window, scope }, { kind: "github" }).accessContextId;
 
 async function cleanup() {
-  await db().from("scoring_v7_source_observations").delete().eq("owner_handle", owner);
-  await db().from("scoring_collection_jobs").delete().eq("owner_handle", owner);
-  await db().from("scoring_v7_sources").delete().eq("owner_handle", owner);
-  await db().from("scoring_v7_subjects").delete().eq("owner_handle", owner);
+  // Local psql avoids PostgREST's 8s statement timeout while cascading a
+  // published 100k generation. The helper verifies this exact local stack.
+  inspectLocalSql(`DELETE FROM public.user_platforms WHERE handle = '${owner}';
+    DELETE FROM public.scoring_v7_subjects WHERE owner_handle = '${owner}'`);
 }
 
 beforeEach(async () => {
   await cleanup();
   expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
 });
-afterEach(cleanup);
+afterEach(cleanup, 600_000);
 
 /** Lease only this synthetic job; other local benchmark jobs may be awaiting retry. */
 async function leaseExactJob(jobId: string) {
@@ -65,6 +79,36 @@ function v2Finish(jobId: string, leaseToken: string, observationId: string, fini
   });
 }
 
+function issueInFreshLocalProcess(): { issuanceMs: number; peakRssBytes: number; osMaxRssBytes: number } {
+  const env: NodeJS.ProcessEnv = { NODE_ENV: "test" };
+  for (const key of ["PATH", "HOME", "TMPDIR", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY",
+    "NEXTAUTH_SECRET", "CHAPA_VERIFICATION_SECRET", "CRON_SECRET", "ADMIN_SECRET"] as const) {
+    if (process.env[key]) env[key] = process.env[key];
+  }
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.NEXTAUTH_SECRET
+    || !env.CHAPA_VERIFICATION_SECRET || process.env.GITHUB_TOKEN) {
+    throw new Error("Fresh issuance requires synthetic local credentials only");
+  }
+  const scratch = mkdtempSync(join(tmpdir(), "chapa-100k-issuance-"));
+  try {
+    const output = join(scratch, "profile.json");
+    Object.assign(env, { SCORING_CHILD_ISSUANCE: "1", SCORING_CHILD_OWNER: owner,
+      SCORING_CHILD_REFERENCE: window.referenceTime, SCORING_CHILD_OUTPUT: output });
+    const result = spawnSync("/usr/bin/time", ["-l", "pnpm", "exec", "vitest", "run", "-c",
+      "vitest.config.contract.ts", "apps/web/lib/db/receipt-issuance-process.contract.test.ts", "--maxWorkers=1"],
+    { cwd: process.cwd(), env, encoding: "utf8", timeout: 180_000, maxBuffer: 1_000_000 });
+    if (result.status !== 0) throw new Error(`Isolated issuance failed (status ${result.status}): ${result.stderr?.slice(-1200)}`);
+    const match = result.stderr?.match(/(\d+)\s+maximum resident set size/);
+    if (!match) throw new Error("Isolated issuance OS RSS unavailable");
+    const child = JSON.parse(readFileSync(output, "utf8")) as { issuanceMs: number; peakRssBytes: number; receiptCount: number };
+    if (child.receiptCount !== 1) throw new Error("Isolated issuance receipt count mismatch");
+    return { issuanceMs: child.issuanceMs, peakRssBytes: child.peakRssBytes,
+      osMaxRssBytes: Number(match[1]) };
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
 describe("collection generation v2 (real local database)", () => {
   it("checkpoints one event and publishes one immutable observation with an ID/count-only response", async () => {
     const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
@@ -88,6 +132,12 @@ describe("collection generation v2 (real local database)", () => {
     const second = await v2Finish(job.id, lease, observationId, finishCoverage);
     expect(second.error).toBeNull();
     expect(second.data).toMatchObject({ status: "lease_mismatch" });
+    expect(await readCollectionJobRecovery(job.id)).toMatchObject({
+      state: "complete", observationId, observationDurable: true, leaseToken: null,
+    });
+    expect(await failCollectionJob({ id: job.id, leaseToken: lease },
+      { provider: "github", operation: "finish", stopKind: "storage", httpStatus: null, retryAfterSeconds: null }, null))
+      .toEqual({ status: "lease_mismatch" });
     expect((await db().from("scoring_v7_source_observations").select("id").eq("owner_handle", owner)).data).toHaveLength(1);
   });
 
@@ -137,6 +187,86 @@ describe("collection generation v2 (real local database)", () => {
     expect(oldClaims.split("\n")).toContain("f");
     const newClaims = inspectLocalSql(`BEGIN; SELECT EXISTS(SELECT 1 FROM public.scoring_collection_claim_v2(100, 120) WHERE id = '${job.id}'); ROLLBACK;`);
     expect(newClaims.split("\n")).toContain("t");
+  });
+
+  it("keeps a legacy job visible to old workers until a v2 checkpoint converts it", async () => {
+    const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const oldBefore = inspectLocalSql(`BEGIN; SELECT EXISTS(SELECT 1 FROM public.scoring_collection_claim(100, 120) WHERE id = '${job.id}'); ROLLBACK;`);
+    expect(oldBefore.split("\n")).toContain("t");
+    const lease = await leaseExactJob(job.id);
+    const released = await db().rpc("scoring_collection_checkpoint_v2", {
+      p_job_id: job.id, p_lease_token: lease, p_checkpoint: EMPTY_CHECKPOINT,
+      p_event_keys: [], p_events: [], p_progress: EMPTY_PROGRESS, p_release: true,
+    });
+    expect(released.error).toBeNull();
+    expect(released.data).toMatchObject({ status: "ok", stagedCount: 0 });
+    const oldAfter = inspectLocalSql(`BEGIN; SELECT EXISTS(SELECT 1 FROM public.scoring_collection_claim(100, 120) WHERE id = '${job.id}'); ROLLBACK;`);
+    const newAfter = inspectLocalSql(`BEGIN; SELECT EXISTS(SELECT 1 FROM public.scoring_collection_claim_v2(100, 120) WHERE id = '${job.id}'); ROLLBACK;`);
+    expect(oldAfter.split("\n")).toContain("f");
+    expect(newAfter.split("\n")).toContain("t");
+  });
+
+  it("accepts a storage diagnostic without admitting arbitrary stop kinds", async () => {
+    const storage = { provider: "github", operation: "finish", stopKind: "storage", httpStatus: null, retryAfterSeconds: null };
+    const allowed = await db().rpc("scoring_collection_valid_stop", { p_stop: storage });
+    expect(allowed.error).toBeNull();
+    expect(allowed.data).toBe(true);
+    const invalid = await db().rpc("scoring_collection_valid_stop", { p_stop: { ...storage, stopKind: "unclassified" } });
+    expect(invalid.error).toBeNull();
+    expect(invalid.data).toBe(false);
+  });
+
+  it("keeps terminal event_limit failed on owner retry, reconnect and refresh until admin reset", async () => {
+    const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    inspectLocalSql(`UPDATE public.scoring_collection_jobs SET state='failed',
+      last_stop=jsonb_build_object('provider','github','operation','event_limit',
+        'stopKind','protocol','httpStatus',NULL,'retryAfterSeconds',NULL)
+      WHERE id='${job.id}'::uuid`);
+    for (const reason of ["retry", "reconnect", "refresh"] as const) {
+      const blocked = await enqueueCollectionJob(owner, "github", reason, window.referenceTime);
+      expect(blocked.state).toBe("failed");
+      expect(blocked.lastStop?.operation).toBe("event_limit");
+      expect((await db().from("scoring_collection_jobs")
+        .select("current_generation_id").eq("id", job.id).single()).data?.current_generation_id).toBeNull();
+    }
+    const admin = await enqueueCollectionJob(owner, "github", "admin", window.referenceTime);
+    expect(admin.state).toBe("queued");
+    expect(admin.lastStop).toBeNull();
+    expect((await db().from("scoring_collection_jobs")
+      .select("current_generation_id").eq("id", job.id).single()).data?.current_generation_id).toBeTruthy();
+  });
+
+  it("retries a terminal storage stop with its checkpoint and generation intact", async () => {
+    const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const lease = await leaseExactJob(job.id);
+    const event = syntheticCollectionEvents({ count: 1, seed: 294, window })[0]!;
+    const checkpoint = { version: 1, operations: [{ key: "repositories", cursor: "next", done: false }],
+      discovered: { repositoryIds: [] } };
+    const staged = await db().rpc("scoring_collection_checkpoint_v2", {
+      p_job_id: job.id, p_lease_token: lease, p_checkpoint: checkpoint,
+      p_event_keys: [engineeringEventKey(event)], p_events: [event],
+      p_progress: { ...EMPTY_PROGRESS, events: 1 }, p_release: false,
+    });
+    expect(staged.data).toMatchObject({ status: "ok", stagedCount: 1 });
+    const generationId = (await db().from("scoring_collection_jobs")
+      .select("current_generation_id").eq("id", job.id).single()).data!.current_generation_id;
+    const failed = await db().rpc("scoring_collection_fail", {
+      p_job_id: job.id, p_lease_token: lease,
+      p_stop: { provider: "github", operation: "finish", stopKind: "storage", httpStatus: null, retryAfterSeconds: null },
+      p_retry_at: null,
+    });
+    expect(failed.error).toBeNull();
+    expect(failed.data).toMatchObject({ status: "failed" });
+    const retry = await enqueueCollectionJob(owner, "github", "retry", window.referenceTime);
+    expect(retry.state).toBe("queued");
+    expect(retry.checkpoint).toEqual(checkpoint);
+    expect(retry.progress.events).toBe(1);
+    expect(retry.lastStop).toBeNull();
+    const retained = await db().from("scoring_collection_jobs")
+      .select("current_generation_id").eq("id", job.id).single();
+    expect(retained.data?.current_generation_id).toBe(generationId);
+    expect((await db().from("scoring_collection_generation_events")
+      .select("event_key", { count: "exact", head: true }).eq("generation_id", generationId)).count).toBe(1);
   });
 
   it("imports an in-flight legacy staged job in bounded steps without losing its event keys", async () => {
@@ -200,6 +330,32 @@ describe("collection generation v2 (real local database)", () => {
     expect(newRows.data).toEqual([{ event_key: engineeringEventKey(secondEvent) }]);
   });
 
+  it.each(["scoring_v7_withdraw_with_receipts", "scoring_v7_delete_user_with_receipts"] as const)(
+    "cascades a published generation on %s",
+    async (operation) => {
+      const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+      const lease = await leaseExactJob(job.id);
+      const event = syntheticCollectionEvents({ count: 1, seed: 294, window })[0]!;
+      expect((await v2Checkpoint(job.id, lease, [event])).data).toMatchObject({ status: "ok", stagedCount: 1 });
+      const observationId = randomUUID();
+      const finishCoverage = { ...coverage, source: syntheticCollectionSource(294), repositoryIds: [event.repositoryId] };
+      expect((await v2Finish(job.id, lease, observationId, finishCoverage)).data)
+        .toEqual({ status: "ok", observationId, eventCount: 1 });
+      const generationId = (await db().from("scoring_v7_source_observations")
+        .select("event_generation_id").eq("id", observationId).single()).data!.event_generation_id;
+      const result = operation === "scoring_v7_withdraw_with_receipts"
+        ? await db().rpc(operation, { p_owner: owner, p_actor: owner, p_acknowledged: true })
+        : await db().rpc(operation, { p_handle: owner });
+      expect(result.error).toBeNull();
+      expect((await db().from("scoring_collection_generations")
+        .select("id").eq("id", generationId)).data).toEqual([]);
+      expect((await db().from("scoring_collection_generation_events")
+        .select("event_key").eq("generation_id", generationId)).data).toEqual([]);
+      expect((await db().from("scoring_v7_source_observations")
+        .select("id").eq("id", observationId)).data).toEqual([]);
+    },
+  );
+
   it("keeps the job running and unpublished when finish raises on invalid coverage", async () => {
     const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
     const lease = await leaseExactJob(job.id);
@@ -213,53 +369,268 @@ describe("collection generation v2 (real local database)", () => {
     expect((await db().from("scoring_v7_source_observations").select("id").eq("id", observationId)).data).toEqual([]);
   });
 
-  it("stages 50,000 events in bounded calls, rejects event 50,001 atomically, and finishes with a tiny response", async () => {
+  scale.each([17_572, 50_000])("profiles row staging, paged read and receipt issuance at %i events", async (count) => {
+    const testBefore = performance.now();
+    const postmasterStart = inspectLocalSql("SELECT pg_postmaster_start_time()");
+    let peakRssBytes = process.memoryUsage().rss;
+    const rssTimer = setInterval(() => { peakRssBytes = Math.max(peakRssBytes, process.memoryUsage().rss); }, 50);
+    const events = syntheticCollectionEvents({ count, seed: 294, window });
     const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
     const lease = await leaseExactJob(job.id);
-    const events = syntheticCollectionEvents({ count: 50_001, seed: 294, window });
-    for (let start = 0; start < 50_000; start += 1_000) {
+    const checkpointMs: number[] = [];
+    let fixtureBytes = 0;
+    let maxResponseBytes = 0;
+    for (let start = 0; start < count; start += 1_000) {
       const batch = events.slice(start, start + 1_000);
+      fixtureBytes += Buffer.byteLength(JSON.stringify(batch));
+      const before = performance.now();
+      const staged = await v2Checkpoint(job.id, lease, batch, start + batch.length);
+      checkpointMs.push(performance.now() - before);
+      expect(staged.error, `batch ${start}`).toBeNull();
+      expect(staged.data).toMatchObject({ status: "ok", stagedCount: start + batch.length });
+      maxResponseBytes = Math.max(maxResponseBytes, Buffer.byteLength(JSON.stringify(staged.data)));
+    }
+    const finishCoverage = { ...coverage, source: syntheticCollectionSource(294),
+      repositoryIds: [...new Set(events.map(event => event.repositoryId))].sort() };
+    const observationId = randomUUID();
+    const finishBefore = performance.now();
+    const finished = await v2Finish(job.id, lease, observationId, finishCoverage);
+    const finishMs = performance.now() - finishBefore;
+    expect(finished.error).toBeNull();
+    expect(finished.data).toEqual({ status: "ok", observationId, eventCount: count });
+    maxResponseBytes = Math.max(maxResponseBytes, Buffer.byteLength(JSON.stringify(finished.data)));
+    const context = { owner, source: syntheticCollectionSource(294), requestedSource: requested,
+      accessContextId: access, scope, window, link: null };
+    const readBefore = performance.now();
+    const manifest = await readSourceManifest(context);
+    expect(manifest?.eventCount).toBe(count);
+    let readCount = 0;
+    for await (const page of readSourcePages(context, manifest!)) readCount += page.length;
+    const readMs = performance.now() - readBefore;
+    expect(readCount).toBe(count);
+    const issueBefore = performance.now();
+    expect(await issueScoreReceipt(owner, { referenceTime: window.referenceTime })).toEqual({ status: "issued" });
+    const issuanceMs = performance.now() - issueBefore;
+    const receipts = await db().from("scoring_v7_receipts")
+      .select("policy_version,semantic_digest,core_semantic_digest").eq("owner_handle", owner);
+    expect(receipts.data).toHaveLength(1);
+    expect(receipts.data?.[0]).toMatchObject({ policy_version: "v7.2",
+      semantic_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      core_semantic_digest: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    const p95Ms = [...checkpointMs].sort((a, b) => a - b)[Math.ceil(checkpointMs.length * 0.95) - 1]!;
+    const profile = { case: "row-generation-profile", eventCount: count, batchSize: 1_000,
+      fixtureBytes, overallWallMs: performance.now() - testBefore, peakRssBytes, maxResponseBytes,
+      checkpoint: { batches: checkpointMs.length, p95Ms, maxMs: Math.max(...checkpointMs) },
+      finishMs, readCount, readMs, issuanceMs,
+      postmasterStart, postmasterEnd: inspectLocalSql("SELECT pg_postmaster_start_time()") };
+    clearInterval(rssTimer);
+    expect(profile.postmasterEnd).toBe(postmasterStart);
+    if (process.env.SCORING_SCALE_PROFILE_DIR) {
+      mkdirSync(process.env.SCORING_SCALE_PROFILE_DIR, { recursive: true });
+      writeFileSync(`${process.env.SCORING_SCALE_PROFILE_DIR}/db-${count}-single.json`, `${JSON.stringify(profile, null, 2)}\n`);
+    }
+  }, 900_000);
+
+  scale("stages and publishes 100,000 events, then rejects event 100,001 atomically", async () => {
+    const testBefore = performance.now();
+    const postmasterStart = inspectLocalSql("SELECT pg_postmaster_start_time()");
+    let peakRssBytes = process.memoryUsage().rss;
+    const rssTimer = setInterval(() => { peakRssBytes = Math.max(peakRssBytes, process.memoryUsage().rss); }, 50);
+    const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
+    const lease = await leaseExactJob(job.id);
+    const events = syntheticCollectionEvents({ count: 100_001, seed: 294, window });
+    const initialMs: number[] = [];
+    const refreshMs: number[] = [];
+    let maxResponseBytes = 0;
+    let fixtureBytes = 0;
+    for (let start = 0; start < 100_000; start += 1_000) {
+      const batch = events.slice(start, start + 1_000);
+      fixtureBytes += Buffer.byteLength(JSON.stringify(batch));
       const before = performance.now();
       const stage = await v2Checkpoint(job.id, lease, batch, start + batch.length);
+      initialMs.push(performance.now() - before);
+      maxResponseBytes = Math.max(maxResponseBytes, Buffer.byteLength(JSON.stringify(stage.data)));
       expect(stage.error, `initial generation batch ${start}`).toBeNull();
       expect(stage.data).toMatchObject({ status: "ok", stagedCount: start + batch.length });
       expect(performance.now() - before).toBeLessThan(8_000);
     }
     const finishCoverage = { ...coverage, source: syntheticCollectionSource(294),
-      repositoryIds: [...new Set(events.slice(0, 50_000).map(event => event.repositoryId))].sort() };
+      repositoryIds: [...new Set(events.slice(0, 100_000).map(event => event.repositoryId))].sort() };
     const observationId = randomUUID();
     const before = performance.now();
     const finished = await v2Finish(job.id, lease, observationId, finishCoverage);
-    expect(performance.now() - before).toBeLessThan(8_000);
+    const finishMs = performance.now() - before;
+    const finishResponseBytes = Buffer.byteLength(JSON.stringify(finished.data));
+    expect(finishMs).toBeLessThan(8_000);
     expect(finished.error).toBeNull();
-    expect(finished.data).toEqual({ status: "ok", observationId, eventCount: 50_000 });
+    expect(finished.data).toEqual({ status: "ok", observationId, eventCount: 100_000 });
     expect(Buffer.byteLength(JSON.stringify(finished.data))).toBeLessThan(256);
     expect((await db().from("scoring_collection_jobs").select("state").eq("id", job.id).single()).data?.state).toBe("complete");
+    const isolatedIssuance = issueInFreshLocalProcess();
+    const issuanceMs = isolatedIssuance.issuanceMs;
+    const receipts = await db().from("scoring_v7_receipts")
+      .select("policy_version,semantic_digest,core_semantic_digest").eq("owner_handle", owner);
+    expect(receipts.error).toBeNull();
+    expect(receipts.data).toHaveLength(1);
+    expect(receipts.data?.[0]).toMatchObject({ policy_version: "v7.2",
+      semantic_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      core_semantic_digest: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    const snapshot = await readRenderableReceipt(owner);
+    expect(snapshot).not.toBeNull();
+    const verification = await resolveBadgeVerification({
+      stats: { handle: owner }, scoring: observedReceiptViewModel(owner, snapshot!),
+    } as never);
+    expect(verification?.hash).toMatch(/^v7\./);
+    expect((await getReceiptVerificationV7(verification!.hash))?.signatureAuthenticated).toBe(true);
 
     // A refresh gets its own generation. Overflow must fail that job without
-    // changing the already published 50,000-event observation.
+    // changing the already published 100,000-event observation.
     const refreshed = await enqueueCollectionJob(owner, "github", "refresh", window.referenceTime);
     const refreshLease = await leaseExactJob(refreshed.id);
-    for (let start = 0; start < 50_000; start += 1_000) {
+    for (let start = 0; start < 100_000; start += 1_000) {
       const batch = events.slice(start, start + 1_000);
       const before = performance.now();
       const staged = await v2Checkpoint(refreshed.id, refreshLease, batch, start + batch.length);
+      refreshMs.push(performance.now() - before);
+      maxResponseBytes = Math.max(maxResponseBytes, Buffer.byteLength(JSON.stringify(staged.data)));
       expect(staged.error, `refresh generation batch ${start}`).toBeNull();
       expect(performance.now() - before).toBeLessThan(8_000);
     }
-    const rejected = await v2Checkpoint(refreshed.id, refreshLease, events.slice(50_000), 50_001);
+    const overflowBefore = performance.now();
+    const rejected = await v2Checkpoint(refreshed.id, refreshLease, events.slice(100_000), 100_001);
+    const overflowMs = performance.now() - overflowBefore;
     expect(rejected.error).toBeNull();
-    expect(rejected.data).toMatchObject({ status: "event_limit", stagedCount: 50_000 });
+    expect(rejected.data).toMatchObject({ status: "event_limit", stagedCount: 100_000 });
     const terminal = await db().from("scoring_collection_jobs")
       .select("state,last_stop,lease_token,progress,current_generation_id").eq("id", refreshed.id).single();
     expect(terminal.data).toMatchObject({ state: "failed", lease_token: null,
       last_stop: { operation: "event_limit", stopKind: "protocol" },
-      progress: { events: 50_000 } });
+      progress: { events: 100_000 } });
     expect((await db().from("scoring_collection_generation_events")
-      .select("event_key", { count: "exact", head: true }).eq("generation_id", terminal.data!.current_generation_id)).count).toBe(50_000);
+      .select("event_key", { count: "exact", head: true }).eq("generation_id", terminal.data!.current_generation_id)).count).toBe(100_000);
     expect((await db().from("scoring_v7_source_observations").select("event_generation_id").eq("id", observationId).single()).data?.event_generation_id)
       .not.toBe(terminal.data!.current_generation_id);
-  }, 600_000);
+    const p95 = (samples: number[]) => [...samples].sort((a, b) => a - b)[Math.ceil(samples.length * 0.95) - 1]!;
+    const profile = { case: "row-generation-100k", eventCount: 100_000, fixtureBytes,
+      overallWallMs: performance.now() - testBefore, batchSize: 1000,
+      initial: { batches: initialMs.length, p95Ms: p95(initialMs), maxMs: Math.max(...initialMs) },
+      refresh: { batches: refreshMs.length, p95Ms: p95(refreshMs), maxMs: Math.max(...refreshMs) },
+      finishMs, finishResponseBytes, issuanceMs, isolatedIssuance, overflowMs, maxResponseBytes, peakRssBytes,
+      postmasterStart, postmasterEnd: inspectLocalSql("SELECT pg_postmaster_start_time()") };
+    clearInterval(rssTimer);
+    expect(profile.postmasterEnd).toBe(postmasterStart);
+    if (process.env.SCORING_SCALE_PROFILE_OUTPUT) {
+      mkdirSync(dirname(process.env.SCORING_SCALE_PROFILE_OUTPUT), { recursive: true });
+      writeFileSync(process.env.SCORING_SCALE_PROFILE_OUTPUT, `${JSON.stringify(profile, null, 2)}\n`);
+    }
+  }, 900_000);
+
+  scale("publishes one 100,000-event owner across GitHub and GitLab with paged reads and one receipt", async () => {
+    const testBefore = performance.now();
+    const postmasterStart = inspectLocalSql("SELECT pg_postmaster_start_time()");
+    let peakRssBytes = process.memoryUsage().rss;
+    const rssTimer = setInterval(() => { peakRssBytes = Math.max(peakRssBytes, process.memoryUsage().rss); }, 50);
+    expect(await dbUpsertLinkedPlatform(owner, "gitlab", "synthetic-remote", "synthetic-local-token", null, null)).toBe(true);
+    const linked = await dbGetLinkedPlatformStrict(owner, "gitlab");
+    expect(linked.status).toBe("linked");
+    if (linked.status !== "linked") throw new Error("Synthetic GitLab link unavailable");
+    const gitlabSource = { provider: "gitlab" as const, host: "gitlab.com", subjectId: "synthetic-subject-295" };
+    const gitlabRequested = { provider: "gitlab" as const, host: "gitlab.com", login: linked.link.remoteLogin };
+    const gitlabAccess = createSourceContext({ owner, requestedSource: gitlabRequested, window, scope },
+      { kind: "linked", link: linked.link, accessToken: linked.link.tokens.accessToken }).accessContextId;
+    const githubEvents = syntheticCollectionEvents({ count: 50_000, seed: 294, window });
+    const gitlabEvents = syntheticCollectionEvents({ count: 50_000, seed: 295, window }).map(event => ({
+      ...event, ...gitlabSource, actorId: gitlabSource.subjectId,
+      canonicalProjectId: `gitlab:${event.repositoryId}`,
+    }));
+    const stageMs: Record<string, number[]> = { github: [], gitlab: [] };
+    const finishMs: Record<string, number> = {};
+    let maxResponseBytes = 0;
+    let fixtureBytes = 0;
+    const contexts = [];
+    for (const entry of [
+      { provider: "github" as const, events: githubEvents, source: syntheticCollectionSource(294),
+        requested, access, link: null },
+      { provider: "gitlab" as const, events: gitlabEvents, source: gitlabSource,
+        requested: gitlabRequested, access: gitlabAccess, link: linked.link },
+    ]) {
+      const job = await enqueueCollectionJob(owner, entry.provider, "signup", window.referenceTime);
+      const lease = await leaseExactJob(job.id);
+      for (let start = 0; start < entry.events.length; start += 1_000) {
+        const batch = entry.events.slice(start, start + 1_000);
+        fixtureBytes += Buffer.byteLength(JSON.stringify(batch));
+        const before = performance.now();
+        const staged = await v2Checkpoint(job.id, lease, batch, start + 1_000);
+        stageMs[entry.provider]!.push(performance.now() - before);
+        expect(staged.error, `${entry.provider} batch ${start}`).toBeNull();
+        expect(staged.data).toMatchObject({ status: "ok", stagedCount: start + 1_000 });
+        maxResponseBytes = Math.max(maxResponseBytes, Buffer.byteLength(JSON.stringify(staged.data)));
+      }
+      const observationId = randomUUID();
+      const providerCoverage = { ...coverage, source: entry.source,
+        repositoryIds: [...new Set(entry.events.map(event => event.repositoryId))].sort() };
+      const beforeFinish = performance.now();
+      const finished = await db().rpc("scoring_collection_finish_v2", {
+        p_job_id: job.id, p_lease_token: lease, p_coverage: providerCoverage,
+        p_observation: observationId, p_requested: entry.requested, p_access: entry.access,
+        p_scope: scope, p_link_id: entry.link?.id ?? null, p_link_version: entry.link?.updatedAt ?? null,
+      });
+      finishMs[entry.provider] = performance.now() - beforeFinish;
+      expect(finished.error).toBeNull();
+      expect(finished.data).toEqual({ status: "ok", observationId, eventCount: 50_000 });
+      maxResponseBytes = Math.max(maxResponseBytes, Buffer.byteLength(JSON.stringify(finished.data)));
+      contexts.push({ owner, source: entry.source, requestedSource: entry.requested,
+        accessContextId: entry.access, scope, window,
+        link: entry.link ? { id: entry.link.id, updatedAt: entry.link.updatedAt } : null });
+    }
+    const readBefore = performance.now();
+    let readCount = 0;
+    for (const context of contexts) {
+      const manifest = await readSourceManifest(context);
+      expect(manifest?.eventCount).toBe(50_000);
+      for await (const page of readSourcePages(context, manifest!)) {
+        expect(page.length).toBeLessThanOrEqual(500);
+        readCount += page.length;
+      }
+    }
+    const readMs = performance.now() - readBefore;
+    expect(readCount).toBe(100_000);
+    const issueBefore = performance.now();
+    expect(await issueScoreReceipt(owner, { referenceTime: window.referenceTime })).toEqual({ status: "issued" });
+    const issuanceMs = performance.now() - issueBefore;
+    const receipts = await db().from("scoring_v7_receipts")
+      .select("policy_version,semantic_digest,core_semantic_digest").eq("owner_handle", owner);
+    expect(receipts.error).toBeNull();
+    expect(receipts.data).toHaveLength(1);
+    expect(receipts.data?.[0]).toMatchObject({ policy_version: "v7.2",
+      semantic_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      core_semantic_digest: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    const snapshot = await readRenderableReceipt(owner);
+    expect(snapshot).not.toBeNull();
+    expect(await hasDrawableCurrentReceipt(owner)).toBe(true);
+    expect(await readScoringStatus(owner)).toMatchObject({ kind: "ready", receiptDate: window.referenceDate });
+    const model = scoreModelFrom(owner, snapshot);
+    expect(model?.policyVersion).toBe("v7.2");
+    expect(model?.identity?.revisionId).toBe(snapshot!.receipt.receipt.revisionId);
+    const verification = await resolveBadgeVerification({
+      stats: { handle: owner }, scoring: model,
+    } as never);
+    expect(verification?.hash).toMatch(/^v7\./);
+    expect((await getReceiptVerificationV7(verification!.hash))?.signatureAuthenticated).toBe(true);
+    const p95 = (samples: number[]) => [...samples].sort((a, b) => a - b)[Math.ceil(samples.length * 0.95) - 1]!;
+    const profile = { case: "mixed-provider-100k", providerCounts: { github: 50_000, gitlab: 50_000 },
+      fixtureBytes, overallWallMs: performance.now() - testBefore,
+      batchSize: 1_000, readCount, readMs, finishMs, issuanceMs, maxResponseBytes, peakRssBytes,
+      checkpoint: Object.fromEntries(Object.entries(stageMs).map(([provider, samples]) => [provider,
+        { batches: samples.length, p95Ms: p95(samples), maxMs: Math.max(...samples) }])),
+      postmasterStart, postmasterEnd: inspectLocalSql("SELECT pg_postmaster_start_time()") };
+    clearInterval(rssTimer);
+    expect(profile.postmasterEnd).toBe(postmasterStart);
+    if (process.env.SCORING_SCALE_PROFILE_OUTPUT) {
+      mkdirSync(dirname(process.env.SCORING_SCALE_PROFILE_OUTPUT), { recursive: true });
+      writeFileSync(process.env.SCORING_SCALE_PROFILE_OUTPUT, `${JSON.stringify(profile, null, 2)}\n`);
+    }
+  }, 900_000);
 });
 
 describe("collection queue (real local database)", () => {

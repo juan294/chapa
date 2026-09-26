@@ -9,7 +9,7 @@ import type { CollectionJobState } from "@/lib/db/collection-queue";
  * served to the owner by `GET /api/scoring/status`, which returns
  * `{ scoringStatus: ScoringStatus }`.
  */
-export type ProviderStatusReason = "reconnect" | "rate_limited" | "temporary" | "failed";
+export type ProviderStatusReason = "reconnect" | "rate_limited" | "temporary" | "failed" | "storage" | "capacity";
 
 export interface ProviderStatus {
   readonly provider: SourceProvider;
@@ -30,8 +30,8 @@ export interface ProviderStatus {
 
 export type ScoringStatus =
   | { readonly kind: "unregistered" }
-  | { readonly kind: "collecting"; readonly percent: number | null; readonly sources: readonly ProviderStatus[]; readonly hasPriorReceipt: boolean }
-  | { readonly kind: "action_needed"; readonly sources: readonly ProviderStatus[]; readonly hasPriorReceipt: boolean }
-  | { readonly kind: "ready"; readonly receiptDate: string; readonly updating: boolean };
+  | { readonly kind: "collecting"; readonly percent: number | null; readonly finalizing?: boolean; readonly sources: readonly ProviderStatus[]; readonly hasPriorReceipt: boolean }
+  | { readonly kind: "action_needed"; readonly sources: readonly ProviderStatus[]; readonly hasPriorReceipt: boolean; readonly priorReceiptDate?: string }
+  | { readonly kind: "ready"; readonly receiptDate: string; readonly updating: boolean; readonly finalizing?: boolean };
 
 export type ScoringStatusKind = ScoringStatus["kind"];

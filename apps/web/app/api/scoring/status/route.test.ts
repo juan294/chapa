@@ -113,8 +113,26 @@ describe("POST /api/scoring/status", () => {
     expect(body).toEqual({ scoringStatus: { kind: "collecting", percent: 40, sources: [], hasPriorReceipt: false } });
   });
 
-  it("returns 503 when the post-retry status read fails", async () => {
+  it("rejects a terminal event limit with a support message and does not enqueue", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", hasPriorReceipt: false, sources: [
+      { provider: "github", state: "failed", percent: null, reason: "capacity" },
+    ] });
+    const res = await POST(makeRequest("POST", { action: "retry", provider: "github" }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "event_limit", error: expect.stringContaining("Contact support") });
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
+    expect(mockScheduleCollectionAdvance).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before enqueue when status cannot be read", async () => {
     mockReadScoringStatus.mockResolvedValue(null);
+    const res = await POST(makeRequest("POST", { action: "retry", provider: "github" }));
+    expect(res.status).toBe(503);
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when the post-retry status read fails", async () => {
+    mockReadScoringStatus.mockResolvedValueOnce({ kind: "collecting", percent: 40, sources: [], hasPriorReceipt: false }).mockResolvedValueOnce(null);
     const res = await POST(makeRequest("POST", { action: "retry", provider: "gitlab" }));
     expect(res.status).toBe(503);
   });

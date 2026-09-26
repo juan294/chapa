@@ -30,6 +30,8 @@ const REASON_KEYS: Record<ProviderStatusReason, string> = {
   rate_limited: "scoring.status.reasonRateLimited",
   temporary: "scoring.status.reasonTemporary",
   failed: "scoring.status.reasonFailed",
+  storage: "scoring.status.reasonStorage",
+  capacity: "scoring.status.reasonCapacity",
 };
 
 /**
@@ -143,21 +145,33 @@ export function ScoringStatusPanel({ initialStatus }: ScoringStatusPanelProps) {
 
       {status.kind === "ready" ? (
         <p className="text-sm text-text-secondary" data-testid="scoring-status-ready">
-          {status.updating ? (t("scoring.status.panelUpdating") as string) : (t("scoring.status.panelReady") as string)}
+          {status.finalizing
+            ? interpolate(t("scoring.status.panelFinalizingPrior") as string, { date: status.receiptDate })
+            : status.updating
+            ? interpolate(t("scoring.status.panelUpdating") as string, { date: status.receiptDate })
+            : (t("scoring.status.panelReady") as string)}
         </p>
       ) : (
         <>
           <p className="text-sm text-text-secondary">
             {status.kind === "collecting"
-              ? status.percent === null
+                ? status.finalizing
+                  ? (t("scoring.status.panelFinalizing") as string)
+                  : status.percent === null
                 ? (t("scoring.status.panelDiscovering") as string)
                 : interpolate(t("scoring.status.panelCollecting") as string, { percent: String(status.percent) })
               : (t("scoring.status.panelActionNeeded") as string)}
           </p>
+          {status.kind === "action_needed" && status.priorReceiptDate && (
+            <p className="text-sm text-text-secondary" data-testid="scoring-status-prior-receipt">
+              {interpolate(t("scoring.status.panelPriorReceipt") as string, { date: status.priorReceiptDate })}
+            </p>
+          )}
           <ul className="space-y-2">
             {status.sources.map((source) => {
               const reconnectKey = source.reason === "reconnect" ? RECONNECT_KEYS[source.provider] : undefined;
-              const canRetry = source.state === "failed" && source.reason !== "reconnect";
+              const canRetry = source.state === "failed" && source.reason !== "reconnect" && source.reason !== "capacity";
+              const needsSupport = source.state === "failed" && (source.reason === "storage" || source.reason === "capacity");
               return (
                 <li
                   key={source.provider}
@@ -187,6 +201,11 @@ export function ScoringStatusPanel({ initialStatus }: ScoringStatusPanelProps) {
                       >
                         {retryingProvider === source.provider ? (t("scoring.status.retrying") as string) : (t("scoring.status.retry") as string)}
                       </button>
+                    )}
+                    {needsSupport && (
+                      <a href="mailto:support@chapa.thecreativetoken.com" className="inline-flex min-h-[44px] items-center rounded-[3px] border border-text-primary px-4 py-2 text-sm text-text-primary hover:bg-purple-tint">
+                        {t("scoring.status.contactSupport") as string}
+                      </a>
                     )}
                   </div>
                   {retryErrorProvider === source.provider && (

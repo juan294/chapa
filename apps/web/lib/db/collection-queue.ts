@@ -51,7 +51,7 @@ export interface CollectionJob {
 const providerSchema = z.enum(["github", "bitbucket", "gitlab", "codeberg"]);
 const stateSchema = z.enum(["queued", "running", "waiting_rate_limit", "retrying", "complete", "failed"]);
 const reasonSchema = z.enum(["signup", "refresh", "daily", "reconnect", "admin", "retry"]);
-const stopKindSchema = z.enum(["budget", "deadline", "rate_limited", "http", "graphql", "network", "protocol", "parse", "not_accessible"]);
+const stopKindSchema = z.enum(["budget", "deadline", "rate_limited", "http", "graphql", "network", "protocol", "parse", "storage", "not_accessible"]);
 
 const operationSchema = z.object({ key: z.string().min(1), cursor: z.string().nullable(), done: z.boolean() }).strict();
 /** Round-trips `CollectorCheckpoint` (lib/collection/plan.ts) exactly, plus
@@ -276,6 +276,59 @@ export async function finishCollectionJob(
   } catch (error) {
     throw new Error(`Collection finish unavailable: ${(error as Error).message}`, { cause: error });
   }
+}
+
+export interface CollectionJobRecovery {
+  readonly state: CollectionJobState;
+  readonly observationId: string | null;
+  readonly observationDurable: boolean;
+  readonly leaseToken: string | null;
+  readonly attempt: number;
+  readonly progress: CollectionProgress;
+  readonly lastStop: SourceDiagnostic | null;
+}
+
+const recoveryJobSchema = z.object({
+  state: stateSchema,
+  observation_id: z.uuid().nullable(),
+  lease_token: z.uuid().nullable(),
+  attempt: z.number().int().nonnegative(),
+  progress: progressSchema,
+  last_stop: stopSchema,
+  owner_handle: z.string().min(1),
+  provider: providerSchema,
+  reference_time: z.string(),
+}).loose();
+const recoveryObservationSchema = z.object({
+  id: z.uuid(), owner_handle: z.string().min(1), reference_time: z.string(),
+}).loose();
+
+/** Read only after an uncertain checkpoint or finish response. A committed
+ * finish must have both the completed job and its transactionally inserted
+ * observation, so a lost HTTP response cannot publish a false receipt. */
+export async function readCollectionJobRecovery(jobId: string): Promise<CollectionJobRecovery | null> {
+  const db = getSupabase();
+  if (!db) throw new Error("Collection recovery unavailable: Supabase client unavailable");
+  const { data, error } = await db.from("scoring_collection_jobs")
+    .select("state,observation_id,lease_token,attempt,progress,last_stop,owner_handle,provider,reference_time")
+    .eq("id", jobId).maybeSingle();
+  if (error) throw new Error(`Collection recovery unavailable: ${error.message}`);
+  if (!data) return null;
+  const job = recoveryJobSchema.parse(data);
+  let observationDurable = false;
+  if (job.state === "complete" && job.observation_id) {
+    const { data: observation, error: observationError } = await db.from("scoring_v7_source_observations")
+      .select("id,owner_handle,reference_time").eq("id", job.observation_id).maybeSingle();
+    if (observationError) throw new Error(`Collection recovery observation unavailable: ${observationError.message}`);
+    if (observation) {
+      const stored = recoveryObservationSchema.parse(observation);
+      observationDurable = stored.id === job.observation_id && stored.owner_handle === job.owner_handle &&
+        Date.parse(stored.reference_time) === Date.parse(job.reference_time);
+    }
+  }
+  return { state: job.state, observationId: job.observation_id,
+    observationDurable, leaseToken: job.lease_token, attempt: job.attempt, progress: job.progress,
+    lastStop: job.last_stop };
 }
 
 /**

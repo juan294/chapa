@@ -6,24 +6,35 @@ import { join, resolve } from "node:path";
 import { qualificationBuildEnvironment, assertNoImplicitBuildEnvironment, assertUntrackedEvidenceOutput, verifyLocalBuildManifest } from "./candidate-artifact-manifest";
 
 export const QUALIFICATION_SESSION_SECRET = "local-scoring-qualification-session-secret-only-0123456789abcdef";
-const SUPABASE_ORIGIN = "http://127.0.0.1:55331";
-const REDIS_ORIGIN = "http://127.0.0.1:56380";
+const REDESIGN_TARGET = { acknowledgment: "chapa-redesign", supabase: "http://127.0.0.1:55331", redis: "http://127.0.0.1:56380" } as const;
+const SCORING_TARGET = { acknowledgment: "chapa-volume-20260926", supabase: "http://127.0.0.1:55431", redis: "http://127.0.0.1:56480" } as const;
+function qualificationTarget(source: Record<string, string | undefined>) {
+  if (source.SCORING_DISPOSABLE_PROJECT !== undefined) {
+    if (source.SCORING_DISPOSABLE_PROJECT !== SCORING_TARGET.acknowledgment || source.REDESIGN_DISPOSABLE_PROJECT !== undefined)
+      throw new Error("Task scoring qualification requires only the exact task disposable acknowledgment");
+    return SCORING_TARGET;
+  }
+  if (source.REDESIGN_DISPOSABLE_PROJECT !== REDESIGN_TARGET.acknowledgment)
+    throw new Error("Disposable fixture acknowledgment required");
+  return REDESIGN_TARGET;
+}
 function serviceTarget(value: string | undefined, expected: string) {
   if (value !== expected) throw new Error("Qualification target must be the explicitly dedicated loopback disposable service");
   return value;
 }
 export function qualificationRuntimeEnvironment(root: string, evidenceDir: string, source: Record<string, string | undefined>, port = 3217): NodeJS.ProcessEnv {
-  if (source.REDESIGN_DISPOSABLE_PROJECT !== "chapa-redesign") throw new Error("Disposable fixture acknowledgment required");
-  const supabase = serviceTarget(source.SUPABASE_URL, SUPABASE_ORIGIN), redis = serviceTarget(source.UPSTASH_REDIS_REST_URL, REDIS_ORIGIN);
+  const target = qualificationTarget(source);
+  const supabase = serviceTarget(source.SUPABASE_URL, target.supabase), redis = serviceTarget(source.UPSTASH_REDIS_REST_URL, target.redis);
   if (!source.SUPABASE_SERVICE_ROLE_KEY?.trim() || !source.UPSTASH_REDIS_REST_TOKEN?.trim()) throw new Error("Dedicated local service credentials required");
-  if (!Number.isSafeInteger(port) || port < 1024 || port > 65535 || [55331, 55332, 56379, 56380].includes(port)) throw new Error("Invalid local application port");
+  if (!Number.isSafeInteger(port) || port < 1024 || port > 65535 || [55331, 55332, 55431, 55432, 56379, 56380, 56480].includes(port)) throw new Error("Invalid local application port");
   return { ...qualificationBuildEnvironment(source), SUPABASE_URL: supabase, SUPABASE_SERVICE_ROLE_KEY: source.SUPABASE_SERVICE_ROLE_KEY,
     UPSTASH_REDIS_REST_URL: redis, UPSTASH_REDIS_REST_TOKEN: source.UPSTASH_REDIS_REST_TOKEN,
     NEXTAUTH_SECRET: QUALIFICATION_SESSION_SECRET, CHAPA_VERIFICATION_SECRET: "local-scoring-qualification-verification-only-0123456789abcdef",
     GITHUB_CLIENT_ID: "local-scoring-qualification-client", GITHUB_CLIENT_SECRET: "local-scoring-qualification-client-secret",
     ADMIN_HANDLES: ["en", "es"].flatMap(locale => ["light", "dark"].flatMap(theme => ["desktop", "mobile"].map(device => `chapa-redesign-${locale}-${theme}-${device}`))).join(","),
     GITHUB_TOKEN: "redesign-local-fixture", CRON_SECRET: "local-scoring-qualification-cron-only",
-    NEXT_PUBLIC_BASE_URL: `http://127.0.0.1:${port}`, REDESIGN_DISPOSABLE_PROJECT: "chapa-redesign",
+    NEXT_PUBLIC_BASE_URL: `http://127.0.0.1:${port}`,
+    ...(target === SCORING_TARGET ? { SCORING_DISPOSABLE_PROJECT: SCORING_TARGET.acknowledgment } : { REDESIGN_DISPOSABLE_PROJECT: REDESIGN_TARGET.acknowledgment }),
     REDESIGN_FIXTURE_FILE: join(evidenceDir, "upstream-fixtures.json"), REDESIGN_UPSTREAM_AUDIT: join(evidenceDir, "unexpected-upstream.log"),
     REDESIGN_EVIDENCE_DIR: join(evidenceDir, "browser", "redesign"), E2E_PRO_RUN_ID: "redesign",
     EXPECTED_DEPLOYMENT_ENV: "local", RELEASE_VERIFICATION_MODE: "local-candidate", PLAYWRIGHT_BASE_URL: `http://127.0.0.1:${port}`,
@@ -31,8 +42,9 @@ export function qualificationRuntimeEnvironment(root: string, evidenceDir: strin
   };
 }
 /** NX avoids replacing another fixture run. A partial seed rolls back only its own successful inserts. */
-export async function seedQualificationCache(url: string, credential: string, cache: Record<string, string>, send: typeof fetch = fetch) {
-  serviceTarget(url, REDIS_ORIGIN);
+export async function seedQualificationCache(url: string, credential: string, cache: Record<string, string>, send: typeof fetch = fetch, expectedOrigin: string = REDESIGN_TARGET.redis) {
+  if (expectedOrigin !== REDESIGN_TARGET.redis && expectedOrigin !== SCORING_TARGET.redis) throw new Error("Unknown disposable cache target");
+  serviceTarget(url, expectedOrigin);
   if (!credential.trim()) throw new Error("Local cache credential required");
   const keys = Object.keys(cache);
   if (!keys.length || keys.some(key => !key || typeof cache[key] !== "string")) throw new Error("Invalid fixture cache seed");
@@ -90,7 +102,7 @@ async function recordRemainingCache(environment: NodeJS.ProcessEnv, evidenceDir:
     cursor = body.result[0];
     for (const key of body.result[1]) keys.add(key);
   } while (cursor !== "0");
-  await writeFile(join(evidenceDir, "remaining-cache-keys.json"), `${JSON.stringify({ service: REDIS_ORIGIN, disposition: "dedicated disposable service retained for owner cleanup", keys: [...keys].sort() }, null, 2)}\n`, { mode: 0o600 });
+  await writeFile(join(evidenceDir, "remaining-cache-keys.json"), `${JSON.stringify({ service: environment.UPSTASH_REDIS_REST_URL, disposition: "dedicated disposable service retained for owner cleanup", keys: [...keys].sort() }, null, 2)}\n`, { mode: 0o600 });
 }
 
 /** A sanitized build can cache absent DB flags. Discard only that mutable
@@ -160,12 +172,12 @@ export async function launchLocalScoringQualification(root: string, evidenceDir:
     Object.assign(upstream.github, collectionQueue.github);
     upstream.githubCollectionResponses = githubZeroActivityResponses();
     await writeFile(environment.REDESIGN_FIXTURE_FILE!, JSON.stringify(upstream), { mode: 0o600 });
-    cleanupTasks.push(await seedQualificationCache(environment.UPSTASH_REDIS_REST_URL!, environment.UPSTASH_REDIS_REST_TOKEN!, cache));
+    cleanupTasks.push(await seedQualificationCache(environment.UPSTASH_REDIS_REST_URL!, environment.UPSTASH_REDIS_REST_TOKEN!, cache, fetch, qualificationTarget(source).redis));
     const preload = join(root, "apps/web/e2e/helpers/redesign-upstream.mjs");
     const child = spawn(process.execPath, ["--import", preload, join(root, "apps/web/node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", String(port)], { cwd: join(root, "apps/web"), env: environment, stdio: "inherit" });
     const exited = new Promise<number | null>((resolveExit, reject) => { child.once("error", reject); child.once("exit", resolveExit); });
     const ready = { schemaVersion: 1, environment: "local", source: { commit: manifest.commit, treeDigest: manifest.treeDigest },
-      baseUrl: environment.PLAYWRIGHT_BASE_URL, services: { supabase: SUPABASE_ORIGIN, redis: REDIS_ORIGIN },
+      baseUrl: environment.PLAYWRIGHT_BASE_URL, services: { supabase: environment.SUPABASE_URL, redis: environment.UPSTASH_REDIS_REST_URL },
       providerEvidence: "synthetic known fixtures; unexpected external requests denied", fixtures: scoring.publicManifest };
     // A launch manifest is not a claim that health/browser qualification has passed.
     await withQualificationServer(child, exited, async () => {

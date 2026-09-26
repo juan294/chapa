@@ -120,6 +120,8 @@ function harness(): MutableCollectionWorkerDeps {
     claim: vi.fn().mockResolvedValue([]),
     checkpoint: vi.fn().mockResolvedValue({ status: "ok", stagedCount: 0 }),
     finish: vi.fn().mockResolvedValue({ status: "ok", observationId: "obs-1" }),
+    readRecovery: vi.fn().mockResolvedValue({ state: "running", observationId: null, observationDurable: false,
+      leaseToken: "lease-1", attempt: 0, progress: makeJob().progress, lastStop: null }),
     fail: vi.fn().mockResolvedValue({ status: "failed" }),
     resolveCredential,
     collect: vi.fn().mockResolvedValue(sliceResult()),
@@ -225,9 +227,11 @@ describe("runCollectionSlice", () => {
     throwing.checkpoint = vi.fn()
       .mockResolvedValueOnce({ status: "ok", stagedCount: 1_000 })
       .mockRejectedValueOnce(new Error("checkpoint timeout"));
-    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, throwing)).rejects.toThrow("checkpoint timeout");
+    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, throwing)).resolves.toBeUndefined();
     expect(throwing.checkpoint).toHaveBeenCalledTimes(2);
     expect(throwing.finish).not.toHaveBeenCalled();
+    expect(throwing.fail).toHaveBeenCalledWith(expect.anything(),
+      expect.objectContaining({ operation: "checkpoint", stopKind: "storage" }), expect.any(String));
   });
 
   it("uses the database's distinct staged count when a collector replays a duplicate key", async () => {
@@ -441,15 +445,20 @@ describe("runCollectionSlice", () => {
     expect(deps.fail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: "collect" }), null);
   });
 
-  it("resumes from exactly the checkpoint persisted before an outcome-processing crash", async () => {
+  it("fails a transient finish timeout through a storage stop and retains the advanced checkpoint for a later claim", async () => {
     const deps = harness();
     const midCheckpoint: CollectorCheckpoint = { version: 1, operations: [{ key: "repositories", cursor: "page2", done: false }], discovered: { repositoryIds: ["r1"] } };
     deps.collect = vi.fn().mockResolvedValue(sliceResult({ checkpoint: midCheckpoint, done: true, coverage: sampleCoverage }));
     deps.finish = vi.fn().mockRejectedValue(new Error("process killed mid-flight"));
-    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, deps)).rejects.toThrow("process killed mid-flight");
+    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, deps)).resolves.toBeUndefined();
     // The checkpoint call (which the DB commits independently of what happens
     // next in this process) already carried the advanced checkpoint.
     expect(deps.checkpoint).toHaveBeenCalledWith(expect.anything(), midCheckpoint, [], expect.anything(), false);
+    expect(deps.fail).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" },
+      expect.objectContaining({ operation: "finish", stopKind: "storage" }),
+      new Date(deps.now() + 60_000).toISOString());
+    expect(deps.emitDiagnostics).toHaveBeenCalledWith("alice", [expect.objectContaining({ operation: "finish", stopKind: "storage" })]);
+    expect(deps.onJobComplete).not.toHaveBeenCalled();
 
     // A later tick claims the job fresh, with that persisted checkpoint as
     // job.checkpoint, and the collector picks up from exactly that state.
@@ -457,6 +466,137 @@ describe("runCollectionSlice", () => {
     deps.finish = vi.fn().mockResolvedValue({ status: "ok", observationId: "obs-2" });
     await runCollectionSlice(resumedJob, Date.now() + 60_000, deps);
     expect(deps.collect).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), midCheckpoint, expect.anything(), expect.anything());
+    expect(deps.onJobComplete).toHaveBeenCalledOnce();
+  });
+
+  it("bounds repeated finish timeouts with no progress and alerts on the terminal stop", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.finish = vi.fn().mockRejectedValue(new Error("statement timeout"));
+    deps.fail = vi.fn().mockImplementation(async (_lease, _stop, retryAt: string | null) =>
+      ({ status: retryAt === null ? "failed" : "retrying" }));
+    deps.onJobFailed = vi.fn().mockResolvedValue(undefined);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const leaseToken = `lease-${attempt}`;
+      deps.readRecovery = vi.fn().mockResolvedValue({ state: "running", observationId: null, observationDurable: false,
+        leaseToken, attempt, progress: makeJob().progress, lastStop: null });
+      await runCollectionSlice(makeJob({ attempt, leaseToken }), Date.now() + 60_000, deps);
+    }
+    expect(deps.fail).toHaveBeenCalledTimes(3);
+    expect(deps.fail).toHaveBeenNthCalledWith(3, { id: "job-1", leaseToken: "lease-2" },
+      expect.objectContaining({ operation: "finish", stopKind: "storage" }), null);
+    expect(deps.onJobFailed).toHaveBeenCalledOnce();
+    expect(deps.onJobComplete).not.toHaveBeenCalled();
+  });
+
+  it("recovers a committed finish whose response was lost only after durable UUID-matched read", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    let committedId = "";
+    deps.finish = vi.fn().mockImplementation(async (_lease, args) => { committedId = args.observationId; throw new Error("response lost"); });
+    deps.readRecovery = vi.fn().mockImplementation(async () => ({ state: "complete", observationId: committedId,
+      observationDurable: true, leaseToken: null, attempt: 0, progress: makeJob().progress, lastStop: null }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.onJobComplete).toHaveBeenCalledWith(expect.objectContaining({ state: "complete", observationId: committedId }));
+    expect(deps.fail).not.toHaveBeenCalled();
+  });
+
+  it("recovers a committed finish that answers lease_mismatch on a repeated response", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    let committedId = "";
+    deps.finish = vi.fn().mockImplementation(async (_lease, args) => {
+      committedId = args.observationId;
+      return { status: "lease_mismatch" };
+    });
+    deps.readRecovery = vi.fn().mockImplementation(async () => ({ state: "complete", observationId: committedId,
+      observationDurable: true, leaseToken: null, attempt: 0, progress: makeJob().progress, lastStop: null }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.onJobComplete).toHaveBeenCalledWith(expect.objectContaining({ observationId: committedId }));
+    expect(deps.fail).not.toHaveBeenCalled();
+  });
+
+  it("does not claim a different completed observation or a superseded lease", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.finish = vi.fn().mockRejectedValue(new Error("response lost"));
+    deps.readRecovery = vi.fn().mockResolvedValue({ state: "complete", observationId: "other-observation",
+      observationDurable: true, leaseToken: null, attempt: 0, progress: makeJob().progress, lastStop: null });
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.onJobComplete).not.toHaveBeenCalled();
+    expect(deps.fail).not.toHaveBeenCalled();
+  });
+
+  it("does not mutate a job after another worker has claimed its lease", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.finish = vi.fn().mockRejectedValue(new Error("response lost"));
+    deps.readRecovery = vi.fn().mockResolvedValue({ state: "running", observationId: null,
+      observationDurable: false, leaseToken: "lease-2", attempt: 0, progress: makeJob().progress, lastStop: null });
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.fail).not.toHaveBeenCalled();
+    expect(deps.onJobComplete).not.toHaveBeenCalled();
+  });
+
+  it("keeps a committed completion after fan-in throws so the pending sweep can retry it", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.onJobComplete = vi.fn().mockRejectedValue(new Error("fan-in unavailable"));
+    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, deps)).rejects.toThrow("fan-in unavailable");
+    expect(deps.fail).not.toHaveBeenCalled();
+    deps.retryPendingFanIns = vi.fn().mockResolvedValue(undefined);
+    deps.claim = vi.fn().mockResolvedValue([]);
+    await runCollectionTick(240_000, deps);
+    expect(deps.retryPendingFanIns).toHaveBeenCalledWith(50);
+  });
+
+  it("converts a checkpoint timeout to a lease-fenced storage retry", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.checkpoint = vi.fn().mockRejectedValue(new Error("checkpoint timeout"));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.fail).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" },
+      expect.objectContaining({ operation: "checkpoint", stopKind: "storage" }), expect.any(String));
+    expect(deps.finish).not.toHaveBeenCalled();
+  });
+
+  it("uses a durable checkpoint progress reset when deciding storage retry budget", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.checkpoint = vi.fn().mockRejectedValue(new Error("checkpoint response lost"));
+    deps.readRecovery = vi.fn().mockResolvedValue({ state: "running", observationId: null,
+      observationDurable: false, leaseToken: "lease-1", attempt: 0,
+      progress: { ...makeJob().progress, operationsDone: 2 }, lastStop: null });
+    await runCollectionSlice(makeJob({ attempt: 2 }), Date.now() + 60_000, deps);
+    expect(deps.fail).toHaveBeenCalledWith(expect.anything(),
+      expect.objectContaining({ operation: "checkpoint", stopKind: "storage" }),
+      new Date(deps.now() + 60_000).toISOString());
+  });
+
+  it("alerts once on a database-terminal event limit without calling fail or finish", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.checkpoint = vi.fn().mockResolvedValue({ status: "event_limit", stagedCount: 100_001 });
+    deps.onJobFailed = vi.fn().mockResolvedValue(undefined);
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.onJobFailed).toHaveBeenCalledOnce();
+    expect(deps.onJobFailed).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: "event_limit" }));
+    expect(deps.fail).not.toHaveBeenCalled();
+    expect(deps.finish).not.toHaveBeenCalled();
+  });
+
+  it("recovers the terminal event-limit alert when the checkpoint response is lost", async () => {
+    const deps = harness();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    deps.checkpoint = vi.fn().mockRejectedValue(new Error("checkpoint response lost"));
+    deps.readRecovery = vi.fn().mockResolvedValue({ state: "failed", observationId: null,
+      observationDurable: false, leaseToken: null, attempt: 0, progress: makeJob().progress,
+      lastStop: { provider: "github", operation: "event_limit", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null } });
+    deps.onJobFailed = vi.fn().mockResolvedValue(undefined);
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.onJobFailed).toHaveBeenCalledOnce();
+    expect(deps.fail).not.toHaveBeenCalled();
+    expect(deps.finish).not.toHaveBeenCalled();
   });
 
   describe("incremental daily reuse (seedFromPrior wiring)", () => {
@@ -521,7 +661,7 @@ describe("runCollectionSlice", () => {
       expect(deps.finish).not.toHaveBeenCalled();
       expect(deps.checkpoint).toHaveBeenCalledWith(expect.anything(), EMPTY_CHECKPOINT, firstPage, makeJob().progress, false);
       expect(deps.fail).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" },
-        { provider: "github", operation: "prior_source_storage", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null },
+        { provider: "github", operation: "prior_source_storage", stopKind: "storage", httpStatus: null, retryAfterSeconds: null },
         new Date(deps.now() + 60_000).toISOString());
 
       failPage = false;
@@ -618,7 +758,7 @@ describe("runCollectionSlice", () => {
       expect(deps.collect).not.toHaveBeenCalled();
       expect(deps.finish).not.toHaveBeenCalled();
       expect(deps.fail).toHaveBeenCalledWith(expect.anything(),
-        expect.objectContaining({ operation: "prior_source_storage", stopKind: "protocol" }), expect.any(String));
+        expect.objectContaining({ operation: "prior_source_storage", stopKind: "storage" }), expect.any(String));
 
       expect(deps.captureError).toHaveBeenCalledTimes(1);
       const [captured] = vi.mocked(deps.captureError).mock.calls[0]!;
@@ -642,6 +782,8 @@ describe("runCollectionSlice", () => {
       deps.onJobFailed = vi.fn().mockResolvedValue(undefined);
 
       for (let attempt = 0; attempt < 3; attempt++) {
+        deps.readRecovery = vi.fn().mockResolvedValue({ state: "running", observationId: null,
+          observationDurable: false, leaseToken: `lease-${attempt}`, attempt, progress: makeJob().progress, lastStop: null });
         await runCollectionSlice(makeJob({ attempt, leaseToken: `lease-${attempt}` }), Date.now() + 60_000, deps);
       }
 
@@ -649,12 +791,32 @@ describe("runCollectionSlice", () => {
       for (let attempt = 0; attempt < 2; attempt++) {
         expect(deps.fail).toHaveBeenNthCalledWith(attempt + 1,
           { id: "job-1", leaseToken: `lease-${attempt}` },
-          { provider: "github", operation: "prior_source_storage", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null },
+          { provider: "github", operation: "prior_source_storage", stopKind: "storage", httpStatus: null, retryAfterSeconds: null },
           new Date(deps.now() + (attempt === 0 ? 60_000 : 120_000)).toISOString());
       }
       expect(deps.fail).toHaveBeenNthCalledWith(3, { id: "job-1", leaseToken: "lease-2" },
-        expect.objectContaining({ operation: "prior_source_storage", stopKind: "protocol" }), null);
+        expect.objectContaining({ operation: "prior_source_storage", stopKind: "storage" }), null);
       expect(deps.onJobFailed).toHaveBeenCalledOnce();
+      expect(deps.collect).not.toHaveBeenCalled();
+      expect(deps.finish).not.toHaveBeenCalled();
+    });
+
+    it("uses a durable progress reset after a lost final seed checkpoint response", async () => {
+      const deps = harness();
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readSourceManifest = vi.fn().mockResolvedValue(priorManifest(1));
+      deps.readSourcePages = vi.fn().mockImplementation(async function* () {
+        yield [event({ eventId: "prior-1", occurredAt: "2026-09-01T00:00:00.000Z" })];
+      });
+      deps.checkpoint = vi.fn().mockResolvedValueOnce({ status: "ok", stagedCount: 1 })
+        .mockRejectedValueOnce(new Error("seed checkpoint response lost"));
+      deps.readRecovery = vi.fn().mockResolvedValue({ state: "running", observationId: null,
+        observationDurable: false, leaseToken: "lease-1", attempt: 0,
+        progress: { ...makeJob().progress, operationsDone: 1, events: 1 }, lastStop: null });
+      await runCollectionSlice(makeJob({ attempt: 2 }), Date.now() + 60_000, deps);
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(),
+        expect.objectContaining({ operation: "prior_source_storage", stopKind: "storage" }),
+        new Date(deps.now() + 60_000).toISOString());
       expect(deps.collect).not.toHaveBeenCalled();
       expect(deps.finish).not.toHaveBeenCalled();
     });

@@ -35,6 +35,7 @@ describe("reasonFor", () => {
     ["network", "source_error"],
     ["protocol", "source_error"],
     ["parse", "source_error"],
+    ["storage", "source_error"],
   ] as const)("maps %s to %s", (stopKind, reason) => {
     expect(reasonFor(stopKind)).toBe(reason);
   });
