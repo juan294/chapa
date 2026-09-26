@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
 import type { CollectionJob, CollectionQueueHealth } from "@/lib/db/collection-queue";
-import type { StoredSourceObservation } from "@/lib/db/source-context";
+import type { SourceObservationManifest } from "@/lib/db/source-context";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint, type SliceResult } from "./plan";
 
 // #1335 phase 4.7 — mocked, not injected: these three modules are the only
@@ -49,7 +49,7 @@ function makeJob(overrides: Partial<CollectionJob> = {}): CollectionJob {
     attempt: 0,
     nextRunAt: window.referenceTime,
     leaseToken: "lease-1",
-    leaseExpiresAt: window.referenceTime,
+    leaseExpiresAt: new Date(Date.parse(window.referenceTime) + 120_000).toISOString(),
     lastStop: null,
     enqueueReason: "signup",
     observationId: null,
@@ -85,26 +85,17 @@ function event(overrides: Partial<NormalizedEngineeringEvent> & { readonly event
   };
 }
 
-/** A `StoredSourceObservation`-shaped fixture for a prior day's complete
- * observation. Only `coverage.status`/`dataThrough` and `events` are read by
- * the worker's seeding path; the rest exists to satisfy the storage type.
- */
-function priorObservation(overrides: { readonly dataThrough: string | null; readonly events: readonly NormalizedEngineeringEvent[] }): StoredSourceObservation {
+function priorManifest(eventCount: number): SourceObservationManifest {
   const priorWindow = createScoringWindow("2026-09-04T12:00:00Z");
   return {
     id: "11111111-1111-1111-1111-111111111111",
     window: priorWindow,
     coverage: {
-      source, window: priorWindow, dataThrough: overrides.dataThrough, status: "complete", discovery: "owned_and_contributed",
+      source, window: priorWindow, dataThrough: priorWindow.referenceTime, status: "complete", discovery: "owned_and_contributed",
       repositoryIds: [], repositoryDiscoveryComplete: true, eventKinds: {}, reasonCodes: [], unknownPeriods: [],
     },
-    events: [...overrides.events],
-    // `provider` here is always one of the four forge providers this test
-    // constructs (`event()` defaults to "github"); the shared
-    // `NormalizedEngineeringEvent` type widens it to `EvidenceProvider`
-    // (which also allows "supplemental"/"portfolio") for non-forge evidence,
-    // so a cast is needed to satisfy the storage schema's narrower type.
-  } as unknown as StoredSourceObservation;
+    storageMode: "rows", eventCount, eventGenerationId: "22222222-2222-2222-2222-222222222222", eventKeysSha256: "digest",
+  };
 }
 
 /** A mutable version of the deps bag, so a test can reassign one field
@@ -130,11 +121,11 @@ function harness(): MutableCollectionWorkerDeps {
     checkpoint: vi.fn().mockResolvedValue({ status: "ok", stagedCount: 0 }),
     finish: vi.fn().mockResolvedValue({ status: "ok", observationId: "obs-1" }),
     fail: vi.fn().mockResolvedValue({ status: "failed" }),
-    listStagedKeys: vi.fn().mockResolvedValue(new Set()),
     resolveCredential,
     collect: vi.fn().mockResolvedValue(sliceResult()),
     discoverSource: vi.fn().mockResolvedValue({ status: "missing" }),
-    readPriorObservation: vi.fn().mockResolvedValue(null),
+    readSourceManifest: vi.fn().mockResolvedValue(null),
+    readSourcePages: vi.fn().mockImplementation(async function* () {}),
     emitDiagnostics: vi.fn(),
     captureError: vi.fn().mockResolvedValue(undefined),
     onJobComplete: vi.fn().mockResolvedValue(undefined),
@@ -189,17 +180,22 @@ describe("runCollectionSlice", () => {
     const previousProgress = { operationsDone: 0, operationsKnown: 1, events: 3, requests: 2 };
     const nextCheckpoint: CollectorCheckpoint = { version: 1, operations: [{ key: "merged", cursor: null, done: true }], discovered: { repositoryIds: ["R1"] } };
     const events = Array.from({ length: 4_005 }, (_, index) => event({ eventId: `bulk-${index}`, occurredAt: "2026-09-01T00:00:00.000Z" }));
-    deps.listStagedKeys = vi.fn().mockResolvedValue(new Set(["old-1", "old-2", "old-3"]));
+    const existing = new Set(["old-1", "old-2", "old-3"]);
+    deps.checkpoint = vi.fn().mockImplementation(async (_lease, _checkpoint, batch: readonly NormalizedEngineeringEvent[]) => {
+      for (const item of batch) existing.add(engineeringEventKey(item));
+      return { status: "ok", stagedCount: existing.size };
+    });
     deps.collect = vi.fn().mockResolvedValue(sliceResult({ events, checkpoint: nextCheckpoint, done: true, coverage: sampleCoverage, requests: 9, discoveryComplete: true }));
 
     await runCollectionSlice(makeJob({ checkpoint: previousCheckpoint, progress: previousProgress }), Date.now() + 60_000, deps);
 
-    expect(deps.checkpoint).toHaveBeenCalledTimes(5);
+    expect(deps.checkpoint).toHaveBeenCalledTimes(6);
     for (let batch = 0; batch < 4; batch++) {
       expect(deps.checkpoint).toHaveBeenNthCalledWith(batch + 1, { id: "job-1", leaseToken: "lease-1" },
         previousCheckpoint, events.slice(batch * 1_000, (batch + 1) * 1_000), previousProgress, false);
     }
-    expect(deps.checkpoint).toHaveBeenNthCalledWith(5, { id: "job-1", leaseToken: "lease-1" }, nextCheckpoint, events.slice(4_000),
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(5, { id: "job-1", leaseToken: "lease-1" }, previousCheckpoint, events.slice(4_000), previousProgress, false);
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(6, { id: "job-1", leaseToken: "lease-1" }, nextCheckpoint, [],
       { operationsDone: 1, operationsKnown: 1, events: 4_008, requests: 9, discovering: false }, false);
     expect(deps.finish).toHaveBeenCalledOnce();
   });
@@ -211,10 +207,11 @@ describe("runCollectionSlice", () => {
     deps.collect = vi.fn().mockResolvedValue(sliceResult({ events, checkpoint: nextCheckpoint,
       stop: { provider: "github", operation: "merged", stopKind: "budget", httpStatus: null, retryAfterSeconds: null } }));
     await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
-    expect(deps.checkpoint).toHaveBeenCalledTimes(3);
+    expect(deps.checkpoint).toHaveBeenCalledTimes(4);
     expect(deps.checkpoint).toHaveBeenNthCalledWith(1, expect.anything(), EMPTY_CHECKPOINT, events.slice(0, 1_000), makeJob().progress, false);
     expect(deps.checkpoint).toHaveBeenNthCalledWith(2, expect.anything(), EMPTY_CHECKPOINT, events.slice(1_000, 2_000), makeJob().progress, false);
-    expect(deps.checkpoint).toHaveBeenNthCalledWith(3, expect.anything(), nextCheckpoint, events.slice(2_000), expect.anything(), true);
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(3, expect.anything(), EMPTY_CHECKPOINT, events.slice(2_000), makeJob().progress, false);
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(4, expect.anything(), nextCheckpoint, [], expect.anything(), true);
 
     const failing = harness();
     failing.collect = vi.fn().mockResolvedValue(sliceResult({ events, checkpoint: nextCheckpoint, done: true, coverage: sampleCoverage }));
@@ -231,6 +228,23 @@ describe("runCollectionSlice", () => {
     await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, throwing)).rejects.toThrow("checkpoint timeout");
     expect(throwing.checkpoint).toHaveBeenCalledTimes(2);
     expect(throwing.finish).not.toHaveBeenCalled();
+  });
+
+  it("uses the database's distinct staged count when a collector replays a duplicate key", async () => {
+    const deps = harness();
+    const repeated = event({ eventId: "repeat", occurredAt: "2026-09-01T00:00:00.000Z" });
+    const staged = new Set<string>();
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ events: [repeated, repeated], done: true, coverage: sampleCoverage }));
+    deps.checkpoint = vi.fn().mockImplementation(async (_lease, _checkpoint, batch: readonly NormalizedEngineeringEvent[]) => {
+      for (const item of batch) staged.add(engineeringEventKey(item));
+      return { status: "ok", stagedCount: staged.size };
+    });
+
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(1, expect.anything(), EMPTY_CHECKPOINT, [repeated, repeated], makeJob().progress, false);
+    expect(deps.checkpoint).toHaveBeenNthCalledWith(2, expect.anything(), EMPTY_CHECKPOINT, [], expect.objectContaining({ events: 1 }), false);
+    expect(deps.finish).toHaveBeenCalledOnce();
   });
 
   // #1342 -- the worker never recomputes discovery on its own; it only
@@ -446,11 +460,87 @@ describe("runCollectionSlice", () => {
   });
 
   describe("incremental daily reuse (seedFromPrior wiring)", () => {
+    it("restages a 50,000-event prior source page by page with no full staged-key scan", async () => {
+      const deps = harness();
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      const priorWindow = createScoringWindow("2026-09-04T12:00:00Z");
+      deps.readSourceManifest = vi.fn().mockResolvedValue({ id: "prior-1", window: priorWindow,
+        coverage: { ...sampleCoverage, window: priorWindow, dataThrough: priorWindow.referenceTime },
+        storageMode: "rows", eventCount: 50_000, eventGenerationId: "generation-1", eventKeysSha256: "digest" });
+      deps.readSourcePages = vi.fn().mockImplementation(async function* () {
+        for (let page = 0; page < 50; page++) {
+          yield Array.from({ length: 1_000 }, (_, index) => event({ eventId: `seed-${page}-${index}`, kind: "authored_commit",
+            occurredAt: index === 0 ? "2020-01-01T00:00:00.000Z" : "2026-09-01T00:00:00.000Z" }));
+        }
+      });
+      let stagedCount = 0;
+      deps.checkpoint = vi.fn().mockImplementation(async (_lease, _checkpoint, events: readonly NormalizedEngineeringEvent[]) => {
+        stagedCount += events.length;
+        return { status: "ok", stagedCount };
+      });
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      expect("listStagedKeys" in deps).toBe(false);
+      expect(deps.readSourcePages).toHaveBeenCalledOnce();
+      expect(stagedCount).toBe(49_950);
+      for (const [, , batch] of vi.mocked(deps.checkpoint).mock.calls) expect(batch.length).toBeLessThanOrEqual(1_000);
+      expect(deps.checkpoint).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ version: 1 }), [],
+        expect.objectContaining({ events: 49_950, discovering: true }), false);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.anything(), new Set());
+      expect(deps.finish).toHaveBeenCalledOnce();
+    }, 30_000);
+
+    it("replays a partially staged prior seed after a middle-page failure and never finishes the failed attempt", async () => {
+      const deps = harness();
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      const priorWindow = createScoringWindow("2026-09-04T12:00:00Z");
+      deps.readSourceManifest = vi.fn().mockResolvedValue({ id: "prior-1", window: priorWindow,
+        coverage: { ...sampleCoverage, window: priorWindow, dataThrough: priorWindow.referenceTime },
+        storageMode: "rows", eventCount: 2_000, eventGenerationId: "generation-1", eventKeysSha256: "digest" });
+      const firstPage = Array.from({ length: 1_000 }, (_, index) => event({ eventId: `prior-${index}`, occurredAt: "2026-09-01T00:00:00.000Z" }));
+      const secondPage = Array.from({ length: 1_000 }, (_, index) => event({ eventId: `prior-${index + 1_000}`, occurredAt: "2026-09-01T00:00:00.000Z" }));
+      let failPage = true;
+      deps.readSourcePages = vi.fn().mockImplementation(async function* () {
+        yield firstPage;
+        if (failPage) throw new Error("Source storage unavailable: middle page");
+        yield secondPage;
+      });
+      const staged = new Set<string>();
+      deps.checkpoint = vi.fn().mockImplementation(async (_lease, _checkpoint, events: readonly NormalizedEngineeringEvent[]) => {
+        for (const item of events) staged.add(engineeringEventKey(item));
+        return { status: "ok", stagedCount: staged.size };
+      });
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+
+      deps.fail = vi.fn().mockResolvedValue({ status: "retrying" });
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+      expect(staged.size).toBe(1_000);
+      expect(deps.collect).not.toHaveBeenCalled();
+      expect(deps.finish).not.toHaveBeenCalled();
+      expect(deps.checkpoint).toHaveBeenCalledWith(expect.anything(), EMPTY_CHECKPOINT, firstPage, makeJob().progress, false);
+      expect(deps.fail).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" },
+        { provider: "github", operation: "prior_source_storage", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null },
+        new Date(deps.now() + 60_000).toISOString());
+
+      failPage = false;
+      await runCollectionSlice(makeJob({ leaseToken: "lease-2", attempt: 1 }), Date.now() + 60_000, deps);
+      expect(staged.size).toBe(2_000);
+      expect(deps.collect).toHaveBeenCalledOnce();
+      expect(deps.finish).toHaveBeenCalledOnce();
+      expect(deps.fail).toHaveBeenCalledOnce();
+      expect(deps.checkpoint).toHaveBeenCalledWith(expect.anything(), expect.anything(), [],
+        expect.objectContaining({ events: 2_000, discovering: true }), false);
+    });
     it("seeds the checkpoint from a prior complete observation and skips its immutable ops before the first collect call", async () => {
       const deps = harness();
       const merged = event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" });
       deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
-      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [merged] }));
+      deps.readSourceManifest = vi.fn().mockResolvedValue(priorManifest(1));
+      deps.readSourcePages = vi.fn().mockImplementation(async function* () { yield [merged]; });
+      deps.checkpoint = vi.fn().mockImplementation(async (_lease, _checkpoint, batch: readonly NormalizedEngineeringEvent[]) =>
+        ({ status: "ok", stagedCount: batch.length ? 1 : 1 }));
       deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
 
       await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
@@ -462,8 +552,10 @@ describe("runCollectionSlice", () => {
         operations: [{ key: "files:github:PR1", cursor: null, done: true }],
         discovered: { repositoryIds: [], itemIds: { seededWorkItemIds: ["github:PR1"] } },
       };
-      expect(deps.checkpoint).toHaveBeenNthCalledWith(1, { id: "job-1", leaseToken: "lease-1" }, seededCheckpoint, [merged], expect.any(Object), false);
-      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), new Set([engineeringEventKey(merged)]));
+      expect(deps.checkpoint).toHaveBeenNthCalledWith(1, { id: "job-1", leaseToken: "lease-1" }, EMPTY_CHECKPOINT, [merged], makeJob().progress, false);
+      expect(deps.checkpoint).toHaveBeenNthCalledWith(2, { id: "job-1", leaseToken: "lease-1" }, seededCheckpoint, [],
+        expect.objectContaining({ events: 1, discovering: true }), false);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), new Set());
     });
 
     // #1342 -- a seed pre-write never runs the collector, so its progress
@@ -472,61 +564,62 @@ describe("runCollectionSlice", () => {
       const deps = harness();
       const merged = event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" });
       deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
-      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [merged] }));
+      deps.readSourceManifest = vi.fn().mockResolvedValue(priorManifest(1));
+      deps.readSourcePages = vi.fn().mockImplementation(async function* () { yield [merged]; });
       deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
 
       await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
 
       expect(deps.checkpoint).toHaveBeenNthCalledWith(
-        1,
+        2,
         expect.anything(),
         expect.anything(),
-        [merged],
+        [],
         expect.objectContaining({ discovering: true }),
         false,
       );
     });
 
-    it("does not seed when the checkpoint already has progress or events are already staged (not the job's first slice)", async () => {
+    it("does not seed after a saved collector cursor has progress", async () => {
       const deps = harness();
       deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
-      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" })] }));
-      deps.listStagedKeys = vi.fn().mockResolvedValue(new Set([engineeringEventKey(event({ eventId: "already-staged", occurredAt: "2026-09-01T00:00:00.000Z" }))]));
+      deps.readSourceManifest = vi.fn().mockResolvedValue(priorManifest(1));
+      const advanced: CollectorCheckpoint = { version: 1, operations: [{ key: "merged", cursor: "next", done: false }], discovered: { repositoryIds: ["R1"] } };
 
-      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+      await runCollectionSlice(makeJob({ checkpoint: advanced, progress: { ...makeJob().progress, requests: 1 } }), Date.now() + 60_000, deps);
 
       expect(deps.discoverSource).not.toHaveBeenCalled();
-      expect(deps.readPriorObservation).not.toHaveBeenCalled();
+      expect(deps.readSourceManifest).not.toHaveBeenCalled();
     });
 
     it("drops out-of-window prior events instead of staging them, and never seeds a checkpoint operation for them", async () => {
       const deps = harness();
       const outOfWindow = event({ eventId: "stale", occurredAt: "2020-01-01T00:00:00.000Z" });
       deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
-      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [outOfWindow] }));
+      deps.readSourceManifest = vi.fn().mockResolvedValue(priorManifest(1));
+      deps.readSourcePages = vi.fn().mockImplementation(async function* () { yield [outOfWindow]; });
       deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
 
       await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
 
-      // Nothing to seed -- the empty checkpoint is untouched by a seed
-      // pre-write, and collect() runs with the job's original empty state.
-      expect(deps.checkpoint).toHaveBeenCalledTimes(1);
-      expect(deps.checkpoint).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" }, EMPTY_CHECKPOINT, [], expect.any(Object), false);
-      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), new Set());
+      expect(vi.mocked(deps.checkpoint).mock.calls.every(([, , events]) => events.length === 0)).toBe(true);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(),
+        expect.objectContaining({ operations: [], discovered: { repositoryIds: [], itemIds: { seededWorkItemIds: [] } } }),
+        expect.anything(), new Set());
     });
 
-    it("never lets a seeding failure (discovery/storage error) block the slice -- collection still proceeds from scratch, but the failure is captured, not silent", async () => {
+    it("reports a seeding storage failure and retries instead of finishing", async () => {
       const deps = harness();
       deps.discoverSource = vi.fn().mockRejectedValue(new Error("storage unavailable"));
       deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
 
       await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
 
-      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), new Set());
-      expect(deps.fail).not.toHaveBeenCalled();
+      expect(deps.collect).not.toHaveBeenCalled();
+      expect(deps.finish).not.toHaveBeenCalled();
+      expect(deps.fail).toHaveBeenCalledWith(expect.anything(),
+        expect.objectContaining({ operation: "prior_source_storage", stopKind: "protocol" }), expect.any(String));
 
-      // The no-silent-failure rule: seeding is an optimization whose failure
-      // must never block the job, but it must still be observable.
       expect(deps.captureError).toHaveBeenCalledTimes(1);
       const [captured] = vi.mocked(deps.captureError).mock.calls[0]!;
       expect(captured.route).toContain("trySeedFromPrior");
@@ -538,6 +631,73 @@ describe("runCollectionSlice", () => {
       // No secrets: never the owner handle, a token, or an access-context HMAC.
       expect(message).not.toContain("alice");
       expect(message).not.toContain("fake-token");
+    });
+
+    it("uses the persisted attempt for bounded prior-storage retries and a terminal failure", async () => {
+      const deps = harness();
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readSourceManifest = vi.fn().mockRejectedValue(new Error("prior storage unavailable"));
+      deps.fail = vi.fn().mockImplementation(async (_lease, _stop, retryAt: string | null) =>
+        ({ status: retryAt === null ? "failed" : "retrying" }));
+      deps.onJobFailed = vi.fn().mockResolvedValue(undefined);
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await runCollectionSlice(makeJob({ attempt, leaseToken: `lease-${attempt}` }), Date.now() + 60_000, deps);
+      }
+
+      expect(deps.fail).toHaveBeenCalledTimes(3);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        expect(deps.fail).toHaveBeenNthCalledWith(attempt + 1,
+          { id: "job-1", leaseToken: `lease-${attempt}` },
+          { provider: "github", operation: "prior_source_storage", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null },
+          new Date(deps.now() + (attempt === 0 ? 60_000 : 120_000)).toISOString());
+      }
+      expect(deps.fail).toHaveBeenNthCalledWith(3, { id: "job-1", leaseToken: "lease-2" },
+        expect.objectContaining({ operation: "prior_source_storage", stopKind: "protocol" }), null);
+      expect(deps.onJobFailed).toHaveBeenCalledOnce();
+      expect(deps.collect).not.toHaveBeenCalled();
+      expect(deps.finish).not.toHaveBeenCalled();
+    });
+
+    it.each(["slice deadline", "lease expiry"])("stops page fetching before %s and releases the job through fail", async (boundary) => {
+      const deps = harness();
+      const start = Date.parse(window.referenceTime);
+      let now = start;
+      deps.now = () => now;
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readSourceManifest = vi.fn().mockResolvedValue(priorManifest(2));
+      let pagesFetched = 0;
+      deps.readSourcePages = vi.fn().mockImplementation(async function* () {
+        pagesFetched++;
+        yield [event({ eventId: "first", occurredAt: "2026-09-01T00:00:00.000Z" })];
+        pagesFetched++;
+        yield [event({ eventId: "second", occurredAt: "2026-09-01T00:00:00.000Z" })];
+      });
+      deps.checkpoint = vi.fn().mockImplementation(async () => {
+        now = start + 35_000; // within the 20s safety margin of the selected boundary
+        return { status: "ok", stagedCount: 1 };
+      });
+      deps.fail = vi.fn().mockResolvedValue({ status: "retrying" });
+      const leaseExpiresAt = new Date(start + (boundary === "lease expiry" ? 50_000 : 120_000)).toISOString();
+      const deadlineAt = start + (boundary === "slice deadline" ? 50_000 : 100_000);
+
+      await runCollectionSlice(makeJob({ leaseExpiresAt }), deadlineAt, deps);
+
+      expect(pagesFetched).toBe(1);
+      expect(deps.checkpoint).toHaveBeenCalledTimes(1);
+      expect(deps.fail).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" },
+        { provider: "github", operation: "prior_source_seed", stopKind: "deadline", httpStatus: null, retryAfterSeconds: null },
+        new Date(now + 60_000).toISOString());
+      expect(deps.collect).not.toHaveBeenCalled();
+      expect(deps.finish).not.toHaveBeenCalled();
+
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        now = start;
+        await runCollectionSlice(makeJob({ attempt, leaseToken: `lease-${attempt + 1}`, leaseExpiresAt }), deadlineAt, deps);
+      }
+      expect(deps.fail).toHaveBeenCalledTimes(3);
+      expect(deps.fail).toHaveBeenNthCalledWith(3, { id: "job-1", leaseToken: "lease-3" },
+        expect.objectContaining({ operation: "prior_source_seed", stopKind: "deadline" }), null);
     });
   });
 });
@@ -591,7 +751,7 @@ describe("runCollectionTick", () => {
 
     // Both jobs in the batch were attempted -- the failing one didn't abort the other.
     expect(result.slicesRun).toBe(2);
-    expect(deps.checkpoint).toHaveBeenCalledTimes(1); // only okJob reached a checkpoint call
+    expect(deps.checkpoint).toHaveBeenCalledTimes(2); // only okJob staged and finalized its checkpoint
     expect(deps.captureError).toHaveBeenCalledTimes(1);
     const [captured] = vi.mocked(deps.captureError).mock.calls[0]!;
     expect(captured.route).toContain("collection");

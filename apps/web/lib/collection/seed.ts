@@ -15,6 +15,38 @@ export interface SeedResult {
 
 const THIRTY_DAYS_MS = 30 * 86_400_000;
 
+/** Derives immutable operations from bounded pages, retaining IDs but no
+ * event bodies after each caller-owned page has been staged. */
+export function createPriorSeedAccumulator(window: ScoringWindow) {
+  const referenceMs = scoringInstant(window.referenceTime).getTime();
+  const immutableFiles = new Set<string>();
+  const staleReviews = new Set<string>();
+  let seededCount = 0;
+
+  return {
+    get seededCount() { return seededCount; },
+    acceptPage(events: readonly NormalizedEngineeringEvent[]): NormalizedEngineeringEvent[] {
+      const retained: NormalizedEngineeringEvent[] = [];
+      for (const event of events) {
+        if (!isWithinScoringWindow(event.occurredAt, window)) continue;
+        retained.push(event);
+        seededCount++;
+        if (event.kind !== "accepted_change") continue;
+        immutableFiles.add(event.workItemId);
+        if (referenceMs - scoringInstant(event.occurredAt).getTime() > THIRTY_DAYS_MS) staleReviews.add(event.workItemId);
+      }
+      return retained;
+    },
+    finish(): CollectorCheckpoint {
+      const operations: CollectorOperation[] = [
+        ...[...immutableFiles].map((workItemId): CollectorOperation => ({ key: `files:${workItemId}`, cursor: null, done: true })),
+        ...[...staleReviews].map((workItemId): CollectorOperation => ({ key: `reviews:${workItemId}`, cursor: null, done: true })),
+      ];
+      return { version: 1, operations, discovered: { repositoryIds: [], itemIds: { seededWorkItemIds: [...immutableFiles].sort() } } };
+    },
+  };
+}
+
 /**
  * Seeds a fresh checkpoint from yesterday's complete observation of the same
  * source (#1335 phase 3, "Incremental daily reuse"). Pure: no I/O, no clock
@@ -37,28 +69,7 @@ const THIRTY_DAYS_MS = 30 * 86_400_000;
  *   effect of the engine processing it.
  */
 export function seedFromPrior(prior: PriorObservation, window: ScoringWindow): SeedResult {
-  const seededEvents = prior.events.filter((event) => isWithinScoringWindow(event.occurredAt, window));
-  const acceptedChanges = seededEvents.filter((event) => event.kind === "accepted_change");
-  const referenceMs = scoringInstant(window.referenceTime).getTime();
-
-  const immutableFiles = new Set(acceptedChanges.map((event) => event.workItemId));
-  const staleReviews = new Set(
-    acceptedChanges
-      .filter((event) => referenceMs - scoringInstant(event.occurredAt).getTime() > THIRTY_DAYS_MS)
-      .map((event) => event.workItemId),
-  );
-
-  const operations: CollectorOperation[] = [
-    ...[...immutableFiles].map((workItemId): CollectorOperation => ({ key: `files:${workItemId}`, cursor: null, done: true })),
-    ...[...staleReviews].map((workItemId): CollectorOperation => ({ key: `reviews:${workItemId}`, cursor: null, done: true })),
-  ];
-
-  return {
-    checkpoint: {
-      version: 1,
-      operations,
-      discovered: { repositoryIds: [], itemIds: { seededWorkItemIds: [...immutableFiles].sort() } },
-    },
-    seededEvents,
-  };
+  const seed = createPriorSeedAccumulator(window);
+  const seededEvents = seed.acceptPage(prior.events);
+  return { checkpoint: seed.finish(), seededEvents };
 }

@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow } from "@chapa/shared";
-import { appendSourceObservation, readSourceObservation, discoverStoredSource } from "./source-context";
+import { createScoringWindow, engineeringEventKey } from "@chapa/shared";
+import { appendSourceObservation, readSourceManifest, readSourcePages, readSourceObservation, discoverStoredSource, type SourceObservationManifest } from "./source-context";
 import { sourceEventFixture } from "./source-context-fixture";
 import { getSupabase } from "./supabase";
 vi.mock("./supabase", () => ({ getSupabase: vi.fn() }));
@@ -65,7 +66,9 @@ describe("private source storage", () => {
  it("preserves prior window/data-through on fallback", async () => {
   const priorWindow = createScoringWindow("2026-09-04T12:00:00Z");
   const prior = { ...value, window: priorWindow, coverage: { ...value.coverage, window: priorWindow, dataThrough: priorWindow.referenceTime } };
-  rpc.mockResolvedValue({ data: prior, error: null });
+  rpc.mockResolvedValueOnce({ data: { id: prior.id, window: prior.window, coverage: prior.coverage,
+   storageMode: "jsonb", eventCount: 0, eventGenerationId: null, eventKeysSha256: null }, error: null });
+  rpc.mockResolvedValueOnce({ data: prior, error: null });
   expect(await readSourceObservation(context, true)).toEqual(prior);
  });
  it("rejects inconsistent read windows before requesting storage", async () => {
@@ -75,5 +78,51 @@ describe("private source storage", () => {
  it("fails closed without echoing transport errors", async () => {
   rpc.mockRejectedValue(new Error("private-token"));
   await expect(readSourceObservation(context)).rejects.toThrow("Source storage unavailable");
+ });
+ it("reads row-mode events in verified pages bound to one manifest and context", async () => {
+  const scoped = { ...context, scope: { ...context.scope, repositoryIds: ["known"] } };
+  const events = [sourceEventFixture(source, window), { ...sourceEventFixture(source, window), eventId: "event2" }];
+  const keys = events.map(engineeringEventKey).sort();
+  const manifest = { id: value.id, window, coverage: { ...value.coverage, repositoryIds: ["known"] },
+   storageMode: "rows", eventCount: 2, eventGenerationId: "22222222-2222-4222-8222-222222222222",
+   eventKeysSha256: createHash("sha256").update(keys.join("\n")).digest("hex") };
+  rpc.mockResolvedValueOnce({ data: manifest, error: null });
+  rpc.mockResolvedValueOnce({ data: keys.map(key => ({ eventKey: key, event: events.find(event => engineeringEventKey(event) === key) })), error: null });
+  expect(await readSourceManifest(scoped)).toEqual(manifest);
+  const pages = [];
+  for await (const page of readSourcePages(scoped, manifest as SourceObservationManifest)) pages.push(page);
+  expect(pages.flat().map(engineeringEventKey)).toEqual(keys);
+  expect(rpc).toHaveBeenCalledWith("scoring_v7_read_source_page", expect.objectContaining({
+   p_observation: value.id, p_generation: manifest.eventGenerationId, p_after_key: null,
+   p_owner: "alice", p_access: scoped.accessContextId,
+  }));
+ });
+ it("rejects a truncated row-mode page instead of accepting incomplete evidence", async () => {
+  const manifest = { id: value.id, window, coverage: value.coverage, storageMode: "rows", eventCount: 2,
+   eventGenerationId: "22222222-2222-4222-8222-222222222222", eventKeysSha256: "0".repeat(64) };
+  rpc.mockResolvedValueOnce({ data: [], error: null });
+  const pages = readSourcePages(context, manifest as SourceObservationManifest);
+  await expect((async () => { for await (const _page of pages) { void _page; } })())
+   .rejects.toThrow("Source storage unavailable");
+ });
+ it("rejects duplicate keys, changed event bodies, and a failed later page", async () => {
+  const scoped = { ...context, scope: { ...context.scope, repositoryIds: ["known"] } };
+  const event = sourceEventFixture(source, window);
+  const key = engineeringEventKey(event);
+  const manifest: SourceObservationManifest = { id: value.id, window, coverage: { ...value.coverage, repositoryIds: ["known"] } as SourceObservationManifest["coverage"],
+   storageMode: "rows", eventCount: 2, eventGenerationId: "22222222-2222-4222-8222-222222222222", eventKeysSha256: "0".repeat(64) };
+  const drain = async (selected = manifest) => { for await (const _page of readSourcePages(scoped, selected)) { void _page; } };
+  rpc.mockResolvedValueOnce({ data: [{ eventKey: key, event }, { eventKey: key, event }], error: null });
+  await expect(drain()).rejects.toThrow("Source storage unavailable");
+  rpc.mockResolvedValueOnce({ data: [{ eventKey: "wrong", event }], error: null });
+  await expect(drain()).rejects.toThrow("Source storage unavailable");
+  const fullPage = Array.from({ length: 500 }, (_, index) => {
+   const distinct = { ...event, eventId: `page-${String(index).padStart(4, "0")}` };
+   return { eventKey: engineeringEventKey(distinct), event: distinct };
+  }).sort((a, b) => Buffer.compare(Buffer.from(a.eventKey), Buffer.from(b.eventKey)));
+  rpc.mockResolvedValueOnce({ data: fullPage, error: null });
+  rpc.mockRejectedValueOnce(new Error("private-link-detail"));
+  await expect(drain({ ...manifest, eventCount: 501 })).rejects.toThrow("Source storage unavailable");
+  expect(rpc).toHaveBeenCalledWith("scoring_v7_read_source_page", expect.objectContaining({ p_limit: 500 }));
  });
 });

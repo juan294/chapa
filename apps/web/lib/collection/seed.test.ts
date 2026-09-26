@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
-import { seedFromPrior } from "./seed";
+import { createPriorSeedAccumulator, seedFromPrior } from "./seed";
 
 const window = createScoringWindow("2026-09-23T12:00:00Z");
 
@@ -26,6 +26,24 @@ function event(overrides: Partial<NormalizedEngineeringEvent> & { readonly event
 }
 
 describe("seedFromPrior", () => {
+  it("filters 50,000 prior events one page at a time without retaining event bodies", () => {
+    const seed = createPriorSeedAccumulator(window);
+    let retained = 0;
+    for (let page = 0; page < 50; page++) {
+      const events = Array.from({ length: 1_000 }, (_, index) => event({
+        eventId: `commit-${page}-${index}`, kind: "authored_commit",
+        occurredAt: index === 0 ? "2020-01-01T00:00:00.000Z" : "2026-09-01T00:00:00.000Z",
+      }));
+      const filtered = seed.acceptPage(events);
+      expect(filtered).toHaveLength(999);
+      expect(filtered.length).toBeLessThanOrEqual(1_000);
+      retained += filtered.length;
+    }
+    expect(seed.seededCount).toBe(retained);
+    expect(seed.finish()).toMatchObject({ operations: [], discovered: { repositoryIds: [] } });
+    expect("seededEvents" in seed).toBe(false);
+  });
+
   it("keeps in-window prior events and drops out-of-window ones", () => {
     const inWindow = event({ eventId: "in", occurredAt: "2026-09-01T00:00:00.000Z" });
     const outOfWindow = event({ eventId: "out", occurredAt: "2024-01-01T00:00:00.000Z" });

@@ -1,7 +1,8 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { z } from "zod";
-import { canonicalJson, createScoringWindow, scoringInstant } from "@chapa/shared";
-import type { ScoringWindow, SourceIdentity } from "@chapa/shared";
+import { canonicalJson, createScoringWindow, engineeringEventKey, scoringInstant } from "@chapa/shared";
+import type { NormalizedEngineeringEvent, ScoringWindow, SourceIdentity } from "@chapa/shared";
 import type { StrictLinkedPlatform } from "./user-platforms";
 import { getSupabase } from "./supabase";
 
@@ -32,6 +33,16 @@ const coverageSchema = z.object({ source: sourceSchema, window: windowSchema, da
 }).strict();
 const valueSchema = z.object({ id: z.uuid(), window: windowSchema, coverage: coverageSchema, events: z.array(eventSchema).max(50000) }).strict();
 export type StoredSourceObservation = z.infer<typeof valueSchema>;
+const manifestSchema = z.object({
+ id: z.uuid(), window: windowSchema, coverage: coverageSchema,
+ storageMode: z.enum(["jsonb", "rows"]), eventCount: z.number().int().min(0).max(100000),
+ eventGenerationId: z.uuid().nullable(), eventKeysSha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+}).strict().superRefine((manifest, check) => {
+ if (manifest.storageMode === "rows" && (!manifest.eventGenerationId || !manifest.eventKeysSha256)) check.addIssue({ code: "custom", message: "Missing row generation" });
+ if (manifest.storageMode === "jsonb" && (manifest.eventGenerationId || manifest.eventKeysSha256)) check.addIssue({ code: "custom", message: "Unexpected row generation" });
+});
+export type SourceObservationManifest = z.infer<typeof manifestSchema>;
+const pageSchema = z.array(z.object({ eventKey: z.string().min(1), event: eventSchema }).strict()).max(500);
 export interface SourceStorageContext {
  readonly owner: string;
  readonly requestedSource: { readonly provider: string; readonly host: string; readonly login: string };
@@ -104,7 +115,66 @@ export async function appendSourceObservation(context: SourceStorageContext, val
 export async function readSourceObservation(context: SourceStorageContext, prior = false): Promise<StoredSourceObservation | null> {
  try {
   const detached = JSON.parse(canonicalJson(context)) as SourceStorageContext;
-  const data = await call("scoring_v7_read_source", { ...args(detached), p_prior: prior });
-  return data === null ? null : parse(data, detached, prior);
+  const manifest = await readSourceManifest(detached, prior);
+  if (!manifest) return null;
+  const events: NormalizedEngineeringEvent[] = [];
+  for await (const page of readSourcePages(detached, manifest)) events.push(...page);
+  return parse({ id: manifest.id, window: manifest.window, coverage: manifest.coverage, events }, detached, prior);
+ } catch { throw new Error("Source storage unavailable"); }
+}
+
+/** Selects one exact or prior observation; the manifest carries the immutable
+ * generation and expected digest used to verify all subsequent pages. */
+export async function readSourceManifest(context: SourceStorageContext, prior = false): Promise<SourceObservationManifest | null> {
+ try {
+  const detached = JSON.parse(canonicalJson(context)) as SourceStorageContext;
+  const data = await call("scoring_v7_read_source_manifest", { ...args(detached), p_prior: prior });
+  if (data === null) return null;
+  const manifest = manifestSchema.parse(data);
+  parse({ id: manifest.id, window: manifest.window, coverage: manifest.coverage, events: [] }, detached, prior);
+  return manifest;
+ } catch { throw new Error("Source storage unavailable"); }
+}
+
+/** Pages a selected observation with a stable key cursor. A consumer must read
+ * the iterator to completion before treating its contents as complete. */
+export async function* readSourcePages(context: SourceStorageContext, selected: SourceObservationManifest): AsyncIterable<readonly NormalizedEngineeringEvent[]> {
+ try {
+  const detached = JSON.parse(canonicalJson(context)) as SourceStorageContext;
+  const manifest = manifestSchema.parse(JSON.parse(canonicalJson(selected)));
+  const prior = manifest.window.referenceTime !== detached.window.referenceTime;
+  parse({ id: manifest.id, window: manifest.window, coverage: manifest.coverage, events: [] }, detached, prior);
+  const base = { ...args(detached), p_prior: prior };
+  if (manifest.storageMode === "jsonb") {
+   const data = await call("scoring_v7_read_source", base);
+   const observation = parse(data, detached, prior);
+   if (observation.id !== manifest.id || canonicalJson(observation.coverage) !== canonicalJson(manifest.coverage) ||
+     observation.events.length !== manifest.eventCount) throw new Error();
+   for (let index = 0; index < observation.events.length; index += 500) yield observation.events.slice(index, index + 500);
+   return;
+  }
+  const digest = createHash("sha256");
+  let afterKey: string | null = null;
+  let count = 0;
+  while (true) {
+   const data = await call("scoring_v7_read_source_page", { ...base, p_observation: manifest.id,
+    p_generation: manifest.eventGenerationId, p_after_key: afterKey, p_limit: 500 });
+   const rows = pageSchema.parse(data);
+   const page: NormalizedEngineeringEvent[] = [];
+   for (const row of rows) {
+    if (row.eventKey !== engineeringEventKey(row.event) ||
+      (afterKey !== null && Buffer.compare(Buffer.from(row.eventKey), Buffer.from(afterKey)) <= 0)) throw new Error();
+    if (count > 0) digest.update("\n");
+    digest.update(row.eventKey);
+    afterKey = row.eventKey;
+    page.push(row.event as NormalizedEngineeringEvent);
+    count++;
+    if (count > manifest.eventCount) throw new Error();
+   }
+   parse({ id: manifest.id, window: manifest.window, coverage: manifest.coverage, events: page }, detached, prior);
+   if (page.length) yield page;
+   if (rows.length < 500) break;
+  }
+  if (count !== manifest.eventCount || digest.digest("hex") !== manifest.eventKeysSha256) throw new Error();
  } catch { throw new Error("Source storage unavailable"); }
 }

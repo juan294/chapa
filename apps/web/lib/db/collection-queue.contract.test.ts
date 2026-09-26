@@ -379,25 +379,26 @@ describe("collection queue (real local database)", () => {
   // 2026-09-24: juan294's GitHub source staged 11,124 in-window commits and
   // failed at the old 10,000-event limit. The limit is now 50,000. The staged
   // keys must also be read past the API's 1,000-row page limit.
-  it("stages, lists, and finishes a source with more than 10,000 events while the legacy reader fails closed", async () => {
+  it("stages, lists, finishes, and reads a source with more than 10,000 events through verified pages", async () => {
     const job = await enqueueCollectionJob(owner, "github", "signup", window.referenceTime);
-    const claimed = (await claimCollectionJobs(1, 120))[0]!;
-    const lease = { id: claimed.id, leaseToken: claimed.leaseToken! };
+    const lease = { id: job.id, leaseToken: await leaseExactJob(job.id) };
     const base = sourceEventFixture(source, window);
     const total = 12_000;
     const events = Array.from({ length: total }, (_, i) => ({ ...base, eventId: `event-${i}`, workItemId: `work-${i}`, artifactRevision: `revision-${i}`, artifactReferenceIds: [`artifact-${i}`],
       categories: [{ category: "implementation" as const, evidenceReferenceIds: [`artifact-${i}`] }],
       acceptance: observed({ method: "merged_change" as const, acceptedAt: "2026-09-01T12:00:00.000Z", acceptedResultId: `result-${i}` }, "complete", "source_observed") }));
-    for (let i = 0; i < total; i += 2_000) {
-      const outcome = await checkpointCollectionJob(lease, EMPTY_CHECKPOINT, events.slice(i, i + 2_000), { ...EMPTY_PROGRESS, events: i + 2_000 }, false);
+    for (let i = 0; i < total; i += 1_000) {
+      const outcome = await checkpointCollectionJob(lease, EMPTY_CHECKPOINT, events.slice(i, i + 1_000), { ...EMPTY_PROGRESS, events: i + 1_000 }, false);
       expect(outcome.status).toBe("ok");
     }
     expect((await listStagedEventKeys(job.id)).size).toBe(total);
     const observationId = randomUUID();
     expect(await finishCollectionJob(lease, { coverage, observationId, requested, access, scope, linkId: null, linkVersion: null }))
       .toEqual({ status: "ok", observationId });
-    await expect(readSourceObservation({ owner, requestedSource: requested, source, window, scope, accessContextId: access, link: null }))
-      .rejects.toThrow("Source storage unavailable");
+    const read = await readSourceObservation({ owner, requestedSource: requested, source, window, scope, accessContextId: access, link: null });
+    expect(read?.id).toBe(observationId);
+    expect(read?.events).toHaveLength(total);
+    expect(new Set(read?.events.map(engineeringEventKey)).size).toBe(total);
   }, 180_000);
 
   it("fails a job terminally when retryAt is null", async () => {

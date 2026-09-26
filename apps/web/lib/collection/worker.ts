@@ -1,11 +1,11 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
 import {
-  checkpointCollectionJob, claimCollectionJobs, failCollectionJob, finishCollectionJob, listStagedEventKeys,
+  checkpointCollectionJob, claimCollectionJobs, failCollectionJob, finishCollectionJob,
   dbReadCollectionQueueHealth, type CollectionJob, type CollectionProgress, type CollectionQueueHealth,
 } from "@/lib/db/collection-queue";
-import { discoverStoredSource, readSourceObservation, type SourceStorageContext } from "@/lib/db/source-context";
+import { discoverStoredSource, readSourceManifest, readSourcePages, type SourceStorageContext } from "@/lib/db/source-context";
 import { readSourceAuthorization, type SourceAuthorization, type SourceProvider } from "@/lib/platform/source-authorization";
 import { refreshSourceLink } from "@/lib/platform/source-refresh";
 import { createSourceContext, type SourceContextInput } from "@/lib/platform/source-context";
@@ -16,7 +16,7 @@ import { cacheSetNxStatus } from "@/lib/cache/redis";
 import { MAX_COLLECTION_ATTEMPTS, nextBackoff } from "./backoff";
 import { isQueueOldestQueuedStuck, isQueueLeaseStuck } from "./queue-health";
 import { collectSourceSlice } from "./collect-source-slice";
-import { seedFromPrior } from "./seed";
+import { createPriorSeedAccumulator } from "./seed";
 import { onJobComplete as fanInOnJobComplete, retryPendingFanIns } from "./fan-in";
 import type { CollectorCheckpoint, CollectSlice } from "./plan";
 
@@ -96,7 +96,6 @@ export interface CollectionWorkerDeps {
   readonly checkpoint: typeof checkpointCollectionJob;
   readonly finish: typeof finishCollectionJob;
   readonly fail: typeof failCollectionJob;
-  readonly listStagedKeys: typeof listStagedEventKeys;
   readonly resolveCredential: ResolveCredential;
   readonly collect: CollectSlice;
   /** Incremental daily reuse (phase-3.md "Incremental daily reuse"): reads
@@ -105,7 +104,8 @@ export interface CollectionWorkerDeps {
    * from scratch. Both are read-only -- this worker remains the only writer.
    */
   readonly discoverSource: typeof discoverStoredSource;
-  readonly readPriorObservation: typeof readSourceObservation;
+  readonly readSourceManifest: typeof readSourceManifest;
+  readonly readSourcePages: typeof readSourcePages;
   readonly emitDiagnostics: typeof emitSourceDiagnostics;
   /** Reports a slice that rejected unexpectedly (a bug, or a genuine
    * infrastructure failure below the collector's own stop classification --
@@ -176,11 +176,11 @@ export const productionCollectionWorkerDeps: CollectionWorkerDeps = {
   checkpoint: checkpointCollectionJob,
   finish: finishCollectionJob,
   fail: failCollectionJob,
-  listStagedKeys: listStagedEventKeys,
   resolveCredential,
   collect: collectSourceSlice,
   discoverSource: discoverStoredSource,
-  readPriorObservation: readSourceObservation,
+  readSourceManifest,
+  readSourcePages,
   emitDiagnostics: emitSourceDiagnostics,
   captureError: captureServerError,
   onJobComplete: (job) => fanInOnJobComplete(job),
@@ -197,14 +197,38 @@ const LEASE_SECONDS = 120;
 const MAX_REQUESTS_PER_SLICE = 150;
 const SLICE_TIME_BUDGET_MS = 60_000;
 const MAX_EVENTS_PER_CHECKPOINT = 1_000;
+/** Leaves time for a lease-fenced fail RPC after an in-flight page or stage. */
+const SEED_TRANSITION_MARGIN_MS = 20_000;
+class PriorSeedDeadline extends Error {}
 /** Stop claiming new work this long before the tick's own deadline, so the
  * last claimed batch has time to finish and the response can still return.
  */
 const TICK_SAFETY_MARGIN_MS = 20_000;
 
-/** Stage event bodies in bounded writes. The durable collector cursor and
- * progress advance only after every body in this slice has been accepted.
- */
+/** Writes bodies without advancing the durable collector state. */
+async function stageEventBatches(
+  deps: CollectionWorkerDeps,
+  lease: { readonly id: string; readonly leaseToken: string },
+  previousCheckpoint: CollectorCheckpoint,
+  previousProgress: CollectionProgress,
+  events: readonly NormalizedEngineeringEvent[],
+  beforeBatch: () => void = () => {},
+): ReturnType<typeof checkpointCollectionJob> {
+  if (events.length === 0) {
+    beforeBatch();
+    return deps.checkpoint(lease, previousCheckpoint, [], previousProgress, false);
+  }
+  let outcome: Awaited<ReturnType<typeof checkpointCollectionJob>>;
+  for (let start = 0; start < events.length; start += MAX_EVENTS_PER_CHECKPOINT) {
+    beforeBatch();
+    outcome = await deps.checkpoint(lease, previousCheckpoint, events.slice(start, start + MAX_EVENTS_PER_CHECKPOINT), previousProgress, false);
+    if (outcome.status !== "ok") return outcome;
+  }
+  return outcome!;
+}
+
+/** Advance the cursor only after all bodies are staged. The final empty
+ * checkpoint uses the database's distinct staged count, including replays. */
 async function checkpointInBatches(
   deps: CollectionWorkerDeps,
   lease: { readonly id: string; readonly leaseToken: string },
@@ -215,38 +239,27 @@ async function checkpointInBatches(
   nextProgress: CollectionProgress,
   release: boolean,
 ): ReturnType<typeof checkpointCollectionJob> {
-  if (events.length === 0) return deps.checkpoint(lease, nextCheckpoint, [], nextProgress, release);
-  for (let start = 0; start < events.length; start += MAX_EVENTS_PER_CHECKPOINT) {
-    const batch = events.slice(start, start + MAX_EVENTS_PER_CHECKPOINT);
-    const final = start + batch.length === events.length;
-    const outcome = await deps.checkpoint(lease,
-      final ? nextCheckpoint : previousCheckpoint,
-      batch,
-      final ? nextProgress : previousProgress,
-      final && release,
-    );
-    if (outcome.status !== "ok" || final) return outcome;
-  }
-  throw new Error("checkpointInBatches: no batch written");
+  const staged = await stageEventBatches(deps, lease, previousCheckpoint, previousProgress, events);
+  if (staged.status !== "ok") return staged;
+  return deps.checkpoint(lease, nextCheckpoint, [], { ...nextProgress, events: staged.stagedCount }, release);
 }
 
 /**
- * Reads yesterday's complete observation for this exact source, if any, and
- * pre-seeds a checkpoint from it (`lib/collection/seed.ts`). Seeding is
- * strictly an optimization: any failure here (no observation, discovery
- * ambiguity, a storage error) must never block or fail the job -- it just
- * means this job collects from scratch, exactly as it always has. That
- * fallback must still be observable, not silent: a genuine failure (as
- * opposed to the ordinary "nothing to seed from" cases below, which return
- * `null` without any error) is reported via `deps.captureError` -- job id
- * and provider only, never the owner handle, a token, or a storage payload.
+ * Reads yesterday's complete observation a page at a time. Body writes keep
+ * the old cursor/progress until the iterator has verified the final page;
+ * a failed page therefore leaves a replayable, incomplete seed. Ordinary
+ * absence/ambiguity falls back to collection, but a storage fault is reported
+ * and retried after lease reclaim, without publishing partial evidence.
  */
 async function trySeedFromPrior(
   deps: CollectionWorkerDeps,
   resolved: ResolvedCredential,
-  job: Pick<CollectionJob, "id" | "provider">,
-): Promise<{ readonly checkpoint: CollectorCheckpoint; readonly seededEvents: readonly NormalizedEngineeringEvent[] } | null> {
+  job: Pick<CollectionJob, "id" | "provider" | "checkpoint" | "progress">,
+  lease: { readonly id: string; readonly leaseToken: string },
+  ensureBudget: () => void,
+): Promise<{ readonly checkpoint: CollectorCheckpoint; readonly progress: CollectionProgress } | null> {
   try {
+    ensureBudget();
     const discovery = await deps.discoverSource({
       owner: resolved.context.owner,
       requestedSource: resolved.requested,
@@ -267,10 +280,46 @@ async function trySeedFromPrior(
     };
     // `prior: true` -- the latest observation strictly earlier than today's
     // window, never today's own (there isn't one yet on a job's first slice).
-    const prior = await deps.readPriorObservation(storageContext, true);
+    ensureBudget();
+    const prior = await deps.readSourceManifest(storageContext, true);
     if (!prior || prior.coverage.status !== "complete") return null;
-    const { checkpoint, seededEvents } = seedFromPrior({ events: prior.events }, resolved.context.window);
-    return { checkpoint, seededEvents };
+    const seed = createPriorSeedAccumulator(resolved.context.window);
+    let stagedCount = job.progress.events;
+    let wroteBodies = false;
+    const pages = deps.readSourcePages(storageContext, prior)[Symbol.asyncIterator]();
+    try {
+      while (true) {
+        ensureBudget();
+        const next = await pages.next();
+        ensureBudget();
+        if (next.done) break; // final count/digest has been validated
+        const retained = seed.acceptPage(next.value);
+        if (retained.length === 0) continue;
+        const staged = await stageEventBatches(deps, lease, job.checkpoint, job.progress, retained, ensureBudget);
+        if (staged.status !== "ok") throw new Error(`Prior seed checkpoint returned ${staged.status}`);
+        stagedCount = staged.stagedCount;
+        wroteBodies = true;
+      }
+    } finally {
+      await pages.return?.();
+    }
+    if (!wroteBodies) {
+      const staged = await stageEventBatches(deps, lease, job.checkpoint, job.progress, [], ensureBudget);
+      if (staged.status !== "ok") throw new Error(`Prior seed checkpoint returned ${staged.status}`);
+      stagedCount = staged.stagedCount;
+    }
+    const checkpoint = seed.finish();
+    const progress: CollectionProgress = {
+      operationsDone: checkpoint.operations.filter((op) => op.done).length,
+      operationsKnown: checkpoint.operations.length,
+      events: stagedCount,
+      requests: 0,
+      discovering: true,
+    };
+    ensureBudget();
+    const completed = await deps.checkpoint(lease, checkpoint, [], progress, false);
+    if (completed.status !== "ok") throw new Error(`Prior seed completion returned ${completed.status}`);
+    return { checkpoint, progress: { ...progress, events: completed.stagedCount } };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await deps.captureError({
@@ -278,7 +327,7 @@ async function trySeedFromPrior(
       statusCode: 500,
       error: new Error(`Seed-from-prior failed for job ${job.id} (provider=${job.provider}): ${message}`),
     });
-    return null;
+    throw error;
   }
 }
 
@@ -325,33 +374,35 @@ export async function runCollectionSlice(
 
   let checkpoint = job.checkpoint;
   let persistedProgress = job.progress;
-  let stagedKeys = await deps.listStagedKeys(job.id);
 
-  // Incremental daily reuse (phase-3.md): only on this job's very first
-  // slice -- an empty checkpoint and nothing staged yet. Seeding later would
-  // silently reset progress a real slice already made.
-  if (checkpoint.operations.length === 0 && stagedKeys.size === 0) {
-    const seed = await trySeedFromPrior(deps, resolved, job);
-    if (seed && (seed.checkpoint.operations.length > 0 || seed.seededEvents.length > 0)) {
-      // The seeded events must go through the same checkpoint RPC as any
-      // other slice's events (full bodies), so the eventual `finish` call
-      // appends them too. Only their keys carry forward into `collect()`.
-      const seedProgress: CollectionProgress = {
-        operationsDone: seed.checkpoint.operations.filter((op) => op.done).length,
-        operationsKnown: seed.checkpoint.operations.length,
-        events: seed.seededEvents.length,
-        requests: 0,
-        // A seed pre-write never runs the collector, so discovery has not
-        // started yet -- always true here (#1342). Without this, a seeded
-        // job's inflated N/N ratio would read as a false 99% before the
-        // first real slice appends any operations.
-        discovering: true,
-      };
-      const outcome = await checkpointInBatches(deps, lease, checkpoint, persistedProgress, seed.checkpoint, seed.seededEvents, seedProgress, false);
-      if (outcome.status !== "ok") return;
+  // An incomplete seed leaves this cursor unchanged and is safely replayed
+  // under a new lease; the database deduplicates its already-staged keys.
+  if (checkpoint.operations.length === 0 && persistedProgress.requests === 0
+      && checkpoint.discovered.itemIds?.seededWorkItemIds === undefined) {
+    let seed: Awaited<ReturnType<typeof trySeedFromPrior>>;
+    const leaseExpiry = job.leaseExpiresAt ? Date.parse(job.leaseExpiresAt) : Number.NEGATIVE_INFINITY;
+    const ensureSeedBudget = () => {
+      if (deps.now() + SEED_TRANSITION_MARGIN_MS >= Math.min(deadlineAt, leaseExpiry)) {
+        throw new PriorSeedDeadline("Prior seed reached its slice or lease safety margin");
+      }
+    };
+    try {
+      seed = await trySeedFromPrior(deps, resolved, job, lease, ensureSeedBudget);
+    } catch (error) {
+      // The current diagnostic schema has no storage stop kind. The stable
+      // operation identifies this as prior-source storage, not a provider
+      // request; `protocol` gives it the bounded structural retry budget.
+      await failJob(lease, {
+        provider: job.provider,
+        operation: error instanceof PriorSeedDeadline ? "prior_source_seed" : "prior_source_storage",
+        stopKind: error instanceof PriorSeedDeadline ? "deadline" : "protocol",
+        httpStatus: null, retryAfterSeconds: null,
+      }, structuralRetryAt(job.attempt, deps));
+      return;
+    }
+    if (seed) {
       checkpoint = seed.checkpoint;
-      persistedProgress = seedProgress;
-      stagedKeys = new Set([...stagedKeys, ...seed.seededEvents.map(engineeringEventKey)]);
+      persistedProgress = seed.progress;
     }
   }
 
@@ -362,7 +413,7 @@ export async function runCollectionSlice(
       { token: resolved.token },
       checkpoint,
       { maxRequests: MAX_REQUESTS_PER_SLICE, deadlineAt },
-      stagedKeys,
+      new Set(),
     );
   } catch (error) {
     // A collector that throws instead of returning a stop must still move
@@ -376,7 +427,7 @@ export async function runCollectionSlice(
   const progress: CollectionProgress = {
     operationsDone: result.checkpoint.operations.filter((op) => op.done).length,
     operationsKnown: result.checkpoint.operations.length,
-    events: stagedKeys.size + result.events.length,
+    events: persistedProgress.events,
     requests: result.requests,
     // Carries the collector's own discoveryComplete for this checkpoint
     // (#1342): while false, a not-done operation could still add more

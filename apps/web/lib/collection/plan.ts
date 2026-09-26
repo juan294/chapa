@@ -62,14 +62,11 @@ export interface SliceResult {
 }
 
 /**
- * One provider's slice collector. `stagedKeys` is the `engineeringEventKey`
- * of every event already staged for this job by earlier slices -- used only
- * to dedupe against events this slice rediscovers (`newSliceEvents` in
- * `slice-helpers.ts`). Coverage is assembled purely from checkpoint
- * operations/reasons (`assembleSliceCoverage`), never from event content, so
- * a slice never needs the full staged event bodies to finish -- only their
- * keys. The worker persists full bodies via `checkpoint()`/`finish()`, which
- * read them back from storage server-side.
+ * One provider's slice collector. `stagedKeys` is slice-local. The database
+ * deduplicates replayed keys across durable slices and rejects conflicting
+ * bodies. Coverage is assembled from checkpoint operations/reasons
+ * (`assembleSliceCoverage`), never from staged event content. The worker
+ * persists event bodies through bounded checkpoint calls.
  */
 export type CollectSlice = (
   input: SourceContextInput,
