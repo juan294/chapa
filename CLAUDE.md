@@ -639,3 +639,6 @@ claude -p "Fix all TypeScript lint errors and run tests" \
 claude -p "Read issue #240 and implement the fix with TDD" \
   --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
+<!-- rpi:claude-import:start -->
+@AGENTS.md
+<!-- rpi:claude-import:end -->
