@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "jobId": "df7a18b8-ee64-463f-98f2-659f38dc0bd0",
+  "stagedCount": 17572,
+  "modeledNextBatchCount": 2000,
+  "parityTimeoutMs": 8000,
+  "standaloneTimings": true,
+  "stages": {
+    "checkpoint_duplicate_join_new_keys": {
+      "status": "ok",
+      "executionMs": 113.141
+    },
+    "checkpoint_insert_modeled_batch": {
+      "status": "ok",
+      "executionMs": 53.868
+    },
+    "checkpoint_count_after_modeled_insert": {
+      "status": "ok",
+      "executionMs": 105.518
+    },
+    "finish_count": {
+      "status": "ok",
+      "executionMs": 59.96
+    },
+    "finish_ordered_jsonb_agg": {
+      "status": "ok",
+      "executionMs": 469.806
+    },
+    "source_value_validation": {
+      "status": "ok",
+      "executionMs": 1514.338
+    },
+    "observation_insert": {
+      "status": "ok",
+      "executionMs": 243.223
+    },
+    "staged_delete": {
+      "status": "ok",
+      "executionMs": 119.947
+    }
+  }
+}

@@ -10,6 +10,8 @@ Complete collection and issue a v7.2 receipt for an owner with **100,000 normali
 
 The production observation is narrower: 17,572 staged events, a timeout in `scoring_collection_finish`, and repeated lease reclaim. The log does not identify the expensive internal operation (research, “Production observation”). Phase 1 measures that operation before changing it. A faster SQL finish alone is not a complete scale result: source reads, prior-day seed, and issuance also load whole arrays (`apps/web/lib/db/source-context.ts:44-69`, `apps/web/lib/collection/worker.ts:215-244`, `apps/web/lib/profile/score-receipt-v7.ts:62-102`, `apps/web/lib/profile/score-receipt-observed.ts:175-206`).
 
+Phase 1 revision (2026-09-26): the deterministic 17,572-event case timed out at finish on a loaded local stack but completed and issued a receipt on a lean stack; its successful finish response was 31.4 MB. One loaded 50,000-event run timed out during checkpoint after 18,000 rows; on a lean stack all 50,000 staged, then the database backend running finish was terminated by signal 9 and the client received HTTP 503. The sender/cause of the signal is unproven. At 100,000 requested events, the current 50,000-row cap returned `event_limit` after a 2,000-row batch brought staging to 52,000. The chosen immutable-row, paged design remains appropriate, with checkpoint throughput and backend survival added as explicit gates. See the Phase 1 evidence and deviation notes; these local observations do not replace production evidence.
+
 ## Design decision
 
 | Option | Benefit | Limit | Decision |
@@ -93,4 +95,4 @@ rg -l 'event_limit|scoring_collection_failed|runCollectionTick|finishCollectionJ
 
 Build and test on isolated implementation worktrees; merge verified phases locally into `develop` under the repository workflow. No push, production migration, release, or issue mutation is part of this planning request. The new migration must be exercised locally before any separately authorized production push (`.claude/rules/supabase.md:24-38`). A release needs the separate `develop` to `main` gate (`CLAUDE.md:387-407`).
 
-Stop implementation and revise this plan if Phase 1 shows a materially different failure boundary, if Phase 2 cannot preserve authorization/atomicity under refresh and withdrawal, or if Phase 4 cannot preserve scoring and digest parity within the measured function budget. Do not raise the event limit before all five phases pass. No open clarification markers remain.
+Stop implementation and revise this plan if Phase 1 shows a materially different failure boundary, if Phase 2 cannot preserve authorization/atomicity under refresh and withdrawal, or if Phase 4 cannot preserve scoring and digest parity within the measured function budget. The Phase 1 checkpoint timeout and finish-backend termination triggered the revision above and the added Phase 2 gates. Do not raise the event limit before all five phases pass. No open clarification markers remain.

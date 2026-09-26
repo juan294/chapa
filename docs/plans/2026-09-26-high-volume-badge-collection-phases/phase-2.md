@@ -4,7 +4,7 @@ Depends on: Phase 1. Batch: sequential. Create the next migration with `supabase
 
 ## Red tests first
 
-Extend `apps/web/lib/db/collection-queue.contract.test.ts` and `source-context.contract.test.ts` with real local Postgres cases for: 50,000 staged rows in bounded checkpoint calls under the current cap; a finish response with IDs/counts only; a timed-out/raised finish publishing neither an observation nor a complete job; exact one-observation idempotency; stale lease; same-day refresh creating a new generation while an earlier observation's rows remain readable; linked-source version change/withdrawal; conflicting duplicate event key; and 50,001 events returning `event_limit`. Run targeted tests red before migration implementation. The existing atomicity and retry cases at `collection-queue.contract.test.ts:129-149,271-292` remain reference contracts. Phase 5 raises the cap after reads and issuance are ready.
+Extend `apps/web/lib/db/collection-queue.contract.test.ts` and `source-context.contract.test.ts` with real local Postgres cases for: 50,000 staged rows in bounded checkpoint calls under the current cap, with each call below the 8-second role timeout and no partial batch on failure; a finish response with IDs/counts only; finish without database backend termination or client disconnect at 50,000; a timed-out/raised finish publishing neither an observation nor a complete job; exact one-observation idempotency; stale lease; same-day refresh creating a new generation while an earlier observation's rows remain readable; linked-source version change/withdrawal; conflicting duplicate event key; and 50,001 events returning `event_limit`. Run targeted tests red before migration implementation. The existing atomicity and retry cases at `collection-queue.contract.test.ts:129-149,271-292` remain reference contracts. Phase 5 raises the cap after reads and issuance are ready.
 
 ## Migration and writer
 
@@ -40,7 +40,7 @@ Enable and force RLS on both new tables, revoke browser-role access, grant only 
 
 ### Automated
 
-- Local migration reset plus contract suite passes; 50k staged events finish under the configured statement timeout with a small response, and no partial publication on any injected failure. Phase 5 re-runs the contract at 100k after lifting the cap.
+- Local migration reset plus contract suite passes; every bounded checkpoint call stays under the configured statement timeout, 50k staged events finish under that timeout with a small response, and the local database backend stays available throughout. Record database health and backend logs around the run; no partial publication occurs on any injected failure. Phase 5 re-runs the contract at 100k after lifting the cap.
 - New and old workers can overlap safely across the migration boundary; lease and generation fences reject stale writes. A refresh cannot change any completed observation's event set.
 - Grants, RLS, withdrawal, and user deletion leave no unauthorized read or orphaned private generation rows.
 - Run targeted DB contracts, `pnpm run typecheck`, `pnpm run lint`, then `pnpm run test:contract:local` sequentially.

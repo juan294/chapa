@@ -1,0 +1,36 @@
+{
+  "count": 50000,
+  "seed": 294,
+  "localApiUrl": "http://127.0.0.1:55431",
+  "batchSize": 2000,
+  "claimMode": "local_exact_job_lease",
+  "outcome": "finish_failed",
+  "stagesMs": {
+    "fixture": 140.63,
+    "checkpoint": 5656.59,
+    "stagedKeys": 665.31,
+    "finish": 10706.07
+  },
+  "peakRssBytes": 574914560,
+  "fixture": {
+    "uncompressedBytes": 84247807,
+    "gzipBytes": 3180495,
+    "sha256": "390429624afcd4989b66108b885c29b33595046c5b4fe86b6948cf2fd2e01387",
+    "kinds": {
+      "authored_commit": 35000,
+      "accepted_change": 10000,
+      "review": 5000
+    },
+    "repositories": 24
+  },
+  "stagedCount": 50000,
+  "checkpointOutcome": "ok",
+  "stagedKeys": 50000,
+  "finish": {
+    "httpStatus": 503,
+    "responseBytes": 133,
+    "status": null,
+    "observationId": null,
+    "error": "Database client error. Retrying the connection."
+  }
+}

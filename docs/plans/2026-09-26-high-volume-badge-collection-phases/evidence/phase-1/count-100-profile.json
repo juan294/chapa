@@ -1,0 +1,62 @@
+{
+  "count": 100,
+  "seed": 294,
+  "owner": "contract-volume-100",
+  "jobId": "df712fee-d856-4d22-9bbb-618aa9160e57",
+  "source": {
+    "provider": "github",
+    "host": "github.com",
+    "subjectId": "synthetic-subject-294"
+  },
+  "requested": {
+    "provider": "github",
+    "host": "github.com",
+    "login": "contract-volume-100"
+  },
+  "scope": {
+    "discovery": "owned_and_contributed",
+    "repositoryIds": [],
+    "eventKinds": []
+  },
+  "window": {
+    "referenceTime": "2026-09-26T12:00:00.000Z",
+    "referenceDate": "2026-09-26",
+    "startInclusive": "2025-09-27T00:00:00.000Z",
+    "endExclusive": "2026-09-27T00:00:00.000Z",
+    "calendarDays": 365
+  },
+  "coverage": {
+    "source": {
+      "provider": "github",
+      "host": "github.com",
+      "subjectId": "synthetic-subject-294"
+    },
+    "window": {
+      "referenceTime": "2026-09-26T12:00:00.000Z",
+      "referenceDate": "2026-09-26",
+      "startInclusive": "2025-09-27T00:00:00.000Z",
+      "endExclusive": "2026-09-27T00:00:00.000Z",
+      "calendarDays": 365
+    },
+    "dataThrough": "2026-09-26T12:00:00.000Z",
+    "status": "complete",
+    "discovery": "owned_and_contributed",
+    "repositoryIds": [
+      "synthetic-repo-0",
+      "synthetic-repo-10",
+      "synthetic-repo-13",
+      "synthetic-repo-14",
+      "synthetic-repo-17",
+      "synthetic-repo-20",
+      "synthetic-repo-21",
+      "synthetic-repo-3",
+      "synthetic-repo-6",
+      "synthetic-repo-7"
+    ],
+    "repositoryDiscoveryComplete": true,
+    "eventKinds": {},
+    "reasonCodes": [],
+    "unknownPeriods": []
+  },
+  "accessContextId": "e03c31ea30ff5cd8fe1ddbff6a3a928f1193a268efcc8acf226fa98271d5d758"
+}

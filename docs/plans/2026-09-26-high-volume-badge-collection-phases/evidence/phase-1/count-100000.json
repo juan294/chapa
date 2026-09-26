@@ -1,0 +1,26 @@
+{
+  "count": 100000,
+  "seed": 294,
+  "localApiUrl": "http://127.0.0.1:55431",
+  "batchSize": 2000,
+  "claimMode": "local_exact_job_lease",
+  "outcome": "current_event_limit",
+  "stagesMs": {
+    "fixture": 779.32,
+    "checkpoint": 6161.88
+  },
+  "peakRssBytes": 876756992,
+  "fixture": {
+    "uncompressedBytes": 168512265,
+    "gzipBytes": 6360239,
+    "sha256": "c8111eaccf81ff769c2f856d824e41db2ff90ad74a3d454d9d3dc2797f474302",
+    "kinds": {
+      "authored_commit": 70000,
+      "accepted_change": 20000,
+      "review": 10000
+    },
+    "repositories": 24
+  },
+  "stagedCount": 52000,
+  "checkpointOutcome": "event_limit"
+}

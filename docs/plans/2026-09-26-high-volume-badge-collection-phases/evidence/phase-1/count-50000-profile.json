@@ -1,0 +1,76 @@
+{
+  "count": 50000,
+  "seed": 294,
+  "owner": "contract-volume-50000",
+  "jobId": "4510e6ba-e76d-4976-80c6-0eb87c471c06",
+  "source": {
+    "provider": "github",
+    "host": "github.com",
+    "subjectId": "synthetic-subject-294"
+  },
+  "requested": {
+    "provider": "github",
+    "host": "github.com",
+    "login": "contract-volume-50000"
+  },
+  "scope": {
+    "discovery": "owned_and_contributed",
+    "repositoryIds": [],
+    "eventKinds": []
+  },
+  "window": {
+    "referenceTime": "2026-09-26T12:00:00.000Z",
+    "referenceDate": "2026-09-26",
+    "startInclusive": "2025-09-27T00:00:00.000Z",
+    "endExclusive": "2026-09-27T00:00:00.000Z",
+    "calendarDays": 365
+  },
+  "coverage": {
+    "source": {
+      "provider": "github",
+      "host": "github.com",
+      "subjectId": "synthetic-subject-294"
+    },
+    "window": {
+      "referenceTime": "2026-09-26T12:00:00.000Z",
+      "referenceDate": "2026-09-26",
+      "startInclusive": "2025-09-27T00:00:00.000Z",
+      "endExclusive": "2026-09-27T00:00:00.000Z",
+      "calendarDays": 365
+    },
+    "dataThrough": "2026-09-26T12:00:00.000Z",
+    "status": "complete",
+    "discovery": "owned_and_contributed",
+    "repositoryIds": [
+      "synthetic-repo-0",
+      "synthetic-repo-1",
+      "synthetic-repo-10",
+      "synthetic-repo-11",
+      "synthetic-repo-12",
+      "synthetic-repo-13",
+      "synthetic-repo-14",
+      "synthetic-repo-15",
+      "synthetic-repo-16",
+      "synthetic-repo-17",
+      "synthetic-repo-18",
+      "synthetic-repo-19",
+      "synthetic-repo-2",
+      "synthetic-repo-20",
+      "synthetic-repo-21",
+      "synthetic-repo-22",
+      "synthetic-repo-23",
+      "synthetic-repo-3",
+      "synthetic-repo-4",
+      "synthetic-repo-5",
+      "synthetic-repo-6",
+      "synthetic-repo-7",
+      "synthetic-repo-8",
+      "synthetic-repo-9"
+    ],
+    "repositoryDiscoveryComplete": true,
+    "eventKinds": {},
+    "reasonCodes": [],
+    "unknownPeriods": []
+  },
+  "accessContextId": "ca8dfff14a7c108318c045daabd0693308330eb70769fba6ea90364ee5cd349b"
+}

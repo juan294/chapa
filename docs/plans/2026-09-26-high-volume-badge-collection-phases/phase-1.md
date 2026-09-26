@@ -32,8 +32,8 @@ for (const count of [17_572, 50_000, 100_000]) {
 ### Automated
 
 - The fixture builder produces the same checksum on repeated runs; no live provider or production database is contacted.
-- The 17,572 and 50,000 cases reproduce every existing contract boundary, and the 100,000 case records the expected current limit separately from any timeout or memory failure.
-- A local SQL profile identifies the share of finish time in aggregate, validation, insert, and delete, or records that the local environment cannot separate them. No presumed root cause is reported as measured.
+- The 17,572 and 50,000 cases record their actual boundary in each local configuration, including a checkpoint timeout, finish timeout, database backend termination, or success; the 100,000 case records the current limit separately. A baseline failure is evidence, not an automatic test failure, when the exact stage and outcome are retained.
+- A local SQL profile measures stand-alone aggregate, validation, insert, and delete statements and models checkpoint substeps. Separate rollback timings are not presented as additive shares of the full RPC. No presumed cause of backend termination is reported as measured.
 
 ### Manual
 

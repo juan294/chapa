@@ -1,0 +1,50 @@
+{
+  "count": 100,
+  "seed": 294,
+  "localApiUrl": "http://127.0.0.1:55431",
+  "batchSize": 2000,
+  "claimMode": "local_exact_job_lease",
+  "outcome": "complete",
+  "stagesMs": {
+    "fixture": 0.64,
+    "checkpoint": 50.38,
+    "stagedKeys": 5.01,
+    "finish": 22.41,
+    "sourceRead": 27.08,
+    "priorSeed": 0.88,
+    "receiptIssuance": 159.26,
+    "pureObservedScore": 22.3,
+    "canonicalEvidenceDigest": 7.22
+  },
+  "peakRssBytes": 167919616,
+  "fixture": {
+    "uncompressedBytes": 167328,
+    "gzipBytes": 7030,
+    "sha256": "27693cae9a74a61801dcaa0685d013a7192ab182a9e89b35c70c67fae6ce4b45",
+    "kinds": {
+      "authored_commit": 70,
+      "accepted_change": 20,
+      "review": 10
+    },
+    "repositories": 10
+  },
+  "stagedCount": 100,
+  "checkpointOutcome": "ok",
+  "stagedKeys": 100,
+  "finish": {
+    "httpStatus": 200,
+    "responseBytes": 178670,
+    "status": "ok",
+    "observationId": "2be98b75-92b9-487e-a26e-674d812981cc",
+    "error": null
+  },
+  "readEvents": 100,
+  "sourceReadParsedBytes": 168258,
+  "seededEvents": 100,
+  "seededEventsJsonBytes": 167328,
+  "receiptIssuance": {
+    "status": "issued"
+  },
+  "coreExact": 40.32763276699856,
+  "canonicalEvidenceSha256": "46fb4fa9d9ddc67d1c0e9a8f371a7e2b5a37dcc5bcadc3161365846d39849565"
+}
