@@ -21,7 +21,8 @@ const HANDLE = "juan294";
 // deliberately never registered in any environment, so it proves the
 // opposite (unregistered) contract instead.
 const REGISTERED_FIXTURE_HANDLE = "octocat";
-const hasRegisteredFixtures = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
+const hasRegisteredFixtures = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign"
+  || process.env.SCORING_DISPOSABLE_PROJECT === "chapa-volume-20260926";
 
 // ────────────────────────────────────────────────────────────────
 // 1. Badge SVG endpoint

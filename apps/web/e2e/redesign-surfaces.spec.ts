@@ -8,7 +8,9 @@ import { studioRoot, studioControl, studioBadgePreview } from './helpers/studio'
 
 // These checks require the explicit disposable bootstrap and server-only replay.
 // The final local gate enables them; ordinary unseeded CI does not claim them.
-test.skip(process.env.REDESIGN_DISPOSABLE_PROJECT !== 'chapa-redesign', 'requires disposable local redesign fixtures');
+const disposableFixtures = process.env.REDESIGN_DISPOSABLE_PROJECT === 'chapa-redesign'
+  || process.env.SCORING_DISPOSABLE_PROJECT === 'chapa-volume-20260926';
+test.skip(!disposableFixtures, 'requires disposable local redesign fixtures');
 const evidence = resolve(process.env.REDESIGN_EVIDENCE_DIR ?? resolve(__dirname, "../../../logs/v7-point/browser/redesign"), "surfaces");
 async function command(page: Page, text: string) {
   const input = page.locator('#terminal-command-input:visible');
