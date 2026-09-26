@@ -19,7 +19,7 @@ order; #1193 removed the fold-order dependence BE-H1 had only made tolerable).
 This document is a derived table, not prose. It replaces the corresponding
 paragraphs in CLAUDE.md rather than joining them, because a duplicate
 description of the same rules makes drift worse rather than better - that exact
-failure produced the stale `stats:stale:` comment fixed in Wave 1. (S08, #1302, later removed the `stats:v2:merged:`/`stats:stale:v2:` keys altogether; 8fcc0371 restored a single grant-bound `stats:v3:<handle>` record, and the read-only row below was rewritten on 2026-09-07 to match.)
+failure produced the stale `stats:stale:` comment fixed in Wave 1. (S08, #1303, later removed the `stats:v2:merged:`/`stats:stale:v2:` keys altogether; 8fcc0371 restored a single grant-bound `stats:v3:<handle>` record, and the read-only row below was rewritten on 2026-09-07 to match.)
 
 **2026-09-22 (badge-source-outage-resilience, phase 1)** — production
 `/u/juan294/badge.svg` returned the generic load-error SVG because one linked

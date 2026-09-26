@@ -22,7 +22,7 @@ async function cleanup() {
 }
 beforeEach(async () => { await cleanup(); expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull(); });
 afterEach(cleanup);
-describe("source context RPC draft contracts (requires reviewed migration045)", () => {
+describe("source context RPC draft contracts", () => {
  it("denies browser roles all source and token mutation RPCs", () => {
   const query = "SELECT p.proname,has_function_privilege('anon',p.oid,'EXECUTE'),has_function_privilege('authenticated',p.oid,'EXECUTE'),has_function_privilege('service_role',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('scoring_v7_append_source','scoring_v7_read_source','scoring_v7_discover_source','scoring_v7_cas_link_tokens') ORDER BY p.proname";
   expect(inspectLocalSql(query).split("\n")).toEqual([
@@ -38,6 +38,26 @@ describe("source context RPC draft contracts (requires reviewed migration045)", 
   expect((await db().rpc("scoring_v7_append_source", args)).error).toBeNull();
   const read = await readSourceObservation({ owner, requestedSource: requested, source, window, scope: args.p_scope, accessContextId: args.p_access, link: null });
   expect(read).toEqual({ id: args.p_observation, window, coverage: args.p_coverage, events: [event] });
+ });
+ it("persists a complete changed-file list larger than 1,000 paths", async () => {
+  const paths = Array.from({ length: 1_604 }, (_, index) => `src/file-${index}.ts`);
+  const event = sourceEventFixture(source, window);
+  const largeEvent = {
+   ...event,
+   measurements: {
+    ...event.measurements,
+    changedFiles: { status: "observed" as const, coverage: "complete" as const, provenance: "source_observed" as const, value: paths },
+   },
+  };
+  const args = {
+   ...append(),
+   p_scope: { ...scope, repositoryIds: ["known"] },
+   p_coverage: { ...coverage, repositoryIds: ["known"] },
+   p_payload: { events: [largeEvent] },
+  };
+  expect((await db().rpc("scoring_v7_append_source", args)).error).toBeNull();
+  const read = await readSourceObservation({ owner, requestedSource: requested, source, window, scope: args.p_scope, accessContextId: args.p_access, link: null });
+  expect(read?.events[0]?.measurements.changedFiles).toMatchObject({ status: "observed", coverage: "complete", value: paths });
  });
  it("rejects foreign event repositories, raw measurement bodies, control characters and non-replayable dates", async () => {
   const event = sourceEventFixture(source, window);

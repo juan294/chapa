@@ -1,6 +1,6 @@
-# Proposed S04 amendment: retired Bitbucket issue APIs
+# S04 amendment: retired Bitbucket issue APIs
 
-Status: pending user approval. Date: 2026-09-05.
+Status: approved by the owner on 2026-09-25 (#1299 closed). Proposed: 2026-09-05.
 
 ## Verified change
 
@@ -14,4 +14,4 @@ S04 expected live Bitbucket issue closure event collection. Atlassian's official
 4. Retain the original fairness regressions on historical evidence: another person's closure earns no individual closure/delivery credit; `updated_on` cannot substitute for the closure event date; unlinked closure does not earn Delivery; missing evidence keeps the relevant completion range open.
 5. Update S04, S07/S11 acceptance mapping, S17 provider-capability wording and S18 cross-provider validation before relaunch. This replaces an unavailable transport; the scoring and attribution requirements remain mandatory.
 
-No Jira integration, external messaging or remote deployment is proposed. Supported Bitbucket work and the other scoring phases can continue while this amendment is reviewed.
+No Jira integration, external messaging or remote deployment is proposed. Bitbucket `issue_work` ships as `unavailable` / `not_supported` (`apps/web/lib/bitbucket/evidence.ts`). Since #1351, `issue_work` earns credit only with a linked issue result, so native closure collection is not needed for scoring.
