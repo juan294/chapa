@@ -1,0 +1,10 @@
+{
+  "case": "historical-combined-process-100k",
+  "purpose": "Explain why the fixture-and-issuance process was replaced by isolated issuance for the function-memory gate",
+  "fixtureBytes": 168512364,
+  "osMaxRssBytes": 1530986496,
+  "gateBytes": 1503238554,
+  "testDurationSeconds": 92.14,
+  "scope": "One Vitest worker retained 100001 synthetic events, issued a receipt, and staged a second 100000-event refresh",
+  "disposition": "Fixture process exceeded the production function-memory gate; fresh-child issuance was measured separately"
+}

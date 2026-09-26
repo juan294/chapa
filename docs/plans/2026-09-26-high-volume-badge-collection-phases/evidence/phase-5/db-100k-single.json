@@ -1,0 +1,30 @@
+{
+  "case": "row-generation-100k",
+  "eventCount": 100000,
+  "fixtureBytes": 168512364,
+  "overallWallMs": 69034.939125,
+  "batchSize": 1000,
+  "initial": {
+    "batches": 100,
+    "p95Ms": 203.87008300000002,
+    "maxMs": 258.8884580000001
+  },
+  "refresh": {
+    "batches": 100,
+    "p95Ms": 195.92416700000467,
+    "maxMs": 224.11354199999914
+  },
+  "finishMs": 175.47749999999724,
+  "finishResponseBytes": 90,
+  "issuanceMs": 31513.629125,
+  "isolatedIssuance": {
+    "issuanceMs": 31513.629125,
+    "peakRssBytes": 1258176512,
+    "osMaxRssBytes": 1258405888
+  },
+  "overflowMs": 40.97783300001174,
+  "maxResponseBytes": 36,
+  "peakRssBytes": 640876544,
+  "postmasterStart": "2026-09-26 14:07:18.374156+00",
+  "postmasterEnd": "2026-09-26 14:07:18.374156+00"
+}

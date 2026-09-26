@@ -1,0 +1,20 @@
+{
+  "case": "row-generation-profile",
+  "eventCount": 17572,
+  "batchSize": 1000,
+  "fixtureBytes": 29609502,
+  "overallWallMs": 10682.014375,
+  "peakRssBytes": 671842304,
+  "maxResponseBytes": 89,
+  "checkpoint": {
+    "batches": 18,
+    "p95Ms": 276.88474999999994,
+    "maxMs": 276.88474999999994
+  },
+  "finishMs": 16.875333999999384,
+  "readCount": 17572,
+  "readMs": 1316.9240829999999,
+  "issuanceMs": 5608.400375,
+  "postmasterStart": "2026-09-26 14:07:18.374156+00",
+  "postmasterEnd": "2026-09-26 14:07:18.374156+00"
+}

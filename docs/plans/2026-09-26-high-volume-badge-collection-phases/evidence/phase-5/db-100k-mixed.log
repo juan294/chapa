@@ -1,0 +1,36 @@
+
+> chapa@ test:contract:local /Users/juan/code/chapa-high-volume-badge
+> tsx scripts/test-contract-local.ts apps/web/lib/db/collection-queue.contract.test.ts -t 'publishes one 100,000-event owner across GitHub and GitLab' --maxWorkers=1
+
+Running contract tests against local Supabase at http://127.0.0.1:55431
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.contract.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/juan/code/chapa-high-volume-badge
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 37 skipped (38)
+   Start at  16:21:30
+   Duration  66.16s (transform 232ms, setup 93ms, import 328ms, tests 65.66s, environment 0ms)
+
+       67.29 real        39.62 user         2.08 sys
+          1447084032  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              284552  page reclaims
+                3142  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                1498  messages sent
+               26774  messages received
+                 224  signals received
+                1228  voluntary context switches
+              139229  involuntary context switches
+          1856963669  instructions retired
+           597563070  cycles elapsed
+            79125320  peak memory footprint

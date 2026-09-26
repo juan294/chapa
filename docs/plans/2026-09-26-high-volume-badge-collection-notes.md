@@ -148,3 +148,39 @@ Implementation branch: `fix/high-volume-badge-collection`, based on `26648ab9d48
   finish failures bounded and visible, raise the writer cap to 100,000 only
   with a passing real end-to-end fixture, and verify owner status/badge
   consistency. The production badge is still unfixed.
+
+## Phase 5 handoff
+
+- **Scope and candidate:** Local implementation commit `a9a556cb` adds
+  migration 063, bounded storage recovery, terminal capacity disclosure,
+  owner status, a task-owned E2E qualifier, and version 4.1.2. It has not
+  been pushed or deployed. The temporary Supabase port override was not
+  committed.
+- **Red and recovery tests:** Worker tests first reproduced thrown checkpoint
+  and finish operations leaving the job running. The implementation reads
+  durable lease/job/observation state after an uncertain response, accepts a
+  completion only for its exact observation UUID, retries storage faults
+  under the existing bounded attempt policy, and alerts at terminal failure.
+  A terminal event limit stays failed under owner Retry, reconnect, or refresh;
+  only the explicit service-admin path can reset it after operator review.
+  Owner copy gives a storage Retry/support path and capacity support only.
+- **Scale evidence:** A disposable local reset applied all 63 migrations.
+  New row-generation contracts staged, read, and issued v7.2 receipts for
+  17,572 and 50,000 events. Single-source and mixed-provider 100,000-event
+  owners each produced one authenticated verification. The single-source
+  100,001st event failed terminally without replacing the published
+  observation. The isolated 100,000-event issuance process peaked at
+  1,258,405,888 bytes OS RSS; the mixed run at 1,447,084,032 bytes, both
+  below the 1,503,238,554-byte limit. The slowest 50,000-event checkpoint
+  took 6.64 seconds under the configured 8-second statement limit. Exact
+  profiles and scope are in `evidence/phase-5/`.
+- **Repository gates:** Full local contract suite passed 263 tests; unit and
+  coverage suites passed 9,390 app/shared tests and 301 script tests.
+  Typecheck, lint, cycle, migration, release-documentation, Vercel config,
+  write registration, license, and vulnerability gates passed. The
+  implementation commit hook repeated typecheck/lint/unit tests.
+- **Operational boundary:** The PostgREST clone preflights row-generation
+  data and refuses an unsupported partial clone before deleting local rows.
+  Deletion and withdrawal contracts prove generation/event cascades.
+  Production-mode build/browser qualification and final develop integration
+  remain the next gates. The production badge is still unfixed.

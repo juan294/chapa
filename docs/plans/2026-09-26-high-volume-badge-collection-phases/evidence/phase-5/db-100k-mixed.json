@@ -1,0 +1,33 @@
+{
+  "case": "mixed-provider-100k",
+  "providerCounts": {
+    "github": 50000,
+    "gitlab": 50000
+  },
+  "fixtureBytes": 168506674,
+  "overallWallMs": 64208.618292,
+  "batchSize": 1000,
+  "readCount": 100000,
+  "readMs": 9521.254375,
+  "finishMs": {
+    "github": 55.32783299999937,
+    "gitlab": 42.471583999998984
+  },
+  "issuanceMs": 35320.179209,
+  "maxResponseBytes": 89,
+  "peakRssBytes": 1445003264,
+  "checkpoint": {
+    "github": {
+      "batches": 50,
+      "p95Ms": 278.83729200000016,
+      "maxMs": 316.53087499999856
+    },
+    "gitlab": {
+      "batches": 50,
+      "p95Ms": 262.82524999999805,
+      "maxMs": 314.34449999999924
+    }
+  },
+  "postmasterStart": "2026-09-26 14:07:18.374156+00",
+  "postmasterEnd": "2026-09-26 14:07:18.374156+00"
+}
